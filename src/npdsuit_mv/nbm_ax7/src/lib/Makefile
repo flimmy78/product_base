@@ -1,0 +1,61 @@
+# Network Platform Daemon Board Management Library
+#
+#CC  = mips-linux-gnu-gcc
+CFLAGS = -g -Wall -ansi
+
+ifeq ($(DRV_LIB_FLAG),CPSS) 
+CFLAGS += -DDRV_LIB_CPSS
+endif
+
+ifeq ($(DRV_LIB_FLAG),CPSS_XCAT)
+CFLAGS += -DDRV_LIB_CPSS -DDRV_LIB_CPSS_XCAT -DDIAG_XCAT
+endif
+
+ifeq ($(DRV_LIB_FLAG),CPSS_3_4)
+CFLAGS += -DDRV_LIB_CPSS -DDRV_LIB_CPSS_3_4
+endif
+
+ifeq ($(DRV_LIB_FLAG),BCM)
+CFLAGS += -DDRV_LIB_BCM
+endif
+
+LDFLAGS = -g -shared -Wl,-soname,$(NPD_BM_SHLIB_SONAME)
+
+
+
+INCLUDES += -I$(ACCAPI_DIR) 
+
+LIBS += $(DBUS_LIBS)
+INCLUDES += $(DBUS_INCLUDE) 
+
+DBUS_LIBS = -ldbus-1
+LIBS += $(DBUS_LIBS)
+
+NPD_BM_OBJS = nbm_util.o nbm_cpld.o nbm_eeprom.o nbm_eth_port.o nbm_log.o
+
+NPD_BM_SHLIB_MAJOR = 0
+NPD_BM_SHLIB_MINOR = 1
+
+
+NPD_BM_SHLIB_LINKERNAME = libnbm.so
+NPD_BM_SHLIB_SONAME = $(NPD_BM_SHLIB_LINKERNAME).$(NPD_BM_SHLIB_MAJOR)
+NPD_BM_SHLIB_REALNAME = $(NPD_BM_SHLIB_SONAME).$(NPD_BM_SHLIB_MINOR)
+
+.PHONY: all
+all: $(NPD_BM_SHLIB_REALNAME) 
+
+$(NPD_BM_SHLIB_REALNAME): $(NPD_BM_OBJS)
+	rm -rf $(LIB_EXPORT_DIR)/$(NPD_BM_SHLIB_REALNAME) $(LIB_EXPORT_DIR)/$(NPD_BM_SHLIB_SONAME) $(LIB_EXPORT_DIR)/$(NPD_BM_SHLIB_LINKERNAME)
+	$(CC) $(LDFLAGS) -o $@ $^
+	mv $(NPD_BM_SHLIB_REALNAME) $(LIB_EXPORT_DIR)/
+	ln -s $(NPD_BM_SHLIB_REALNAME)  $(LIB_EXPORT_DIR)/$(NPD_BM_SHLIB_SONAME)
+	ln -s $(NPD_BM_SHLIB_SONAME)  $(LIB_EXPORT_DIR)/$(NPD_BM_SHLIB_LINKERNAME)
+
+
+%.o: %.c
+	$(CC) -c $(CFLAGS) $(INCLUDES) -o $*.o $<
+
+.PHONY: clean
+clean:
+	rm -rf *~  $(NBM_ROOT_PATH)/export/lib/$(NPD_BM_SHLIB_REALNAME)  $(NBM_ROOT_PATH)/export/lib/$(NPD_BM_SHLIB_SONAME)  $(NBM_ROOT_PATH)/export/lib/$(NPD_BM_SHLIB_LINKERNAME) $(NPD_BM_OBJS)
+

@@ -1,0 +1,19 @@
+
+
+###
+###  add include path and file list
+###
+
+#INCLUDE_PATH =
+#C_FILE_LIST  =
+#SUBDIRS      =
+
+SUBDIRS = utf
+
+ifeq (YES, $(INCLUDE_ENHANCED_UTF))
+SUBDIRS += trafficEngine
+endif
+
+##################################################
+##################################################
+include $(PROJ_BASE)/gtTopMake

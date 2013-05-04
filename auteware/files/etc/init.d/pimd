@@ -1,0 +1,43 @@
+#! /bin/sh
+
+PATH=/opt/bin:/opt/lib
+DAEMON=/opt/bin/pimd
+NAME=pimd
+DESC=pimd
+
+test -x $DAEMON || exit 0
+
+set -e
+
+case "$1" in
+  start)
+	echo -n "Starting $DESC: "
+#	start-stop-daemon --start --quiet --pidfile /var/run/$NAME.pid \
+#		--exec $DAEMON
+	ulimit -c unlimited
+	$DAEMON 1> /dev/null 2>&1 &
+	echo "$NAME."
+	;;
+  stop)
+	echo -n "Stopping $DESC: "
+	start-stop-daemon --stop --quiet --pidfile /var/run/$NAME.pid \
+		--exec $DAEMON
+	echo "$NAME."
+	;;
+  restart|force-reload)
+	echo -n "Restarting $DESC: "
+	start-stop-daemon --stop --quiet --pidfile \
+		/var/run/$NAME.pid --exec $DAEMON
+	sleep 1
+	start-stop-daemon --start --quiet --pidfile \
+		/var/run/$NAME.pid --exec $DAEMON
+	echo "$NAME."
+	;;
+  *)
+	N=/etc/init.d/$NAME
+	echo "Usage: $N {start|stop|restart|force-reload}" >&2
+	exit 1
+	;;
+esac
+
+exit 0

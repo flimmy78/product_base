@@ -1,0 +1,1 @@
+password	required	pam_cracklib.so	retry=1 difok=3 type=system

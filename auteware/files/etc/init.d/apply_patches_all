@@ -1,0 +1,39 @@
+#! /bin/sh
+
+PATH=/sbin:/bin:/usr/bin:/usr/sbin:/opt/bin
+
+. /usr/bin/libinstpatch.sh
+
+apply_patches()
+{
+ 	if [ -d /mnt/patch ] ; then
+ 		printf "Checking patches ...\n"
+  	
+  	
+   		for patch1 in /mnt/patch/*.sp
+		do
+			if [ "$patch1" != " " ];then
+				if [ "$patch1" != "/mnt/patch/*.sp" ];then
+					patch2=`basename $patch1 .sp`
+					log_action_msg1 " Found patch $patch2"
+					apply_one_patch $patch2
+				fi
+			fi
+		done
+			
+		for patch_temp1 in /mnt/patch/*.sps
+		do
+			if [ "$patch_temp1" != " " ];then
+				if [ "$patch_temp1" != "/mnt/patch/*.sps" ];then
+					patch_temp2=`basename $patch_temp1 .sps`
+					log_action_msg1 "Fount patch $patch_temp2"
+					apply_one_patch_sec $patch_temp2
+				fi
+			fi
+		done
+	
+		printf "Done.\n"
+	fi
+}
+
+apply_patches

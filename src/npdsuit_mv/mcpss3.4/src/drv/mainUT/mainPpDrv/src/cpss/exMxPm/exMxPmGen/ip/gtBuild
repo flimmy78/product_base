@@ -1,0 +1,23 @@
+
+
+###
+###  add include path and file list
+###
+
+#INCLUDE_PATH =
+#C_FILE_LIST  =
+#SUBDIRS      =
+#C_EXCLUDE_FILE_LIST =
+
+LIB_NAME = cpssExMxPmIpUT.lib
+
+# Test cpssExMxPmIpv6McRuleSet brokes stack if optimization is used
+# with -O2 option GCC generate bad code while compiling cpssExMxPmIpv6McRuleSetUT
+# It is GCC bug (GCC Bugzilla Bug 27363), so optimization will be disabled here 
+ifeq (linux, $(OS_RUN))
+  AD_CFLAGS += -O0
+endif
+
+##################################################
+##################################################
+include $(PROJ_BASE)/gtTopMake

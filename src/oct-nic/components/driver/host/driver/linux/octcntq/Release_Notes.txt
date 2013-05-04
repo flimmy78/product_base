@@ -1,0 +1,144 @@
+Linux Driver for Octeon (CNTQ Module - Version 2.2.0)
+=======================================================
+
+
+ The CNTQ package requires OCTEON-PCI-BASE version 2.2.0 to be installed.
+
+ The CNTQ driver is available as a linux kernel loadable module that uses
+ the features provided by the base driver. The base driver is available from
+ the OCTEON-PCI-BASE RPM package. 
+
+
+
+                           Directory Structure
+                           -------------------
+
+OCTEON-SDK/components/driver/host/driver/linux/octcntq
+    |
+    |-- README.txt (Compilation instructions)
+    |
+    |-- Makefile
+    |
+    |-- (Linux specific CNTQ driver files)
+
+ The CNTQ module sources are kept in the directory shown above.
+
+
+
+OCTEON-SDK/applications/pci-core-app/cntq
+    |
+    |-- Core application to support CNTQ functionality.
+
+
+ The pci-core-app/cntq directory has the sources for a core application that
+ supports CNTQ functionality.
+
+
+
+
+
+                               Change History
+                               --------------
+
+ (NOTE: Additional bug fixes and functionality changes or improvements may
+        have been made to the OCTEON-PCI-BASE package. Please refer to the
+        release notes of the base package for any such changes.)
+
+ Release 2.2.0
+ =============
+ * Support added for CN66XX Pass1. 
+
+ * Includes the fixes of the following bugs.
+ 1. #3555 - Multiple DDOQ thread patch is integrated.
+ 2. #3907 - DDOQs are not able transfer more than 8192 bytes to host.
+ 3. Issue with 17th core on 68XX, because of struct ddoq_profile dprof[16], is resolved by adding the suport for 32 cores.
+
+
+ Release 2.1.0
+ =============
+ * Support added for CN63XX Pass2.x.
+ * Support added for CN68XX Pass1.
+ * DDOQ send API now supports more than 13 local pointers.
+
+
+ Release 2.0.0
+ =============
+ * Support added for CN63XX Pass1.
+ * Support for CN38XX is included but deprecated.
+ * 2.4.x kernel versions are no longer supported.
+
+
+
+ Release 1.0.0
+ =============
+ * Support added for 56XX Pass2.1. CNTQ module is not supported for 56XX Pass1.
+ * ddoq delete now waits for confirmation from cores.
+
+
+NOTE: There are no driver releases between 0.9.8 and 1.0.0.
+
+
+ 
+ Release 0.9.8
+ =============
+ * Support added for 56XX Pass2. CNTQ module is not supported for 56XX Pass1.
+ 
+ Bug fixes
+ 1. #1825 - Race condition between DDOQ Add & Delete in core.
+
+
+
+ Release 0.9.7
+ =============
+ * CN56XX Pass1 is not supported in CNTQ module.
+
+
+ Release 0.9.6
+ =============
+ * Added workaround for Octeon CN56XX Pass1.
+ 
+ Bug fixes
+ 1. #1371 - Macro syntax incorrect in descriptor copy code in cvm-ddoq.c.
+ 2. #1403 - DDOQ Packet may not get processed under a race condition.
+ 3. #1430 - DDOQ Packets are dispatched out of sequence.
+ 
+
+
+ Release 0.9.5
+ =============
+  * Support Added for CN58XX.
+  * Directory structure of CNTQ application modified. Common routines are now
+    in pci-core-app/common; CNTQ application remains in pci-core-app/cntq;
+    test routines are now in pci-core-app/test.
+  * Updated copyright and License.
+
+
+  Release 0.9.4 - * Supports Hot Reset (Reset without unloading the Octeon
+                    driver). Requires SDK 1.5.0.
+                  * Fixes the following bugs:
+                    #1095 - panic in ddoq create if core app is not CNTQ.
+                    Bugs still open in this release:
+                    #730 - Performance drop due to dma-mapping changes.
+                    #768 - Probable Gather issues 
+
+  Release 0.9.3 - * Release for SDK 1.5. Supports Octeon PASS3.
+                    Fixes for bugs
+                    #789 - Module load sequence failure
+                    #819 - osi code has linux components
+                    #846 - DDOQ Create can fail sometimes.
+                    Bugs still open in this release:
+                    #730 - Performance drop due to dma-mapping changes.
+                    #768 - Probable Gather issues 
+
+ Release 0.9.2 - * PCI CNTQ module now supports multiple octeon devices and
+                   is hot-swap capable.
+
+ Release 0.9.1 - * PCI CNTQ module support for 64-bit systems and big endian
+                   systems added.
+
+ Release 0.9.0 - * Repackaged PCI driver. This package provides CNTQ  
+                   functionality for the Octeon PCI driver.
+                   Fix for bugs #678 (DDOQ Delete completes even if core fails),
+                   #687 (DDOQ lookup incorrect), #688 (panic if buffer 
+                   allocation fails).
+                 * Requires SDK 1.3.1 or higher.

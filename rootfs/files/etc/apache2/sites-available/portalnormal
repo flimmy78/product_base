@@ -1,0 +1,36 @@
+ServerAdmin webmaster@localhost
+ServerName  127.0.0.1
+DocumentRoot "/opt/eag/www"
+
+<Directory /opt/eag/www>
+Options -Indexes FollowSymLinks MultiViews
+AllowOverride None
+Order allow,deny
+Allow from all
+</Directory>
+
+ScriptAlias /wispr/ /opt/www/ccgi-bin/
+<Directory /opt/www/ccgi-bin>
+AllowOverride None 
+Options ExecCGI -MultiViews +SymLinksIfOwnerMatch
+Order allow,deny 
+Allow from all
+</Directory>
+
+<FilesMatch ".*eag.*\.cgi$">
+Order allow,deny
+Allow from all
+</FilesMatch>
+
+ErrorLog /var/log/apache2_error_eag.log
+LogLevel  warn
+CustomLog /var/log/apache2_access_eag.log combined
+
+
+RewriteEngine On
+
+RewriteRule ^/wispr/login$ /wispr/wp_eag_wispr_login.cgi [PT]
+RewriteRule ^/wispr/abortlogin$ /wispr/wp_eag_wispr_abortlogin.cgi [PT]
+RewriteRule ^/wispr/logout$ /wispr/wp_eag_wispr_logout.cgi [PT]
+RewriteRule ^/wispr/status$ /wispr/wp_eag_wispr_status.cgi [PT]
+RewriteRule ^/wispr/loginresults$ /wispr/wp_eag_wispr_loginresults.cgi [PT]

@@ -1,0 +1,339 @@
+#/bin/bash
+#
+# rc.local
+#
+# This script is executed at the end of each multiuser runlevel.
+# Make sure that the script will "exit 0" on success or any other
+# value on error.
+#
+# In order to enable or disable this script just change the execution
+# bits.
+#
+# By default this script does nothing.
+
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/opt/bin
+export PATH
+
+#export LD_LIBRARY_PATH=/opt/lib
+#It will be run in npd script before npd is launched.
+#ldconfig
+
+#echo "Preparing netfilter ..."
+#loadnetfilter.sh
+
+printf "Preparing users database "
+mkdir /home
+#builtin_username=`cat /proc/sysinfo/admin_username`
+#builtin_passwd=`cat /proc/sysinfo/admin_passwd`
+builtin_username=admin
+builtin_passwd=admin
+#printf "with [$builtin_username:$builtin_passwd]"
+/usr/bin/useradd.sh $builtin_username $builtin_passwd enable normal
+printf " done.\n"
+
+
+
+# Create dir for apache and especially srvload.
+[ -d /var/lock/apache2 ] || mkdir -p /var/lock/apache2
+chown www-data.www-data /var/lock/apache2
+
+[ -d /var/run/apache2 ] || mkdir -p /var/run/apache2
+chown www-data.www-data /var/run/apache2
+
+
+#
+# Daemons are moved to rc2.d scripts.
+######################################################
+#echo "Launching network platform daemon ..."
+#npd 1> /npd.log 2> /npd.err & 
+
+#echo "Luanching bridge software suit ..."
+#bridge 1> /bridge.log 2> /brige.err &
+
+#echo "Launching routing software suit ..."
+#[ -d /var/run/quagga ] || mkdir -p /var/run/quagga
+#chown quagga.quagga /var/run/quagga
+
+#zebra -f /opt/etc/zebra.conf -d
+#zebra -d
+#ripd -d
+#ospfd -d
+
+#mkdir /var/run/wcpss
+
+#wid 1> /var/log/wid.log 2> /var/log/wid.err &
+#asd 1> /var/log/asd.log 2> /var/log/asd.err &
+#wsm 1> /var/log/wsm.log 2> /var/log/wsm.err &
+#########################################################
+
+#printf "Resetting smp affinities of daemons ...\n"
+# These 3 daemons should work fine with multi-cores.
+#taskset -p 1 `pidof cron`
+#taskset -p 1 `pidof dbus-daemon`
+#taskset -p 1 `pidof syslog-ng`
+
+CON_PATH=/opt/services/conf/
+INIT_PATH=/opt/services/init/
+OPTION_PATH=/opt/services/option/
+STATUS_PATH=/opt/services/status/
+
+
+# cmd after ; will always be executed.
+[ -d $CON_PATH ] || mkdir -p $CON_PATH ; chmod 777 $CON_PATH
+[ -d $INIT_PATH ] || mkdir -p $INIT_PATH ; chmod 777 $INIT_PATH
+[ -d $OPTION_PATH ] || mkdir -p $OPTION_PATH ; chmod 777 $OPTION_PATH
+[ -d $STATUS_PATH ] || mkdir -p $STATUS_PATH ; chmod 777 $STATUS_PATH
+
+# Copy oem logo images to http doc dirs.
+
+/usr/bin/image.sh
+
+# Create dir for captive portal usage.
+CAPID_PATH=/var/run/cpp/
+[ -d $CAPID_PATH ] || mkdir -p $CAPID_PATH ; chmod 777 $CAPID_PATH
+chown www-data:www-data $CAPID_PATH 
+
+
+CAPTIVE_PORTAL=/mnt/eag_html/ 
+CAPTIVE_HTML=/opt/eag/www/
+CAPTIVE_HTML_APA=/opt/www/htdocs/portal
+
+[ -d $CAPTIVE_HTML  ] || mkdir $CAPTIVE_HTML
+chmod -R 777 $CAPTIVE_HTML
+
+ln -s $CAPTIVE_HTML $CAPTIVE_HTML_APA
+
+if [ -d $CAPTIVE_PORTAL ] ; then	
+	cp -rf $CAPTIVE_PORTAL* $CAPTIVE_HTML
+fi
+
+printf "Preparing management interfaces "
+product_type_info=`cat /proc/product_info/product_type`
+
+printf ".\n"
+
+is_distributed=`cat /proc/product_info/distributed_product`
+
+
+if [ $is_distributed -eq 0 ] ; then
+	printf "This isn't distributed product\n"
+	# C5A000 for Chassis 5 slots Cheetah2
+	if [ ! -f /mnt/conf_xml.conf ] ; then 
+
+		if [ $product_type_info -eq 0 ] ; then
+			printf "\nNo configuration found, assigning 192.168.0.1/24 to interface eth0-1 " 
+			printf "."
+			vtysh -c "
+			configure terminal 
+			interface eth0-1
+			ip address 192.168.0.1/24
+			"
+			printf "."
+			printf "."
+		else
+			printf "."
+			printf "\nNo configuration found, assigning 192.168.0.1/24 to interface vlan1" 
+			printf "."
+			vtysh -c "
+			configure terminal 
+			interface vlan1
+			ip address 192.168.0.1/24
+			"
+			printf "."
+			printf "."
+		fi
+		printf " done.\n"
+
+	else
+
+		loadcfg=`cat /proc/loadcfg`
+
+		if [ $loadcfg -eq 1 ] ; then
+			loadcfg2=1
+			echo "Press S then Enter within 3 seconds if you want to skip loading configuration."
+			if read -t 3 inputkey > /dev/null 2>&1 ; then
+				if [ $inputkey"x" = "Sx" ] || [ $inputkey"x" = "sx" ] ; then
+				  echo "Skip loading configuration."
+				  loadcfg2=0
+				fi
+			fi
+			if [ $loadcfg2 -eq 1 ] ; then 
+	 			printf "Loading startup configurations ...\n"
+			  /usr/bin/srvload.sh
+			fi
+			if [ -d /mnt/startup ] ; then
+				printf "Running startup scripts ...\n"
+				run-parts /mnt/startup 
+				#run-parts /mnt/startup --verbose 
+				printf "Done.\n"
+			fi
+		else
+			printf "According to boot option, Skipping startup configurations ... done.\n"
+		fi
+
+	fi
+
+else
+	#distributed product load config
+	is_active_master=`cat /dbm/local_board/is_active_master`
+	product_state=`cat /dbm/product_state`
+	#product_serial=`cat /dbm/product/product_serial`
+	#is_active_master=`cat ./is_active_master`
+	#product_state=`cat ./product_state`
+	#notice /dbm/product/product_type: 1->7605i,0x4->8610,0x5->8606,0x6->8603
+	product_type=`cat /dbm/product/product_type`
+	#notice board_type: 0->81_SMU,1->81_12C,2->81_8C,3->81_12X,4->81_2X,5->81_1X,6->81_4X
+	board_type=`cat /dbm/local_board/board_code`
+	self_slot_id=`cat /dbm/local_board/slot_id`
+	if [ $is_active_master -eq 1 ] ; then
+
+		printf "is active master ,load config \n"
+
+#		while [ $product_state -lt 2 ] 
+#		do
+#			sleep 1
+#			product_state=`cat /dbm/product_state`
+			#product_state=`cat ./product_state`
+#		done
+
+
+		if [ ! -f /mnt/conf_xml.conf ] ; then
+			#7605i
+			if [ $product_type -eq 1 ] ; then
+		
+			#self_slot_id=`cat /proc/product_info/board_slot_id`
+			#printf "\n#################7605i##################### "
+			printf "\nNo configuration found, assigning 192.168.0.1/24 to interface eth$self_slot_id-1 "
+			printf "."
+			vtysh -c "
+			configure terminal
+			interface eth$self_slot_id-1
+			ip address 192.168.0.1/24
+			"
+			printf "."
+			printf "."
+			printf "done.\n"
+			#8610
+			elif [ $product_type -eq 4 ] ; then
+				#printf "\n#################8610##################### "
+				#self_slot_id=`cat /proc/board/slot_id`
+				printf "\nNo configuration found, assigning 192.168.0.1/24 to interface mng$self_slot_id-1 "
+				printf "."
+				vtysh -c "
+				configure terminal
+				interface mng$self_slot_id-1
+				ip address 192.168.0.1/24
+				"
+				printf "."
+				printf "."
+				printf "done.\n"
+			#8606
+			elif [ $product_type -eq 5 ] ; then
+				#printf "\n#################8606##################### "
+				#self_slot_id=`cat /proc/board/slot_id`
+				printf "\nNo configuration found, assigning 192.168.0.1/24 to interface mng$self_slot_id-1 "
+				printf "."
+				vtysh -c "
+				configure terminal
+				interface mng$self_slot_id-1
+				ip address 192.168.0.1/24
+				"
+				printf "."
+				printf "."
+				printf "done.\n"
+			#8603
+			elif [ $product_type -eq 6 ] ; then
+				#self_slot_id=`cat /proc/board/slot_id`
+				if [ $board_type -eq 1 ] ; then
+				#12C is master 
+				#printf "\n#################8603(12C)##################### "
+					printf "\nNo configuration found, assigning 192.168.0.1/24 to interface eth$self_slot_id-5 "
+					printf "."
+					vtysh -c "
+					configure terminal
+					interface eth$self_slot_id-5
+					ip address 192.168.0.1/24
+					"
+					printf "."
+					printf "."
+					printf "done.\n"
+				elif [ $board_type -eq 6 ] ; then
+				#4X is master 
+				#printf "\n#################8603(4X)##################### "
+					printf "\nNo configuration found, 4X not to assigning 192.168.0.1/24 to interface eth$self_slot_id-1 "
+				else
+				#8C is master
+				#printf "\n#################8603(8C)##################### "
+					printf "\nNo configuration found, assigning 192.168.0.1/24 to interface eth$self_slot_id-1 "
+					printf "."
+					vtysh -c "
+					configure terminal
+					interface eth$self_slot_id-1
+					ip address 192.168.0.1/24
+					"
+					printf "."
+					printf "."
+					printf "done.\n"
+				fi
+			
+			fi
+		else
+
+#			loadcfg=`cat /proc/loadcfg`
+			
+			loadcfg=1
+			if [ $loadcfg -eq 1 ] ; then
+				loadcfg2=1
+				echo "Press S then Enter if you want to skip loading configuration."
+				while [ $product_state -lt 2 ]
+				do
+					if read -t 2 inputkey > /dev/null 2>&1 ; then
+						if [ $inputkey"x" = "Sx" ] || [ $inputkey"x" = "sx" ] ; then
+						  echo "Skip loading configuration."
+						  loadcfg2=0
+						  break
+						fi
+					fi
+					product_state=`cat /dbm/product_state`
+	#				echo "product_state is $product_state"
+				done
+				if [ $loadcfg2 -eq 1 ] ; then 
+				  printf "Loading startup configurations ...\n"
+				  /usr/bin/srvload.sh
+				fi
+				if [ -d /mnt/startup ] ; then
+					printf "Running startup scripts ...\n"
+					run-parts /mnt/startup 
+					#run-parts /mnt/startup --verbose 
+					printf "Done.\n"
+				fi
+			else
+				printf "According to boot option, Skipping startup configurations ... done.\n"
+			fi
+		fi
+	else 
+		printf "this is not acticve board\n"
+	fi
+fi
+printf "Enabling switching asic, set board.state "
+#if [ ! -f /var/run/npd_sig.pid ]; then 
+#	printf "."
+#	sleep 5
+#fi
+#sig_handler_pid=`cat /var/run/npd_sig.pid`
+#/bin/kill -s RTMIN+1 $sig_handler_pid
+#Use "kill -SIGUSR1 $sig_handler_pid" and "kill -s SIGUSR1 $sig_handler_pid" doesn't work during startup while works fine in shell which is very strange.
+#kill -SIGUSR1 $sig_handler_pid
+echo 1 > /var/run/board.state
+# wangjiankun add e1000e protect.
+#echo 1 > /sys/module/e1000e/parameters/e1000e_rx_en
+printf " done.\n"
+
+checkcliserv.sh &
+
+if [ $is_active_master -eq 1 ] ; then
+        echo 1 >  /dbm/is_loadconfig_done
+	printf "is loadconfig done.\n"
+fi
+
+exit 0

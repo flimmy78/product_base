@@ -1,0 +1,16 @@
+usr/lib/libipsec.so.0
+usr/lib/libipsec.so.0.0.0
+usr/lib/libracoon.so.0.0.0
+usr/lib/libracoon.so.0
+usr/sbin/racoon
+usr/sbin/racoon-tool
+usr/sbin/plainrsa-gen
+usr/sbin/racoonctl
+usr/sbin/setkey
+etc/racoon/racoon-tool.conf
+etc/racoon/racoon.conf
+etc/racoon/psk.txt
+etc/ipsec-tools.conf
+etc/default/setkey
+etc/init.d/racoon
+etc/init.d/setkey

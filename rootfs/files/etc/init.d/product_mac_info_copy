@@ -1,0 +1,23 @@
+#!/bin/sh
+
+#copy base mac to other necessary locations
+SOURCE_MAC_FILE_PATH_1="/devinfo/mac"
+SOURCE_MAC_FILE_PATH_2="/proc/sysinfo/product_base_mac_addr"
+
+TARGET_MAC_FILE_PATH_1="/devinfo/base_mac"
+TARGET_MAC_FILE_PATH_2="/dbm/product/base_mac"
+TARGET_MAC_FILE_PATH_3="/devinfo/mac"
+
+if [ -s $SOURCE_MAC_FILE_PATH_1 ];then
+	cp $SOURCE_MAC_FILE_PATH_1 $TARGET_MAC_FILE_PATH_1
+	cp $SOURCE_MAC_FILE_PATH_1 $TARGET_MAC_FILE_PATH_2
+else
+	if [ -s $SOURCE_MAC_FILE_PATH_2 ];then
+		cp $SOURCE_MAC_FILE_PATH_2 $TARGET_MAC_FILE_PATH_1
+		cp $SOURCE_MAC_FILE_PATH_2 $TARGET_MAC_FILE_PATH_2
+		cp $SOURCE_MAC_FILE_PATH_2 $TARGET_MAC_FILE_PATH_3
+	else
+		echo "Source base mac files are not exist."
+	fi
+fi
+

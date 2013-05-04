@@ -1,0 +1,50 @@
+
+
+###
+###  add include path and file list
+###
+
+#INCLUDE_PATH =
+#C_FILE_LIST  =
+SUBDIRS      = NONE
+#C_EXCLUDE_FILE_LIST =
+
+CORE_O = lapi.c lcode.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c lmem.c \
+	lobject.c lopcodes.c lparser.c lstate.c lstring.c ltable.c ltm.c  \
+	lundump.c lvm.c lzio.c
+LIB_O = lauxlib.c lbaselib.c ldblib.c liolib.c lmathlib.c loslib.c ltablib.c \
+	lstrlib.c loadlib.c linit.c
+
+INCLUDE_PATH += $(FIS)$(LUA_SRCPATH)$(FIE)
+
+ifneq (VXWORKS, $(OS_RUN))
+ifneq (win32, $(OS_RUN))
+  AD_CFLAGS += $(FD)LUA_USE_MKSTEMP
+endif
+endif
+
+ifeq (VXWORKS, $(OS_RUN))
+  # <vxWorks.h> must be included to make lua compilable
+  AD_CFLAGS += -include vxWorks.inc
+endif
+ifeq (win32, $(OS_RUN))
+#  AD_CFLAGS += $(FD)LUA_ANSI $(FD)_WIN32
+  AD_CFLAGS += $(FD)_WIN32
+endif
+
+C_FILE_LIST = $(addprefix $(LUA_SRCPATH)/,$(CORE_O) $(LIB_O))
+C_FILE_LIST += cmdLuaCommon.c
+C_FILE_LIST += genwrapper_API.c
+
+# cmdLuaFS: a file system wrapper to store/load scripts
+#   defines:            CMD_LUA_FS
+#   files required:     cmdLuaFS.c
+ifeq (yes,$(CMD_FS))
+  AD_CFLAGS += $(FD)CMD_LUA_FS
+  C_FILE_LIST += cmdLuaFS.c
+endif
+
+
+##################################################
+##################################################
+include $(PROJ_BASE)/gtTopMake

@@ -1,0 +1,245 @@
+#!/bin/bash
+
+if [ -z "$OCTEON_ROOT" ] ; then
+    echo "OCTEON_ROOT not set"
+    exit 1
+fi
+se_dir=$OCTEON_ROOT/executive
+
+
+if [ -n "$2" ] ; then
+    kernel_dir=$2
+else
+    kernel_dir=`pwd`
+fi
+
+if [ "$1" = "copy" ] ; then
+    action0="rm -f"
+    action=cp
+    action_desc="Copying"
+elif [ "$1" = "diff" ] ; then
+    action0=:
+    action="diff -u"
+    action_desc="Diffing"
+elif [ "$1" = "link" ] ; then
+    action0="rm -f"
+    action="ln -s -f"
+    action_desc="Linking"
+else
+    echo "Usage: copy-se2kernel.sh [copy | diff | link] {kernel-dir}"
+    exit 1
+fi
+
+echo "$action_desc from $kernel_dir to $se_dir"
+
+(
+cd $kernel_dir/arch/mips/include/asm/octeon
+echo "Working in asm/octeon"
+
+{ while read file ; do
+
+    case $file in 
+	cvmx.h)
+		echo skip $file
+	    ;;
+	*)
+	    if [ -e $se_dir/$file ] ; then
+		$action0 $file
+		$action $se_dir/$file .
+	    else
+		echo skip $file
+	    fi
+	    ;;
+    esac
+
+done } <<EOF
+cvmx-address.h
+cvmx-agl-defs.h
+cvmx-app-hotplug.h
+cvmx-app-init.h
+cvmx-asm.h
+cvmx-asx0-defs.h
+cvmx-asxx-defs.h
+cvmx-atomic.h
+cvmx-bootmem.h
+cvmx-ciu-defs.h
+cvmx-clock.h
+cvmx-cmd-queue.h
+cvmx-core.h
+cvmx-csr-db.h
+cvmx-csr-enums.h
+cvmx-csr-typedefs.h
+cvmx-dbg-defs.h
+cvmx-debug.h
+cvmx-dfa-defs.h
+cvmx-dfm-defs.h
+cvmx-dpi-defs.h
+cvmx-error-custom.h
+cvmx-error.h
+cvmx-fau.h
+cvmx-fpa-defs.h
+cvmx-fpa.h
+cvmx-gmx.h
+cvmx-gmxx-defs.h
+cvmx-gpio-defs.h
+cvmx-helper-board.h
+cvmx-helper-errata.h
+cvmx-helper-fpa.h
+cvmx-helper.h
+cvmx-helper-jtag.h
+cvmx-helper-loop.h
+cvmx-helper-npi.h
+cvmx-helper-rgmii.h
+cvmx-helper-sgmii.h
+cvmx-helper-spi.h
+cvmx-helper-srio.h
+cvmx-helper-util.h
+cvmx-helper-xaui.h
+cvmx-iob-defs.h
+cvmx-ipd-defs.h
+cvmx-ipd.h
+cvmx-key-defs.h
+cvmx-l2c-defs.h
+cvmx-l2c.h
+cvmx-l2d-defs.h
+cvmx-l2t-defs.h
+cvmx-led-defs.h
+cvmx-lmcx-defs.h
+cvmx-mdio.h
+cvmx-mio-defs.h
+cvmx-mixx-defs.h
+cvmx-mpi-defs.h
+cvmx-nand.h
+cvmx-ndf-defs.h
+cvmx-npei-defs.h
+cvmx-npi-defs.h
+cvmx-packet.h
+cvmx-pci-defs.h
+cvmx-pcieepx-defs.h
+cvmx-pcie.h
+cvmx-pciercx-defs.h
+cvmx-pcm-defs.h
+cvmx-pcmx-defs.h
+cvmx-pcsx-defs.h
+cvmx-pcsxx-defs.h
+cvmx-pemx-defs.h
+cvmx-pescx-defs.h
+cvmx-pexp-defs.h
+cvmx-pip-defs.h
+cvmx-pip.h
+cvmx-pko-defs.h
+cvmx-pko.h
+cvmx-pow-defs.h
+cvmx-pow.h
+cvmx-rad-defs.h
+cvmx-rnm-defs.h
+cvmx-scratch.h
+cvmx-sli-defs.h
+cvmx-smi-defs.h
+cvmx-smix-defs.h
+cvmx-spi.h
+cvmx-spinlock.h
+cvmx-spx0-defs.h
+cvmx-spxx-defs.h
+cvmx-srio.h
+cvmx-sriomaintx-defs.h
+cvmx-sriox-defs.h
+cvmx-srxx-defs.h
+cvmx-stxx-defs.h
+cvmx-swap.h
+cvmx-sysinfo.h
+cvmx-tim-defs.h
+cvmx-tra-defs.h
+cvmx-tra.h
+cvmx-twsi.h
+cvmx-uahcx-defs.h
+cvmx-uart.h
+cvmx-uctlx-defs.h
+cvmx-usbcx-defs.h
+cvmx-usbd.h
+cvmx-usb.h
+cvmx-usbnx-defs.h
+cvmx-wqe.h
+cvmx-zip-defs.h
+octeon-boot-info.h
+octeon-feature.h
+octeon-model.h
+octeon-pci-console.h
+EOF
+)
+
+(
+cd $kernel_dir/arch/mips/cavium-octeon/executive
+echo "Working in cavium-octeon/executive"
+
+{ while read file ; do
+
+    case $file in 
+	*)
+	    if [ -e $se_dir/$file ] ; then
+		$action0 $file
+		$action $se_dir/$file .
+	    else
+		echo skip $file
+	    fi
+	    ;;
+    esac
+
+done } <<EOF
+cvmx-bootmem.c
+cvmx-clock.c
+cvmx-cmd-queue.c
+cvmx-core.c
+cvmx-csr-db.c
+cvmx-csr-db-support.c
+cvmx-debug.c
+cvmx-debug-handler.S
+cvmx-debug-remote.c
+cvmx-debug-uart.c
+cvmx-uart.c
+cvmx-error.c
+cvmx-error-custom.c
+cvmx-error-init-cn30xx.c
+cvmx-error-init-cn31xx.c
+cvmx-error-init-cn38xx.c
+cvmx-error-init-cn38xxp2.c
+cvmx-error-init-cn50xx.c
+cvmx-error-init-cn52xx.c
+cvmx-error-init-cn52xxp1.c
+cvmx-error-init-cn56xx.c
+cvmx-error-init-cn56xxp1.c
+cvmx-error-init-cn58xx.c
+cvmx-error-init-cn58xxp1.c
+cvmx-error-init-cn63xx.c
+cvmx-error-init-cn63xxp1.c
+cvmx-fpa.c
+cvmx-helper-board.c
+cvmx-helper.c
+cvmx-helper-errata.c
+cvmx-helper-fpa.c
+cvmx-helper-jtag.c
+cvmx-helper-loop.c
+cvmx-helper-npi.c
+cvmx-helper-rgmii.c
+cvmx-helper-sgmii.c
+cvmx-helper-spi.c
+cvmx-helper-srio.c
+cvmx-helper-util.c
+cvmx-helper-xaui.c
+cvmx-l2c.c
+cvmx-nand.c
+cvmx-pcie.c
+cvmx-pko.c
+cvmx-spi4000.c
+cvmx-spi.c
+cvmx-srio.c
+cvmx-sysinfo.c
+cvmx-tra.c
+cvmx-twsi.c
+cvmx-usb.c
+cvmx-usbd.c
+octeon-model.c
+octeon-pci-console.c
+EOF
+
+)

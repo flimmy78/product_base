@@ -1,0 +1,22 @@
+#!/bin/sh
+
+
+PATH=/sbin:/bin:/usr/bin:/usr/sbin:/opt/bin
+. /lib/init/vars.sh
+ 
+. /lib/lsb/init-functions
+
+log_action_begin_msg "Starting snmp monitor"
+
+mem_status_dog.sh >/dev/null 2>&1 &
+
+log_action_end_msg $?
+
+
+log_action_begin_msg "Starting system base guard"
+. /usr/bin/libsnapshot.sh
+touch $GUARDLOG
+chmod 666 $GUARDLOG
+#nice -n-2 baseguard.sh >/var/log/nice_baseguard.log 2>&1 &
+nice -n-2 baseguard.sh >/dev/null 2>&1 &
+log_action_end_msg $?

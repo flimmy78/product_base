@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -e
+
+if [ -x /usr/sbin/update-cracklib -a -r /etc/cracklib/cracklib.conf ]
+then
+    status="$(/usr/sbin/update-cracklib)"
+    /usr/bin/logger -p cron.info -t cracklib "updated dictionary (read/written words: ${status})."
+fi
+
+exit 0

@@ -1,0 +1,60 @@
+ServerAdmin   webmaster@localhost 
+ServerName  127.0.0.1
+
+DocumentRoot  /opt/www/htdocs
+<Directory />
+Options FollowSymLinks
+AllowOverride None
+</Directory>
+
+<Directory /opt/www/htdocs> 
+Options -Indexes FollowSymLinks MultiViews
+AllowOverride None
+Order allow,deny
+allow from all
+</Directory>
+
+ScriptAlias /cgi-bin/ /opt/www/ccgi-bin/ 
+<Directory /opt/www/ccgi-bin>
+AllowOverride None	
+Options ExecCGI -MultiViews +SymLinksIfOwnerMatch
+Order allow,deny
+Allow from all
+
+AuthType Digest
+AuthName "AuteLAN"
+AuthDigestProvider file
+AuthUserFile /etc/htdigest
+Require valid-user 
+BrowserMatch "MSIE" AuthDigestEnableQueryStringHack=On
+</Directory>
+
+ErrorLog /var/log/apache2_error.log	
+LogLevel  warn
+CustomLog /var/log/apache2_access.log combined
+ServerSignature On
+
+Alias  /debug_download_only/ /opt/debugdown/
+<Directory /opt/debugdown/> 
+Options -Indexes
+AllowOverride None
+Order allow,deny
+Allow from all
+</Directory>
+
+ScriptAlias /debug/ /usr/bin/cgi-bin/
+<Directory /usr/bin/cgi-bin>
+AllowOverride None
+Options ExecCGI -MultiViews +SymLinksIfOwnerMatch
+Order allow,deny
+Allow from all
+</Directory>
+
+SetEnvIf Range (,.*?){5,} bad-range=1  
+RequestHeader unset Range env=bad-range  
+
+	RewriteEngine on
+RewriteCond %{REQUEST_METHOD} ^(TRACE|TRACK)
+	RewriteRule .* - [F]
+
+	ErrorDocument 401 /401.html

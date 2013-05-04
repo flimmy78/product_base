@@ -1,0 +1,190 @@
+#!/bin/bash
+
+
+# Make this file a func called inside mount-movable
+load_devinfo() 
+{
+FILE=/mnt/devinfo
+
+. /etc/default/rcS
+. /lib/lsb/init-functions
+
+
+log_action_begin_msg "Loading devinfo "
+
+mkdir /devinfo/
+
+if [ -f $FILE ] ; then
+
+
+sed -e 's/\r//g' -e 's/^[[:blank:]]*//g' -e 's/[ \t]*$//' -e '/^$/d' $FILE | awk '{ 
+	n=split($0,parts,":") 
+	if ( n != 2 ) 
+	    print "Error in line " NR ": \""$line"\""
+	if ( tolower(parts[1]) == "mac" )
+	  {
+	    if ( length(parts[2]) != 12 ) 
+	      print "Length of mac addr is illegal in line " NR ": \""$line"\""
+	    else
+	      print parts[2] > "/devinfo/mac"
+	  }  
+	else if ( tolower(parts[1]) == "sn" )
+	    print parts[2] > "/devinfo/sn"
+	else if ( tolower(parts[1]) == "hardware_version" )
+	    print parts[2] > "/devinfo/hardware_version"
+	else if ( tolower(parts[1]) == "product_name" )
+	    print parts[2] > "/devinfo/product_name"
+	else if ( tolower(parts[1]) == "software_name" )
+	    print parts[2] > "/devinfo/software_name"
+	else if ( tolower(parts[1]) == "enterprise_name" )
+	    print parts[2] > "/devinfo/enterprise_name"
+	else if ( tolower(parts[1]) == "enterprise_snmp_oid" )
+	    print parts[2] > "/devinfo/enterprise_snmp_oid"
+	else if ( tolower(parts[1]) == "snmp_sys_oid" )
+	    print parts[2] > "/devinfo/snmp_sys_oid"
+	else if ( tolower(parts[1]) == "maxwtpcount" )
+	    print parts[2] > "/devinfo/maxwtpcount"
+	else if ( tolower(parts[1]) == "c5a001" )
+	    print parts[2] > "/devinfo/c5a001"
+	else if ( tolower(parts[1]) == "c5a002" )
+	    print parts[2] > "/devinfo/c5a002"
+	else if ( tolower(parts[1]) == "c5a003" )
+	    print parts[2] > "/devinfo/c5a003"
+	else if ( tolower(parts[1]) == "c5a004" )
+	    print parts[2] > "/devinfo/c5a004"
+        else if ( tolower(parts[1]) == "c2a001" )
+            print parts[2] > "/devinfo/c2a001"
+        else
+	    print "Unknow devinfo line " NR ": \""$line"\""
+	}' 
+  log_action_end_msg 0
+else
+  errmsg="Failed to read devinfo."
+
+  log_action_end_msg 1 $errmsg  
+  echo "$errmsg" >> /etc/motd
+fi
+
+# Get mac address from sysinfo if doens't exist in devinfo
+if [ ! -f /devinfo/mac ] ; then
+	cat /proc/sysinfo/product_base_mac_addr > /devinfo/mac 
+fi
+
+log_success_msg " Device base mac: "`cat /devinfo/mac`
+
+
+# For white brand sn
+if [ -f /devinfo/sn ] ; then
+    log_success_msg " Device sn: "`cat /devinfo/sn`
+fi
+
+if [ ! -f /devinfo/product_name ] ; then
+	echo "PRODUCT" > /devinfo/product_name
+fi
+
+if [ ! -f /devinfo/software_name ] ; then
+	echo "SOFTWARE" > /devinfo/software_name
+fi
+
+if [ ! -f /devinfo/enterprise_name ] ; then
+	echo "VENDOR" > /devinfo/enterprise_name
+fi
+
+
+verstring=`cat /etc/version/version`" (Build "`cat /etc/version/buildno`")"
+
+
+if [ ! -f /devinfo/enterprise_snmp_oid ] ; then
+	errmsg="No valid SNMP enterprise oid found, using 0."
+	log_warning_msg $errmsg 
+	echo $errmsg >> /etc/motd
+	echo "0" > /devinfo/enterprise_snmp_oid
+else
+	log_success_msg " SNMP enterprise oid: "`cat /devinfo/enterprise_snmp_oid`
+	ent_oid=`cat /devinfo/enterprise_snmp_oid`
+	# for TD project 
+	if [ "$ent_oid" = "5105" ] ; then
+		#verstring="V5.1.0.0"
+	#Changed software version no based on GAO Chao's notification.
+	#	verstring="V3.0.0.0"
+	#Changed software version based on YAO Lei's notification on 24/May/2010
+		verstring="V3.0.1.0"
+	fi
+	# for XH project 
+	# 2515 is fake oid, 33940 is the true oid.
+	if [ "$ent_oid" = "2515" ] || [ "$ent_oid" = "33940" ] ; then
+	#	verstring="V2.1.2"
+	# Increased version no to 3.3.9 since mail on 5/December/2011
+		verstring="V3.3.9"
+	fi
+	# for NetGear project 
+	if [ "$ent_oid" = "4526" ] ; then
+#For Net Gear Mobile test only
+#		verstring="V2.1.2"
+	#	verstring="V1.1"
+	#Changed version no based on YAO Lei 's notification on 24/May/2010
+	#	verstring="V1.3"
+	#Changed version based on ZhaiYu notification on 30/Aug/2011
+		verstring="V2.2.0"
+	fi
+	# for XJ project
+	if [ "$ent_oid" = "17518" ] ; then
+	#	verstring="V3.0.7"
+	#Changed software version no based on YAO Lei's inform .
+	#	verstring="V3.0.1"
+	#Changed version no based on YAO Lei 's notification on 24/May/2010
+
+	#	verstring="V3.0.8"
+	#Changed version based on ZhaiYu notification on 30/Aug/2011
+		verstring="V3.0.7"
+	fi
+
+        # for XYT project
+        if [ "$ent_oid" = "29917" ] ; then
+        #Changed version based on ZhaiYu notification on 30/Aug/2011
+                verstring="V1.4.0.0"
+        fi
+
+fi
+
+
+if [ -f /mnt/forcevstring ] ; then
+verstring=`cat /mnt/forcevstring`
+echo "$verstring" > /etc/version/rversion
+fi
+
+echo "$verstring" > /etc/version/verstring
+echo "$verstring" > /etc/version/rversion
+
+
+if [ ! -f /devinfo/snmp_sys_oid ] ; then
+#	errmsg="No valid SNMP system oid found, using 0."
+#	log_warning_msg $errmsg 
+#	echo $errmsg >> /etc/motd
+	echo "0" > /devinfo/snmp_sys_oid
+#else
+#	log_success_msg " SNMP system oid: "`cat /devinfo/snmp_sys_oid`
+fi
+
+
+if [ ! -f /devinfo/c5a001 ] ; then
+	echo "MASTER" > /devinfo/c5a001
+fi
+
+if [ ! -f /devinfo/c5a002 ] ; then
+	echo "6GTX" > /devinfo/c5a002
+fi
+
+if [ ! -f /devinfo/c5a003 ] ; then
+	echo "6GE-SFP" > /devinfo/c5a003
+fi
+
+if [ ! -f /devinfo/c5a004 ] ; then
+	echo "XFP" > /devinfo/c5a004
+fi
+
+if [ ! -f /devinfo/c2a001 ] ; then
+        echo "MASTER" > /devinfo/c2a001
+fi
+
+}

@@ -1,0 +1,1 @@
+install ipv6 /sbin/modprobe --ignore-install ipv6 && sysctl net.ipv6.conf.all.forwarding=1 && sysctl net.ipv6.conf.default.forwarding=1

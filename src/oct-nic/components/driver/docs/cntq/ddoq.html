@@ -1,0 +1,480 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+	<META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=utf-8">
+	<TITLE>Direct Data Output Queue - Cavium Octeon PCI Driver</TITLE>
+	<META NAME="GENERATOR" CONTENT="OpenOffice.org 1.0.2  (Linux)">
+	<META NAME="CREATED" CONTENT="20060821;12325800">
+	<META NAME="CHANGED" CONTENT="20060821;12383200">
+	<META NAME="ProgId" CONTENT="Word.Document">
+	<META NAME="Originator" CONTENT="Microsoft Word 11">
+	<!--[if !mso]>
+<style>
+v\:* {behavior:url(#default#VML);}
+o\:* {behavior:url(#default#VML);}
+w\:* {behavior:url(#default#VML);}
+.shape {behavior:url(#default#VML);}
+</style>
+<![endif]-->
+	<!--[if gte mso 9]><xml>
+ <o:DocumentProperties>
+  <o:Author>Manoj</o:Author>
+  <o:Template>Normal</o:Template>
+  <o:LastAuthor>Manoj</o:LastAuthor>
+  <o:Revision>26</o:Revision>
+  <o:TotalTime>114</o:TotalTime>
+  <o:Created>2006-08-20T23:21:00Z</o:Created>
+  <o:LastSaved>2006-08-21T16:30:00Z</o:LastSaved>
+  <o:Pages>1</o:Pages>
+  <o:Words>2628</o:Words>
+  <o:Characters>14986</o:Characters>
+  <o:Company> </o:Company>
+  <o:Lines>124</o:Lines>
+  <o:Paragraphs>35</o:Paragraphs>
+  <o:CharactersWithSpaces>17579</o:CharactersWithSpaces>
+  <o:Version>11.8036</o:Version>
+ </o:DocumentProperties>
+</xml><![endif]-->
+	<!--[if gte mso 9]><xml>
+ <w:WordDocument>
+  <w:SpellingState>Clean</w:SpellingState>
+  <w:GrammarState>Clean</w:GrammarState>
+  <w:ValidateAgainstSchemas/>
+  <w:SaveIfXMLInvalid>false</w:SaveIfXMLInvalid>
+  <w:IgnoreMixedContent>false</w:IgnoreMixedContent>
+  <w:AlwaysShowPlaceholderText>false</w:AlwaysShowPlaceholderText>
+  <w:BrowserLevel>MicrosoftInternetExplorer4</w:BrowserLevel>
+ </w:WordDocument>
+</xml><![endif]-->
+	<!--[if gte mso 9]><xml>
+ <w:LatentStyles DefLockedState="false" LatentStyleCount="156">
+ </w:LatentStyles>
+</xml><![endif]-->
+	<!--[if gte mso 10]>
+<style>
+ /* Style Definitions */
+ table.MsoNormalTable
+	{mso-style-name:"Table Normal";
+	mso-tstyle-rowband-size:0;
+	mso-tstyle-colband-size:0;
+	mso-style-noshow:yes;
+	mso-style-parent:"";
+	mso-padding-alt:0in 5.4pt 0in 5.4pt;
+	mso-para-margin:0in;
+	mso-para-margin-bottom:.0001pt;
+	mso-pagination:widow-orphan;
+	font-size:10.0pt;
+	font-family:"Times New Roman";
+	mso-ansi-language:#0400;
+	mso-fareast-language:#0400;
+	mso-bidi-language:#0400;}
+</style>
+<![endif]-->
+	<!--[if gte mso 9]><xml>
+ <o:shapedefaults v:ext="edit" spidmax="2050"/>
+</xml><![endif]-->
+	<!--[if gte mso 9]><xml>
+ <o:shapelayout v:ext="edit">
+  <o:idmap v:ext="edit" data="1"/>
+ </o:shapelayout></xml><![endif]-->
+	<STYLE>
+	<!--
+		P { color: #000000 }
+	-->
+	</STYLE>
+</HEAD>
+<BODY LANG="en-US" TEXT="#000000">
+<P CLASS="msonormal" ALIGN=CENTER><FONT FACE="Verdana"><FONT SIZE=4><B>Direct
+Data Output Queue (DDOQ)</B></FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>&nbsp;</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><B>1. Introduction</B></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>&nbsp;</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>DDOQ or Direct
+Data Output Queue is a software implementation that allows a
+connection specific queue to be implemented. These queues form the
+basis of an offloading mechanism for the TCP stack &amp; RDMA
+provided by Cavium. The responsibility for maintaining the queue is
+shared between the Octeon core PCI driver&nbsp;and the host PCI
+driver. The host driver uses the input queues (instruction queues) to
+update the core software about DDOQ events like the creation of a
+DDOQ, availability of descriptors, deletion etc. The core software
+uses the DMA counter queues (CNTQ) to push packets into the DDOQ and
+to inform the host about&nbsp;packet arrival. <BR><BR>A DDOQ is
+conceptually similar to a DROQ – the output queues of Octeon. They
+have a descriptor ring which point to available buffers and info
+fields. The host provides the buffers and the Octeon core consumes
+them. But unlike DROQ, the descriptors list is&nbsp;provided to the
+Octeon core software via a PCI&nbsp;instruction. Certain opcodes are
+reserved for communication between the host driver and the Octeon
+core software for this purpose. DDOQ’s do not have any direct
+interrupt mechanism and do not have any direct support from the
+Octeon hardware.<BR><BR><BR><BR><BR><BR></FONT><B>2.</B><FONT SIZE=2>
+</FONT><B>DDOQ id lookup mechanism</B></FONT></P>
+<P CLASS="msonormal"><FONT SIZE=2><FONT FACE="Verdana">Each DDOQ is
+assigned a 22-bit identification number upon creation. The id's from
+0 to 35 are reserved. Thus, the first DDOQ created in the system will
+have its id as 36. The Octeon host&nbsp;PCI driver can support a
+maximum of&nbsp;4194268 (2<SUP>22</SUP> - 36)&nbsp;DDOQ's in a
+system.<BR><BR>Only the DDOQ id is used in communication between the
+application and the driver and between the driver and Octeon to
+identify a connection. To get to the DDOQ implementation in memory
+for a given DDOQ id, we need a lookup mechanism. The Octeon driver
+implements the following lookup mechanism. </FONT></FONT>
+</P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>To make the
+lookup faster, the DDOQ id is divided into 3 parts. The upper part is
+4 bits wide, the middle part 8 bits wide and the lower part is 10
+bits wide. Each of the 3 parts is used as an index into a lookup
+table.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>There are
+three levels of lookup tables. There is only one first level table
+with 16 entries in it (4 upper bits index into 16 entries). There are
+16 second level tables (each of the first level entry stores the
+address of one such second level table).&nbsp; Each second level
+table has 256 entries (8 middle bits index into 256 entries). Each
+second level entry, in turn, stores the address of third level
+entries. There are 256 third level tables. &nbsp;Each third level
+table has 1024 entries (10 lower bits index into 1024 entries). The
+third level entries point to the actual DDOQ structure in memory.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>This
+implementation provides a constant and fast lookup for all DDOQ ids,
+while at the same time keeping the memory usage in control by
+implementing only as many 2<SUP>nd</SUP> and 3<SUP>rd</SUP> level
+tables as required. At start time, the first level table is fully
+allocated. There is only one 2<SUP>nd</SUP> level table, which is
+pointed to by index 0 of the 1<SUP>st</SUP> level table. Also there
+is only one 3<SUP>rd</SUP> level table pointed to by index 0 of the
+2<SUP>nd</SUP> level table. So at start time, there is space
+available to lookup 1024 DDOQ’s (1024 connections). </FONT></FONT>
+</P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2><BR>If the no.
+of connections goes over 1024 another 3<SUP>rd</SUP> level table is
+allocated which will be pointed to by index 1 of the 2<SUP>nd</SUP>
+level table. So now there’s space to handle 2048 entries. This goes
+on till we have 256 * 1024 connections in the system when the single
+2<SUP>nd</SUP> level table is not enough. At this time another 2<SUP>nd</SUP>
+level table is created which is pointed to by index 1 of the 1<SUP>st</SUP>
+level table and more 3<SUP>rd</SUP> level tables are allocated and
+the process continues as before.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2><BR>To explain
+the actual lookup process, lets use an example. Lets assume that the
+driver receives a operation to be performed (either sent from the
+application or from the Octeon device via the DMA queues) with the
+DDOQ id as 0x000804, which in binary form is&nbsp;00 0000 0000 1000
+0000 0100. Dividing this id into 3 parts, we get, upper bits: &nbsp;0000;
+middle bits: 00000010; lower bits: 0000000100.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>So, the 1<SUP>st</SUP>
+level index is 0, 2<SUP>nd</SUP> level index is 2 and 3<SUP>rd</SUP>
+level index is 4. We look at index 0 in the 1<SUP>st</SUP> level
+table to get the start address of the required 2<SUP>nd</SUP> level
+table. We look at index 2 in this 2<SUP>nd</SUP> level table to get
+the start address of the 3<SUP>rd</SUP> level table. We look at index
+4 in this 3<SUP>rd</SUP> level table to get the address of the DDOQ
+structure in memory corresponding to DDOQ id 0x000804. </FONT></FONT>
+</P>
+<P CLASS="msonormal"><BR><BR>
+</P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2><BR><B>3.</B>
+<B>The DDOQ id free list</B></FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>DDOQ
+connections can be established and freed at different times. We need
+a free list to keep track of available DDOQ id numbers. Every time a
+connection request is made, the free list is looked up to find the
+next available DDOQ id that can be allocated. Also, when a connection
+is freed the DDOQ id is released back to the free list.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>The free list
+doesn’t need to be 2^22 entries big. We can use the same lookup
+tables described above to maintain the free list as well. The trick
+is to use the 3<SUP>rd</SUP> level entries to store both the free
+list indices and the DDOQ pointers. So, at start, the free list is
+only 1024 entries big (same as the no. of available DDOQ pointers).
+When the free list is empty (all 1024 id’s are used), a new 3<SUP>rd</SUP>
+level entry is allocated which provides another 1024 free id’s (and
+another 1024 pointers made available for DDOQ’s).</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>The free list
+is implemented as a stack with the head of the stack holding the next
+available DDOQ id. The head is called the free list index and it can
+grow till the maximum allocated entries in the 3<SUP>rd</SUP> level
+table. For e.g., at start when only 1024 entries are allocated (with
+only one 3<SUP>rd</SUP> level table), the stack can grow only up to
+1024 entries. When the free list index reaches 1024 – in other
+words, no more DDOQ id’s are available and the free list is empty –
+then another 1024 entries are allocated into which the free list can
+grow. This free list index is used to traverse the 3 tables to get to
+the head free-index entry in the same way as DDOQ id’s. <BR>&nbsp;<BR></FONT></FONT><BR><BR>
+</P>
+<P CLASS="msonormal"><A NAME="_x0000_i1025"></A><IMG SRC="image001.gif" NAME="Graphic1" ALIGN=LEFT WIDTH=589 HEIGHT=436 BORDER=0><BR CLEAR=LEFT><BR><BR>
+</P>
+<P CLASS="msonormal" ALIGN=CENTER><FONT FACE="Verdana"><FONT SIZE=2><B>Figure
+1: The lookup table for DDOQ and the free list of DDOQ ids.</B></FONT></FONT></P>
+<P CLASS="msonormal" ALIGN=CENTER><FONT FACE="Verdana"><FONT SIZE=2>&nbsp;</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2><BR></FONT><B>4.</B><FONT SIZE=2>
+</FONT><B>DDOQ Operation</B></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2><B>4.1. DDOQ
+Creation</B></FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>To create a
+DDOQ, a user calls the Octeon PCI driver with a set of setup
+parameters. These parameters include the following: </FONT></FONT>
+</P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2><BR>1. Number
+of descriptors<BR>2. Buffer size</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>3. Refill
+threshold<BR>4. Number of descriptors to be initially filled (call it
+initial_fill).<BR>5. DDOQ type.<BR>6. Tag value.<BR>7. User defined
+data <BR>8. Function pointers <BR>&nbsp; &nbsp; a. Buffer allocation
+function<BR>&nbsp; &nbsp; b. Buffer deletion function.<BR>&nbsp; &nbsp;
+c. Dispatch function.<BR>&nbsp; &nbsp; d. DDOQ delete confirmation
+function.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2><BR>Refer to
+the octeon_ddoq_setup_t structure in
+driver/host/include/cavium_defs.h.<BR><BR>The host PCI driver
+allocates memory for the DDOQ structure and optionally performs the
+following operations: <BR>1. if a buffer allocation function is
+given, it will&nbsp;call this function to fill as many descriptors as
+determined by the initial_fill value. For e.g. if a DDOQ was created
+with 100 descriptors and the initial_fill value was 10, then the
+driver will allocate buffers for only the first 10 descriptors. If
+the initial fill value is 0, all the descriptors are filled with
+buffers.<BR>2. If the DDOQ type id DDOQ_TYPE_TCP, it will copy any
+user-defined data to the DDOQ structure.<BR><BR>When the DDOQ
+structure and buffers have been allocated, the host driver creates a
+raw PCI instruction with information about the DDOQ and the contents
+of its descriptor ring as the data payload for this instruction. It
+uses the tag specified in the setup in the PCI raw instruction. The
+instruction is sent to Octeon where the core driver receives it. </FONT></FONT>
+</P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>The core
+driver also allocates memory to store its copy of the descriptor ring
+and the setup parameters for the DDOQ. The core too maintains a
+lookup table similar to figure 1 except that there is no free list in
+its table. This is because it does not assign id number to a new
+DDOQ. That is the job of the host PCI driver.&nbsp; The core driver
+adds a pointer to the DDOQ structure in its DDOQ lookup table and
+responds to the PCI instruction on success. If the DDOQ structure
+could not be allocated or if its pointer could not be added to the
+lookup table, the core does not respond to the instruction. The
+instruction processing would fail with a timeout in this case.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>If the PCI
+instruction failed, the DDOQ is marked inactive by the host PCI
+driver. If a response arrives from the core, the DDOQ is marked
+active and can now receive packets.</FONT></FONT></P>
+<P CLASS="msonormal"><BR><BR>
+</P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2><B>4.2. Packet
+transmission on a DDOQ</B></FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>On successful
+creation of a DDOQ, the host driver&nbsp;informs the core PCI driver
+about this DDOQ via a PCI instruction. The core driver also allocates
+memory to store the descriptor contents which hold the address of the
+buffers and info pointers for this DDOQ. &nbsp;</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>When a Octeon
+core application needs to send a packet to a DDOQ, it calls the core
+PCI driver API with the id of the DDOQ and a pointer to the data to
+be sent. The core PCI driver looks up the DDOQ id in its lookup table
+and if a valid DDOQ exists, it checks if the DDOQ has enough buffers
+to accommodate the data. If there are enough buffers, the core PCI
+driver fetches the host address of buffers from the descriptor ring
+and constructs a PCI DMA command to directly DMA the data into the
+DDOQ buffers in host memory. No interrupt is generated in the host
+for this DMA operation. The core driver marks the buffers as
+consumed. The descriptors will be replenished when a credit arrives
+for this DDOQ.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>The core
+driver also generates a packet that it will send out on the DMA
+counter queues. This packet informs the host PCI driver of a packet
+available in a DDOQ. This CNTQ packet generates an interrupt in the
+host. The interrupt handler looks into the CNTQ and determines that a
+packet has arrived in a DDOQ. The DDOQ id is retrieved from this CNTQ
+packet and the pointer to DDOQ is fetched from the DDOQ lookup table.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>The function
+looks at the next location in the descriptor ring where a packet is
+expected. If the packet size is greater than the size of the buffer
+for this descriptor, then the packet straddles multiple descriptors.
+In this case, all the buffer addresses are noted in an array in the
+recv_pkt structure which is forwarded to the dispatch function. The
+size of each buffer is also noted. If the packet size is less then or
+equal to the current descriptor's buffer size, then only the current
+buffer address is forwarded in the recv_pkt structure to the dispatch
+function. The dispatch function expects the packet details in the
+recv_pkt structure which include the response header from the packet,
+the length of the packet, the list of buffer addresses and the size
+of the buffer at each address. </FONT></FONT>
+</P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>Once all the
+buffers have been processed, the location where the next packet is
+expected is moved forward. The number of descriptors that were
+consumed is also incremented. If a buffer allocation function is
+available, and if the no. of descriptors consumed has reached a
+threshold then the buffers are refilled. See section on refilling
+below. If a buffer allocation function is not available, the driver
+expects the application to post a new set of buffers for this DDOQ.
+This can happen at any time. The application is required to provide
+sufficient buffers to be able to read in all packets that it expects
+to receive on this DDOQ.</FONT></FONT></P>
+<P CLASS="msonormal"><BR><BR>
+</P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2><B>4.3.
+Refilling the descriptors</B></FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>At init time,
+the driver calls the buffer allocation function to allocate buffers
+before the DDOQ_INIT instruction is posted. The application would
+also have passed a refill threshold which lets the driver how many
+descriptors can be consumed before it attempts to replace them. The
+driver remembers the next location in the descriptor ring where a
+refill is required (At init time it is at start of the ring).</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>When for a
+DDOQ, the no. of descriptors consumed reaches the threshold; the
+driver calls the buffer allocation function for every descriptor
+starting for all the descriptors that require a new buffer from the
+remembered location. Remember that some of the descriptors may
+already have valid buffers if the packet in them were dropped. The
+buffer allocation function is not called for such descriptors.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>If any of the
+allocation calls fail, the driver posts all the descriptors refilled
+(including the one that already had buffers) till that point,&nbsp;through
+a DDOQ_CREDIT PCI instruction. The driver creates a gather list for
+passing the refilled descriptors to Octeon. The gather list allows
+the driver to point out the split locations in the ring in case there
+is a wrap-around the ring during the refilling process.</FONT></FONT></P>
+<P CLASS="msonormal"><BR><BR>
+</P>
+<P CLASS="msonormal"><BR><BR>
+</P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2><B>4.4. DDOQ
+Deletion</B></FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>To delete a
+DDOQ, the application calls the driver with the DDOQ id number. The
+host PCI driver uses the id to index into the lookup table and get
+the pointer to the DDOQ structure. If a DDOQ exists, the host PCI
+driver creates a DDOQ DELETE PCI instruction and sends it to the
+core. The application can also add front data when calling the driver
+to delete a DDOQ. Any such front data is forwarded along with the
+DDOQ DELETE instruction to the core. No other action is taken till
+the core driver responds to the instruction. The core PCI driver
+cleans up its DDOQ structures on receiving the DDOQ DELETE
+instruction and updates its lookup table before responding to the
+instruction.&nbsp; When the host PCI driver receives the response, it
+cleans up its DDOQ structure and updates the lookup table to indicate
+that this DDOQ is deleted. It also puts the DDOQ id into the lookup
+table’s free list. </FONT></FONT>
+</P>
+<P CLASS="msonormal"><BR><BR>
+</P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><B>5. Host Driver API</B></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>The following
+section discusses the API exposed by the PCI driver to enable
+applications to manage DDOQ’s.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>5.1. Creating
+a DDOQ</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>int
+<B>octeon_ddoq_create</B>(uint32_t&nbsp;&nbsp; <B><I>octeon_id</I></B>,
+octeon_ddoq_setup_t&nbsp;&nbsp; *<B><I>ddoq_op</I></B>);</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>-<FONT SIZE=1><FONT FACE="Times New Roman">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</FONT></FONT>called by application to create a DDOQ on a particular
+Octeon device. The Octeon device is identified by the <B><I>octeon_id</I></B>.
+The setup parameters for the new DDOQ are passed in <B><I>ddoq_op</I></B>.
+On success returns the DDOQ id. On failure returns a negative error
+number.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>5.2. Deleting
+a DDOQ</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>uint32_t
+<B>octeon_ddoq_delete</B>(uint32_t&nbsp; <B><I>octeon_id</I></B>,
+uint32_t&nbsp;&nbsp;&nbsp; <B><I>ddoq_id</I></B>, void *<B><I>udd</I></B>,
+uint32_t&nbsp;&nbsp;&nbsp; <B><I>udd_size</I></B>);</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>-<FONT SIZE=1><FONT FACE="Times New Roman">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</FONT></FONT>called by the application to delete a DDOQ on an Octeon
+device. The Octeon device is identified by the <B><I>octeon_id</I></B>.
+The DDOQ to be deleted is identified by <B><I>ddoq_id</I></B>. The
+parameter <B><I>udd</I></B> points to front data passed by the
+application, whereas <B><I>udd_size</I></B> gives the size of user
+defined data. The user defined data is forwarded to the Octeon core
+only if the udd size is not zero.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>5.3. Stop
+packet reception on a DDOQ.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>Packet
+transmission on a DDOQ can be stopped by returning from the dispatch
+function with a positive value. This gives the indication to the host
+driver that the application cannot accept further packets for this
+DDOQ. There is no explicit API to call to stop transmission.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>5.4. Restart
+packet reception on DDOQ.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>int
+<B>octeon_ddoq_restart_rx</B>(uint32_t <B><I>octeon_id</I></B>,
+uint32_t&nbsp;&nbsp; <B><I>ddoq_id</I></B>);</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>- to restart
+reception on a DDOQ, this API is called with the Octeon device id –
+<B><I>octeon_id</I></B>; and the the DDOQ id – <B><I>ddoq_id</I></B>.
+The driver would immediately start dispatching any available packets
+before this function returns.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>5.5. Get
+statistics for a DDOQ.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>int
+<B>octeon_ddoq_get_stats</B>(int <B><I>octeon_id</I></B>, &nbsp;int
+<B><I>ddoq_id</I></B>, &nbsp;oct_ddoq_stats_t&nbsp; *<B><I>ddoq_stats</I></B>);</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2> - called by
+the application to get the statistics for a DDOQ identified by
+<B><I>ddoq_id</I></B>. The statistics are returned in the <B><I>ddoq_stats</I></B>
+structure.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>5.6. Change
+the tag used in PCI instructions</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>int
+<B>octeon_ddoq_change_tag</B>(uint32_t&nbsp;&nbsp; <B><I>octeon_id</I></B>,&nbsp;
+uint32_t&nbsp;&nbsp; <B><I>ddoq_id</I></B>,&nbsp; uint32_t&nbsp;&nbsp;
+<B><I>tag</I></B>);</FONT></FONT></P>
+<UL>
+	<LI><P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>called by
+	application to change the tag used by the PCI driver for
+	instructions sent to the core for the DDOQ identified by <B><I>ddoq_id</I></B>.
+	The tag is changed to the value given in the parameter <B><I>tag</I></B>.</FONT></FONT></P>
+	<P CLASS="msonormal"></P>
+</UL>
+<P CLASS="msonormal"><BR><BR>
+</P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><B>6. Core driver API</B></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>6.1. Send data
+to a DDOQ</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>int
+<B>cvm_ddoq_send_data</B>(uint32_t&nbsp; <B><I>ddoq_id</I></B>,
+cvmx_buf_ptr_t&nbsp;&nbsp; <B><I>dptr</I></B>, cvm_ptr_type_t&nbsp;&nbsp;
+<B><I>ptr_type</I></B>, uint32_t <B><I>segs</I></B>, uint32_t&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<B><I>total_bytes</I></B>, cvmx_resp_hdr_t *<B><I>user_resp_hdr</I></B>);</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Courier New"><FONT SIZE=2><FONT FACE="Verdana">-<FONT SIZE=1><FONT FACE="Times New Roman">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</FONT></FONT>called by a core application when it has data to send
+to a DDOQ’s buffers in host memory. The DDOQ is identified by
+<B><I>ddoq_id</I></B>. <B><I>dptr</I></B> points to the location
+where the data buffers are in local memory. The parameter <B><I>ptr_type</I></B>
+reveals whether the data is available in a single buffer or in
+multiple linked or gather mode buffers. The parameter <B><I>segs</I></B>
+gives the number of data buffers. Total data bytes are given by
+<B><I>total_bytes</I></B>. The response header put into the info
+pointer of a DDOQ descriptor is passed in the parameter
+<B><I>user_resp_hdr</I></B>.</FONT></FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>6.2. Change
+the tag for a DDOQ.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>int
+<B>cvm_ddoq_change_tag</B>(uint32_t&nbsp;&nbsp; <B><I>ddoq_id</I></B>,
+uint32_t&nbsp;&nbsp; <B><I>new_tag</I></B>);</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>-<FONT SIZE=1><FONT FACE="Times New Roman">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</FONT></FONT>For every PCI instruction that it receives, the core
+PCI driver checks that the tag in the instruction matches the DDOQ’s
+tag. If the tag is changed by the host application, the core
+application must change it in the core too. Use this API to change
+the tag. The parameter <B><I>ddoq_id</I></B> identifies the DDOQ. The
+new tag is given by <B><I>new_tag</I></B>.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>6.3. Set a
+callback for DDOQ actions.</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2> int
+<B>cvm_ddoq_setup_appcallback</B>(uint32_t&nbsp; <B><I>ddoq_type</I></B>,
+uint32_t <B><I>ddoq_action</I></B>, int (*<B><I>appcallback</I></B>)(uint32_t,
+uint32_t, void *));</FONT></FONT></P>
+<P CLASS="msonormal"><FONT FACE="Verdana"><FONT SIZE=2>-<FONT SIZE=1><FONT FACE="Times New Roman">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</FONT></FONT>Core applications can register a callback function for
+DDOQ actions like INIT, DELETE and CREDIT. The core driver only
+supports this callback mechanism for DDOQ’s of type DDOQ_TYPE_TCP.
+The callback function is given by the function pointer <B><I>appcallback</I></B>.
+The core driver calls the callback function with the ddoq id, the tag
+for the DDOQ and a pointer to the user defined data for the DDOQ.</FONT></FONT></P>
+<P CLASS="msonormal"><BR><BR>
+</P>
+</BODY>
+</HTML>

@@ -1,0 +1,36 @@
+
+
+###
+###  add include path and file list
+###
+
+#INCLUDE_PATH =
+#C_FILE_LIST  =
+#SUBDIRS      =
+#C_EXCLUDE_FILE_LIST =
+
+SUBDIRS  = NONE
+  
+ifeq (EXISTS, $(EX_FAMILY))
+    SUBDIRS  = 
+    EXMX_FAMILY = EXIST
+endif
+
+ifeq (EXISTS, $(MX_FAMILY))
+    SUBDIRS  = 
+    EXMX_FAMILY = EXIST
+endif
+  
+ifeq (EXIST, $(EXMX_FAMILY))
+    SUBDIRS  += dfcdl
+endif
+
+ifeq (EXCLUDE_LIB, $(EXCLUDE_EXT_UTILS))
+   SUBDIRS  = NONE
+endif
+
+
+
+##################################################
+##################################################
+include $(PROJ_BASE)/gtTopMake

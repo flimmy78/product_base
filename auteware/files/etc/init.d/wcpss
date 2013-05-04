@@ -1,0 +1,230 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          wcpss
+# Required-Start:    $local_fs 
+# Required-Stop:     $local_fs 
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: wcpss 
+# Description:       Wireless Control & Provisioning Software Suit
+### END INIT INFO
+
+
+# Do NOT "set -e"
+
+# PATH should only include /usr/* if it runs after the mountnfs.sh script
+trap "" INT
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/opt/bin
+DESC="Wireless Control & Provisioning Software Suit"
+NAME=wcpss
+SCRIPTNAME=/etc/init.d/$NAME
+DAEMONS="wid asd wsm"
+D_PATH=/opt/bin
+PID_WID=/var/run/wcpss/wid$2_$3.pid
+PID_ASD=/var/run/wcpss/asd$2_$3.pid
+PID_WSM=/var/run/wcpss/wsm$2_$3.pid
+PIDTHREAD_WID=/var/run/wcpss/wid_thread$2_$3.pid
+PIDTHREAD_WSM=/var/run/wcpss/wsm_thread$2_$3.pid
+PIDTHREAD_ASD=/var/run/wcpss/asd_thread$2_$3.pid
+PID_MAIN_WID=/var/run/wcpss/wid$2_$3.pid
+PID_MAIN_WSM=/var/run/wcpss/wsm$2_$3.pid
+PID_MAIN_ASD=/var/run/wcpss/asd$2_$3.pid
+
+D_WID=/opt/bin/wid
+D_ASD=/opt/bin/asd
+D_WSM=/opt/bin/wsm
+LOCAL=$2
+PROFILENO=$3
+# Load the VERBOSE setting and other rcS variables
+. /lib/init/vars.sh
+
+# Define LSB log_* functions.
+# Depend on lsb-base (>= 3.0-6) to ensure that this file is present.
+. /lib/lsb/init-functions
+
+# ulimit file descriptor
+ulimit -n 4096
+
+pidfile()
+{
+	echo "/var/run/wcpss/$1.pid"
+}
+
+# Check if daemon is started by using the pidfile.
+started()
+{
+	[ -e `pidfile $1` ] && kill -0 `cat \`pidfile $1\`` 2> /dev/null && return 0
+	return 1
+}
+
+start()
+{
+#	echo -n " $1"
+
+#	start-stop-daemon \
+#		--start -b \
+#		--pidfile=`pidfile $1` \
+#		--exec "$D_PATH/$1" \
+#		-- \
+#		`eval echo "$""$1""_options"`
+	#$D_PATH/$1 1> /var/log/$1.log 2>&1 &
+	ulimit -c unlimited
+	$D_PATH/$1 1> /dev/null 2>&1 &
+	
+}
+
+stop()
+{
+	#pkill -SIGKILL $1
+	PID=`cat $PID_WID 2>/dev/null`
+
+	kill -9 $PID 2>/dev/null
+	PID=`cat $PID_ASD 2>/dev/null`
+	sudo kill -9 $PID 2>/dev/null
+	PID=`cat $PID_WSM 2>/dev/null`
+	kill -9 $PID 2>/dev/null
+	rm -f $PIDTHREAD_WID 
+	rm -f $PIDTHREAD_WSM 
+	rm -f $PIDTHREAD_ASD 
+#	echo $PIDTHREAD_WID
+	rm -f $PID_MAIN_WID 
+	rm -f $PID_MAIN_WSM
+	rm -f $PID_MAIN_ASD
+}
+
+# Stop the daemon given in the parameter, printing its name to the terminal.
+stop_old()
+{
+    if ! started "$1" ; then
+#	echo -n " ($1)"
+	return 0
+    else
+	PIDFILE=`pidfile $1`
+	PID=`cat $PIDFILE 2>/dev/null`
+	start-stop-daemon --stop --quiet --oknodo --exec "$D_PATH/$1"
+	#
+	#       Now we have to wait until $DAEMON has _really_ stopped.
+	#
+	if test -n "$PID" && kill -0 $PID 2>/dev/null; then
+	    echo -n " (waiting) ."
+	    cnt=0
+	    while kill -0 $PID 2>/dev/null; do
+		cnt=`expr $cnt + 1`
+		if [ $cnt -gt 60 ]; then
+		    # Waited 120 secs now, fail.
+		    echo -n "Failed.. "
+		    break
+		fi
+		sleep 2
+		echo -n "."
+		done
+	    fi
+#	echo -n " $1"
+	rm -f `pidfile $1`
+    fi
+}
+
+
+#
+# Function that starts the daemon/service
+#
+do_start()
+{
+	# Return
+	#   0 if daemon has been started
+	#   1 if daemon was already running
+	#   2 if daemon could not be started
+	#for daemon_name in $DAEMONS; do
+	#	start "$daemon_name"
+	#done
+	ulimit -c unlimited
+	start-stop-daemon --start --quiet -b --pidfile $PID_WID --exec $D_WID $LOCAL $PROFILENO		|| return 2	
+	start-stop-daemon --start --quiet -b --pidfile $PID_ASD --exec $D_ASD $LOCAL $PROFILENO		|| return 2
+	start-stop-daemon --start --quiet -b --pidfile $PID_WSM --exec $D_WSM $LOCAL $PROFILENO		|| return 2
+        /usr/bin/mcore_set4.sh wid 0xfff0 $LOCAL $PROFILENO  
+	/usr/bin/mcore_set4.sh wsm 0xfff0 $LOCAL $PROFILENO  
+	/usr/bin/mcore_set4.sh asd 0xfff0 $LOCAL $PROFILENO  
+#	/opt/bin/wid >> /var/log/nice_wid.log 2>&1 &
+#	nice -n+1 /opt/bin/asd >> /var/log/nice_asd.log 2>&1 &
+#	nice -n+2 /opt/bin/wsm >> /var/log/nice_wsm.log 2>&1 &
+	return 0
+	# Add code here, if necessary, that waits for the process to be ready
+	# to handle requests from services started subsequently which depend
+	# on this one.  As a last resort, sleep for some time.
+}
+
+#
+# Function that stops the daemon/service
+#
+do_stop()
+{
+	for daemon_name in $DAEMONS; do
+		stop "$daemon_name"
+	done
+	return 0
+}
+
+if [ ! -d /var/run/wcpss ] ; then
+	mkdir -p /var/run/wcpss
+	chmod 755 /var/run/wcpss
+fi
+
+
+case "$1" in
+  start)
+	[ "$VERBOSE" != no ] && log_daemon_msg "Starting $DESC" "$NAME"
+	echo "Starting $DESC": "$NAME"
+	do_start
+	case "$?" in
+		0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+		2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+	esac
+	;;
+  stop)
+	[ "$VERBOSE" != no ] && log_daemon_msg "Stopping $DESC" "$NAME"
+	echo "Stoping $DESC": "$NAME"
+	stop
+	case "$?" in
+		0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+		2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+	esac
+	;;
+  #reload|force-reload)
+	#
+	# If do_reload() is not implemented then leave this commented out
+	# and leave 'force-reload' as an alias for 'restart'.
+	#
+	#log_daemon_msg "Reloading $DESC" "$NAME"
+	#do_reload
+	#log_end_msg $?
+	#;;
+  restart|force-reload)
+	#
+	# If the "reload" option is implemented then remove the
+	# 'force-reload' alias
+	#
+	log_daemon_msg "Restarting $DESC" "$NAME"
+	do_stop
+	case "$?" in
+	  0|1)
+		do_start
+		case "$?" in
+			0) log_end_msg 0 ;;
+			1) log_end_msg 1 ;; # Old process is still running
+			*) log_end_msg 1 ;; # Failed to start
+		esac
+		;;
+	  *)
+	  	# Failed to stop
+		log_end_msg 1
+		;;
+	esac
+	;;
+  *)
+	#echo "Usage: $SCRIPTNAME {start|stop|restart|reload|force-reload}" >&2
+	echo "Usage: $SCRIPTNAME {start|stop|restart|force-reload}" >&2
+	exit 3
+	;;
+esac
+
+:

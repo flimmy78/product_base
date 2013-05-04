@@ -1,0 +1,32 @@
+
+
+###
+###  add include path and file list
+###
+
+#INCLUDE_PATH =
+#C_FILE_LIST  =
+SUBDIRS      = NONE
+C_EXCLUDE_FILE_LIST = cpssLuaTest.c
+
+C_FILE_LIST = \
+		wraplOsMsgQ.c wraplTaskCreate.c \
+		cmdLuaBitwizeFunctions.c \
+		wraplCpssCommon.c wraplCpssDeviceInfo.c \
+		wraplCpssTypes.c \
+		wraplCpssTrunk.c \
+		wraplCpssPortCntr.c
+ifeq (EXISTS, $(CHX_FAMILY))
+  C_FILE_LIST += wraplCpssDxChBrg.c wraplCpssDxChMirror.c wraplCpssDxChNet.c \
+                wraplCpssPFC.c wraplCpssQCN.c wraplCpssDxChVlan.c
+endif
+ifeq (EXISTS, $(PM_FAMILY))
+  C_FILE_LIST += wraplCpssExMxPmIpTypes.c
+endif
+
+
+INCLUDE_PATH += $(FIS)$(LUA_SRCPATH)$(FIE)
+
+##################################################
+##################################################
+include $(PROJ_BASE)/gtTopMake

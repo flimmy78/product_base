@@ -1,0 +1,55 @@
+#!/bin/bash
+
+. /etc/default/rcS
+. /lib/lsb/init-functions
+
+#product_id=`cat /proc/product_id`
+
+
+# C5A000 for Chassis 5 slots Cheetah2
+#if [  $(($product_id & 0xFFF000)) -eq $((0xC5A000)) ] ; then
+#	echo "256" > /devinfo/maxwtpcount
+#else
+#	echo "128" > /devinfo/maxwtpcount
+#fi
+# Set Default license value to 2 
+install_lic_type()
+{
+LICTYPE=$1
+if [ ${LICTYPE} -eq 1 ] ; then
+LICTS=''
+else
+LICTS=${LICTYPE}
+fi
+
+if [ -r /mnt/lic/maxwtpcount${LICTS}.lic ] ; then
+  log_action_msg "Found Type ${LICTYPE} license file, trying to install it .."
+  LIC_ENCRYPT=`cat /mnt/lic/maxwtpcount${LICTS}.lic`
+  LIC_MAXWTPCOUNT_VALUE=`/etc/lic/lic_getvalue.sh $LIC_ENCRYPT`
+  LICRET=$?
+  if [ ${LICRET} -eq 0 ] || [ ${LICRET} -ge 65 ] ; then
+    printf ${LIC_MAXWTPCOUNT_VALUE} > /devinfo/maxwtpcount${LICTS}
+    log_success_msg " Installed Type ${LICTYPE} license of ${LIC_MAXWTPCOUNT_VALUE} maxwtpcount."
+  else
+    echo "2" > /devinfo/maxwtpcount${LICTS}
+    echo " " > /devinfo/licreq${LICTS}
+    log_failure_msg " Type ${LICTYPE} Error code ${LICRET}:${LIC_MAXWTPCOUNT_VALUE}."
+  fi
+  chmod 666 /devinfo/maxwtpcount${LICTS}
+else
+  	echo "2" > /devinfo/maxwtpcount${LICTS}
+	chmod 666 /devinfo/maxwtpcount${LICTS}
+	echo " " > /devinfo/licreq${LICTS}
+	if [ $LICTYPE -eq 1 ] ; then
+	log_action_msg "No Type ${LICTYPE} license file found, using default maxwtpcount value "`cat /devinfo/maxwtpcount${LICTS}`
+	fi
+fi
+
+
+}
+
+for i in 1 2 3 4 5 6 7 8 9
+do
+install_lic_type $i
+done
+

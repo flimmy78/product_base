@@ -1,0 +1,67 @@
+###########################################
+##                                       ##
+##    Top Make file for Galileo drivers  ##
+##                                       ##
+###########################################
+PROJ_NAME = mainCmd
+
+include $(USER_BASE)/gtDefsTopMake.mk  
+
+PROJECT_PATH = $(BASE_PATH)    \
+               $(PRES_PATH)    \
+               $(OS_PATH)      \
+               $(APPDEMO_PATH) \
+               $(EXT_DRV_PATH)  \
+               $(OS_INCLUDE) \
+               $(XBAR_DRV_PATH)
+
+
+include $(USER_BASE)/gtToolsTopMake.mk  
+
+ifeq (DX_FAMILY, $(PRESTERA_FAMILY))
+  CFLAGS3 = $(FD)SALSA_FAMILY
+else
+  ifeq (SX_FAMILY, $(PRESTERA_FAMILY))
+    CFLAGS3 = $(FD)SOHO_FAMILY
+  endif
+endif
+
+#for PSS/PoC
+ifeq (EXMXPM_FAMILY, $(PRESTERA_FAMILY))
+  AD_CFLAGS += $(FD)EXMXPM_FAMILY
+endif
+
+#for cpss
+ifeq (EXISTS, $(PM_FAMILY))
+  AD_CFLAGS += $(FD)EXMXPM_FAMILY
+endif
+
+ifeq (workbench, $(TOOL_ENV))
+ AD_CFLAGS += $(FD)WORKBENCH_TOOL_ENV
+endif
+
+#############################
+### CPSS mode support ###
+#############################
+ifeq (CPSS, $(PRODUCT_TYPE))
+AD_CFLAGS += $(FD)CPSS_PRODUCT
+PROJECT_PATH += $(CPSS_MAIN_CMD) $(CPSS_INCLUDE)
+else
+## at this stage there is code not usefull for pss_over_cpss and cpss_only
+## and for cpss_only CPSS_PRODUCT key not defined, 
+## so temporary we need pss_only key
+AD_CFLAGS += $(FD)PSS_PRODUCT
+endif
+
+# Image for FE200
+ifeq (DUNE, $(BSP_VENDOR))
+AD_CFLAGS += $(FD)DUNE_FE_IMAGE
+endif
+
+
+CFLAGS += $(CFLAGS1) $(CFLAGS2) $(CFLAGS3) $(CFLAGS_OPT) $(OS_DEFINE) $(CPU_FLAGS) $(LFLAGS) $(AD_CFLAGS)
+
+include $(USER_BASE)/gtTargetsTopMake.mk 
+
+full: build_dir dep compile elf
+

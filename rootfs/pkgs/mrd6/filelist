@@ -1,0 +1,13 @@
+usr
+usr/bin
+usr/bin/mrd6sh
+usr/lib
+usr/lib/mrd6
+usr/lib/mrd6/mrdisc.so
+usr/lib/mrd6/msnip.so
+usr/lib/mrd6/bgp.so
+usr/sbin
+usr/sbin/mrd6
+etc
+etc/init.d
+etc/init.d/mrd6

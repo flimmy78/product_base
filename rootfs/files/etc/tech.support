@@ -1,0 +1,31 @@
+#! /bin/bash
+
+echo "======================="
+echo "System memory usage..."
+echo "======================="
+free -b -l -t
+
+echo "======================="
+echo "System process map..."
+echo "======================="
+ps -ef 
+
+echo "======================="
+echo "NPD boot log..."
+echo "======================="
+cat /var/run/bootlog.npd
+
+echo "======================="
+echo "NPD pid..."
+echo "======================="
+cat /var/run/npd_all.pid
+
+echo "======================="
+echo "Other log..."
+echo "======================="
+cat /var/log/daemon.log
+
+echo "======================="
+echo "Kernel message..."
+echo "======================="
+dmesg

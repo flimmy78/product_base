@@ -1,0 +1,130 @@
+#!/bin/bash
+
+#if [ -e /dev/console ]; then
+#  echo Entering `tput setaf 4`AuteWare`tput op` System
+#fi
+
+# Note that this only becomes /dev on the real filesystem if udev's scripts
+# are used; which they will be, but it's worth pointing out
+
+tmpfs_size="5M"
+
+/bin/chown root:root -R /
+
+if [ -e /etc/udev/udev.conf ]; then
+	. /etc/udev/udev.conf
+fi
+
+mount -t tmpfs -o size=$tmpfs_size,mode=0755 udev /dev
+
+
+#Added console device for output information of init processes.
+[ -e /dev/console ] || mknod /dev/console c 5 1
+
+
+#echo Preparing temporary file systems ...
+
+
+[ -d /root ] || mkdir --mode=0700 /root
+[ -d /sys ] || mkdir /sys
+[ -d /proc ] || mkdir /proc
+[ -d /tmp ] || mkdir /tmp
+
+[ -d /var ] || mkdir /var
+mkdir -p /var/lock
+mkdir -p /var/run
+#/var/run and /var/lock will be remounted as tmpfs
+#mkdir -p /var/lock/apache2
+#chown www-data.www-data /var/lock/apache2
+
+#[ -d /var/run/apache2 ] || mkdir -p /var/run/apache2
+#chown www-data.www-data /var/run/apache2
+
+mkdir -p /var/spool/cron/crontabs
+
+mkdir -p /var/log
+mkdir -p /var/log/apache2
+chown www-data.www-data /var/log/apache2
+
+mkdir -p /opt/debugdown
+chown -R www-data.www-data /opt/debugdown
+chown -R www-data.www-data /opt/www
+mkdir -p /opt/bin/core
+chmod 777 /opt/bin/core
+
+mkdir -p /var/log/snort
+
+
+mkdir -p /var/lib
+
+mkdir -p /var/lib/dbus
+mkdir -p /var/lib/iptraf
+mkdir -p /var/lib/snmp
+mkdir -p /lib/init/rw
+
+mkdir -p /var/lib/ntp
+chown ntp:ntp /var/lib/ntp
+
+#chown -R admin:vtyadmin /home/admin
+#mkdir -p /home
+mkdir -p /mnt
+
+#Temporary added for web console
+#chmod 777 -R /etc # This would cause problem
+#chmod 777 -R /etc/default # We should not need this since dhcp should be moved to /opt/services directory.
+/bin/chmod 600 /etc/ssh/ssh_host_dsa_key /etc/ssh/ssh_host_rsa_key 
+/bin/chmod 440 /etc/sudoers
+
+chmod u+s /bin/rm
+
+#Added stick bit so that normal user can execute user management tasks.
+chmod u+s /usr/sbin/useradd
+chmod u+s /usr/sbin/userdel
+chmod u+s /usr/sbin/usermod
+chmod u+s /usr/bin/gpasswd
+chmod u+s /usr/bin/checkpassword-pam
+chmod u+s /opt/bin/vtysh
+chmod u+s /sbin/start-stop-daemon
+chmod u+s /sbin/reboot
+chmod u+s /sbin/modprobe
+chmod u+s /bin/cat
+chmod u+s /bin/echo
+chmod u+s /bin/hostname
+chmod u+s /usr/bin/sudo
+chmod u+s /bin/su
+chmod u+s /bin/kill
+chmod u+s /usr/bin/passwd
+#Added s so that normal user can execute ping (open a raw socket)
+chmod u+s /bin/ping
+chmod u+s /bin/ping6
+chmod u+s /usr/bin/pkill
+chmod u+s /usr/bin/traceroute.lbl
+chmod u+s /usr/bin/traceroute6
+
+check_mod() 
+{
+if [ -e $1 ] ; then 
+	chmod u+s $1 
+fi
+}
+
+check_mod /opt/bin/iptables
+check_mod /opt/bin/iptables-save
+check_mod /opt/bin/iptables-restore
+check_mod /opt/bin/ipset
+check_mod /opt/bin/autelan-subagent
+check_mod /opt/bin/trap-helper
+check_mod /usr/sbin/tcpdump
+check_mod /sbin/tc
+
+> /var/log/dmesg
+
+mount -t sysfs none /sys
+mount -t proc none /proc
+
+# We should use /etc/sysctl.conf to configure printk instead of here
+#echo 3 > /proc/sys/kernel/printk
+
+depmod -a
+
+exec /sbin/init 

@@ -1,0 +1,217 @@
+#!/bin/sh -e
+### BEGIN INIT INFO
+# Provides:          module-init-tools
+# Required-Start:    
+# Required-Stop:     
+# Should-Start:      checkroot
+# Should-stop:
+# Default-Start:     S
+# Default-Stop:
+# Short-Description: Load device module.
+# Description:       Load the modules based on product type.
+### END INIT INFO
+
+# Silently exit if the kernel does not support modules or needs modutils.
+[ -f /proc/modules ] || exit 0
+[ ! -f /proc/ksyms ] || exit 0
+[ -x /sbin/modprobe  ] || exit 0
+
+. /etc/default/rcS
+. /lib/lsb/init-functions
+
+
+
+PATH="/sbin:/bin:/usr/bin:/usr/sbin:/opt/bin"
+
+
+load_module() {
+  local module args
+  module="$1"
+  args="$2"
+
+  log_action_begin_msg " $module"
+  modprobe $module $args >> /var/log/modprobe.log || true
+  log_action_end_msg 0
+}
+
+log_action_msg "Loading kernel modules .."
+
+#load_module bm
+#[ -e /dev/bm0 ] || mknod /dev/bm0 c 236 0
+#echo "bm load successfully"
+
+load_module kes
+sleep 1
+if [ -f /proc/kes_flag ] ; then
+kes_flag=`cat /proc/kes_flag`
+	if [ "x$kes_flag" == "xenable" ] ; then
+		echo "copying kes.log to SD card..."
+		if [ -f /proc/kes_proc ] ; then
+		cat /proc/kes_proc > /mnt/kes.log
+		#sor.sh cp kes.log 10
+		echo disable > /proc/kes_flag
+		echo "done."
+		else
+		echo "kes_proc not exist."
+		fi
+	else
+	echo "kes_flag not enabled."
+	fi
+else
+echo "kes_flag not exist."
+fi
+
+if [ -f /proc/nvram_mem_flag ] ; then
+nvram_mem_flag=`cat /proc/nvram_mem_flag`
+nvram_mem_time=`cat /proc/nvram_mem_time`
+	if [ "x$nvram_mem_flag" == "xnew" ] ; then
+		echo "copying nvram log to SD card..."
+		if [ -f /proc/nvram_mem ] ; then
+		mkdir /mnt/nvram_log
+		cat /proc/nvram_mem > /mnt/nvram_log/nvram${nvram_mem_time}.log
+		#sor.sh cp nvram_log 10
+		echo old > /proc/nvram_mem_flag
+		echo "done."
+		else
+		echo "nvram_mem not exist."
+		fi
+	else
+	echo "nvram_mem_flag not new."
+	fi
+else
+echo "nvram_mem_flag not exist."
+fi
+
+load_module kernel-sem
+
+load_module pfm_kern
+#use NULL_SN as default when there is no sn in devinfo which can be processed by dcli_system.c
+# wangjiankun added on Aug 29, 2010
+if [ ! -d /devinfo ]; then
+        mkdir -p /devinfo
+fi
+
+if [ ! -f /devinfo/sn ] ; then
+if [ ! -f /proc/sysinfo/product_sn ] ; then 	
+	echo "000000000000000000000" > /devinfo/sn
+else
+	cat /proc/sysinfo/product_sn > /devinfo/sn
+fi
+fi
+
+
+if [ ! -f /devinfo/mac ] ; then
+if [ ! -f /proc/sysinfo/product_base_mac_addr ] ; then
+errmsg="Error: No official device mac addr found, using a temporary mac."
+log_failure_msg $errmsg
+echo "$errmsg" >> /etc/motd
+else
+	cat /proc/sysinfo/product_base_mac_addr > /devinfo/mac
+    	log_success_msg " Product base mac: "`cat /devinfo/mac`
+fi
+fi
+
+# DHCP Broadcast Agent module
+#load_module dba
+load_module sctp
+
+#jump this, or be "cat: /proc/product_id: No such file or directory"
+#product_id=`cat /proc/product_id`
+
+# Insmod mvPpDrv for distribute board.
+load_module mvPpDrv
+[ -e /dev/mvPP ] || mknod /dev/mvPP c 252 0
+echo "mvPP load successfully"
+
+# kap0 will be created by kapDrv
+# Sometimes kap0 was created just after check whether it was created.
+# expecially smp was enabled, set affinity of this process doesnt work.
+load_module kapDrv
+sleep 1
+[ -e /dev/kap0 ] || mknod /dev/kap0 c 10 210
+echo "kap load successfully"
+
+# on SDK2.2 jump there, but the bcm should add later!!!  
+# For any Cheetah2 products, they all have cavium ethernet mod
+# move from /etc/modules, install modules according to asic type
+#if [ $(($product_id & 0x00F000)) -eq $((0x00A000)) ] ; then
+#	DO NOT load cavium-ip-offload by default to avoid problems.
+#	if [ `cat /etc/version/products` != "X7X5" ] ; then
+#		echo "Fatal error, you are running `cat /etc/version/products` software on X7X5 hardware.";
+#		echo "Please upgrade a compatible software image.";
+#		while true
+#		do
+#			read cmd
+#		done
+#	fi
+#	load_module mvPpDrv
+#	[ -e /dev/mvPP ] || mknod /dev/mvPP c 252 0
+#elif [ $(($product_id & 0x00F000)) -eq $((0x00B000)) ] ; then
+#	if [ `cat /etc/version/products` != "X3" ] ; then
+#		echo "Fatal error, you are running `cat /etc/version/products` software on X3 hardware.";
+#		echo "Please upgrade a compatible software image.";
+#		while true
+#		do
+#			read cmd
+#		done
+#	fi
+#	load_module linux-user-bde
+#	load_module linux-kernel-bde
+#	[ -e /dev/ubde ] || mknod /dev/ubde c 126 0
+# Insmod mvPpDrv for all distribute board.
+#elif [ $(($product_id))  -eq  0 ] ; then
+#	if [ -e /proc/board/is_distributed ] ; then
+#		if [ `cat /proc/board/is_distributed` = "1" ] ; then
+#			echo " Native board is distributed.";
+#			load_module mvPpDrv
+#			[ -e /dev/mvPP ] || mknod /dev/mvPP c 252 0
+#		fi
+#	fi
+#	
+#fi
+
+#load_module cavium-ethernet
+[ -e /dev/oct0 ] || mknod /dev/oct0 c 242 0
+
+#This will be controlled by loadconfig
+#load_module cavium-ip-offload
+#[ -e /dev/ipfwd0 ] || mkod /dev/ipfwd0 c 244 0
+
+load_module rpa-ethernet
+[ -e /dev/rpa0 ] || mknod /dev/rpa0 c 245 0
+
+load_module wifi-ethernet
+[ -e /dev/wifi0 ] || mknod /dev/wifi0 c 243 0
+
+# cavium_ratelimit default majar is 244 , don't use it as others please, 
+# change it with parameter cr_major_num=xxx cr_minor_num=0
+#load_module cavium_ratelimit cr_major_num=244 cr_minor_num=0
+#load_module cavium_ratelimit
+#[ -e /dev/cavium_ratelimit ] || mknod /dev/cavium_ratelimit c 244 0
+
+load_module dba
+
+load_module e1000e
+
+#load_module adm1021
+#sleep 2
+#load_module ipfwd_learn_coexist
+#if [ `cat /proc/product_info/board_type` = "4" ] ; then
+#this will load base drive module of pcie targe module for 12c wangchong
+#load_module octeon_drv
+
+#if you want up slave cpu to nic mode,you need download .strip for 12c slave cpu 
+#cmd> OCTEON_PCI_DEVICE=1 oct-pci-load  0x20000000  ./cvmcs-nic.strip
+#cmd> OCTEON_PCI_DEVICE=1 oct-pci-bootcmd "bootoct 0x20000000 coremask=f"
+
+#Load the NIC module wangchong
+#load_module octnic
+#fi
+
+load_module kpppoe
+
+# DO NOT Load watchdog nmi by default, since cpld watchdog should be enough.
+#load_module oct_watchdog_nmi
+
+exit 0
+

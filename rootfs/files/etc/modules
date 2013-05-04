@@ -1,0 +1,10 @@
+# /etc/modules: kernel modules to load at boot time.
+#
+# This file contains the names of kernel modules that should be loaded
+# at boot time, one per line. Lines beginning with "#" are ignored.
+
+#pcnet32 were loaded by udev , ide-generic should be loaded by udev too.
+#ide-generic
+#pcnet32
+#adm1021
+#Our main device module were loaded by rc2.d/S10laodmodule

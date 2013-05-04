@@ -1,0 +1,107 @@
+#! /bin/sh
+
+KMOD_DIR=/lib/modules/2.6.22.18
+
+check_asicstate()
+{
+        printf "Checking ASIC state..."
+        i=0
+        while true
+        do
+
+        if [ -s /var/run/asic.state ] ; then
+                asicstate=`cat /var/run/asic.state`
+	        if [ "$asicstate" = "1" ] ; then
+	                printf " done. $i seconds waited.\n"
+	                return 0
+	        fi
+    		printf " [$asicstate] "
+      	fi
+	
+	i=$(($i+1));
+	if [ $i -gt 120 ] ; then # totally wait for 120s until timeout
+		printf " timeout\n"
+		return 1;
+	fi
+	
+	printf "  $(($i))s"
+	
+	# sleep for a while
+	sleep 1s
+	
+	# clear the process line
+	printf "\b\b\b\b"
+	
+	if [ $i -gt 99 ] ; then
+		printf "\b\b"
+	elif [ $i -gt 9 ] ; then
+		printf "\b"
+	fi
+        done
+}
+
+echo "system task info"
+ps
+
+ulimit -c unlimited 
+
+if [ ! -d /tmp ] ; then
+	mkdir /tmp
+fi
+
+echo "installing kernel modules"
+
+if [ -e $KMOD_DIR/bm.ko ] ; then
+	echo "  BM module..."
+	insmod $KMOD_DIR/bm.ko
+fi
+
+if [ -e $KMOD_DIR/kapDrv.ko ] ; then
+	echo "  kapDrv module..."
+	insmod $KMOD_DIR/kapDrv.ko
+fi
+
+if [ -e $KMOD_DIR/mvPpDrv.ko ] ; then
+	echo "  mvPpDrv module..."
+	insmod $KMOD_DIR/mvPpDrv.ko
+fi
+
+if [ -e $KMOD_DIR/mvKernelExt.ko ] ; then
+	echo "  mvKernelExt module..."
+	insmod $KMOD_DIR/mvKernelExt.ko
+fi
+
+echo "check and build NPD device node"
+if [ ! -e /dev/bm ] ; then
+	echo " build device node /dev/bm0..."
+	mknod /dev/bm0 c 236 0
+fi
+ls -la /dev/bm0
+
+if [ ! -e /dev/kap0 ] ; then
+	echo " build device node /dev/kap0..."
+	mknod /dev/kap0 c 10 210
+fi
+ls -la /dev/kap0
+
+if [ ! -e /dev/mvPP ] ; then
+	echo " build device node /dev/mvPP..."
+	mknod /dev/mvPP c 254 0
+fi
+ls -la /dev/mvPP
+
+if [ ! -e /dev/mvKernelExt ] ; then
+	echo " build device node /dev/mvKernelExt..."
+	mknod /dev/mvKernelExt c 254 1
+fi
+ls -la /dev/mvKernelExt
+
+echo "system task info"
+ps
+
+echo 0 >/var/run/aw.state
+
+echo "starting network process daemon"
+npd &
+
+check_asicstate

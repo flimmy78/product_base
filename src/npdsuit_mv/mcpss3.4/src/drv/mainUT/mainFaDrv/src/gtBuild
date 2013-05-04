@@ -1,0 +1,23 @@
+
+
+###
+###  add include path and file list
+###
+
+#INCLUDE_PATH =
+#C_FILE_LIST  =
+#SUBDIRS      =
+#C_EXCLUDE_FILE_LIST =
+
+ifeq (EXCLUDE_LIB, $(EXCLUDE_FA))
+    SUBDIRS  = NONE
+endif
+
+### check if we may be in NONE FA system
+ifneq (PRESTERA , $(FA_VENDOR))
+    SUBDIRS = NONE
+endif
+
+##################################################
+##################################################
+include $(PROJ_BASE)/gtTopMake

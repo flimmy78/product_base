@@ -1,0 +1,49 @@
+#! /bin/bash
+
+PATH=/sbin/:/usr/sbin:/bin:/usr/bin:/opt/bin
+
+<<"COM"
+if [ -f /proc/kes_flag ] ; then
+kes_flag=`cat /proc/kes_flag`
+	if [ "x$kes_flag" == "xenable" ] ; then
+		echo "copying kes.log to SD card..."
+		if [ -f /proc/kes_proc ] ; then
+		cat /proc/kes_proc > /mnt/kes.log
+		sor.sh cp kes.log 10
+		echo disable > /proc/kes_flag
+		echo "done."
+		else
+		echo "kes_proc not exist."
+		fi
+	else
+	echo "kes_flag not enabled."
+	fi
+else
+echo "kes_flag not exist."
+fi
+
+if [ -f /proc/nvram_mem_flag ] ; then
+nvram_mem_flag=`cat /proc/nvram_mem_flag`
+nvram_mem_time=`cat /proc/nvram_mem_time`
+	if [ "x$nvram_mem_flag" == "xnew" ] ; then
+		echo "copying nvram log to SD card..."
+		if [ -f /proc/nvram_mem ] ; then
+		mkdir /mnt/nvram_log
+		cat /proc/nvram_mem > /mnt/nvram_log/nvram${nvram_mem_time}.log
+		sor.sh cp nvram_log 10
+		echo old > /proc/nvram_mem_flag
+		echo "done."
+		else
+		echo "nvram_mem not exist."
+		fi
+	else
+	echo "nvram_mem_flag not new."
+	fi
+else
+echo "nvram_mem_flag not exist."
+fi
+COM
+
+echo "Trying to copy kes or nvram log to /blk/ ..."
+sor.sh cp kes.log 10
+sor.sh cp nvram_log 10

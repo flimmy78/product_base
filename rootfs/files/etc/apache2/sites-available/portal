@@ -1,0 +1,22 @@
+ServerAdmin webmaster@localhost
+ServerName  127.0.0.1
+DocumentRoot "/opt/eag/www"
+
+<Directory />
+Options -Indexes FollowSymLinks MultiViews
+AllowOverride None
+Order allow,deny
+allow from all
+</Directory>
+
+ScriptAlias /cgi-bin/ /opt/www/ccgi-bin/ 
+<Directory /opt/www/ccgi-bin>
+AllowOverride None
+Options ExecCGI -MultiViews +SymLinksIfOwnerMatch
+Order allow,deny
+Allow from all
+</Directory>
+
+ErrorLog /var/log/apache2_error_eag.log
+LogLevel  warn
+CustomLog /var/log/apache2_access_eag.log combined

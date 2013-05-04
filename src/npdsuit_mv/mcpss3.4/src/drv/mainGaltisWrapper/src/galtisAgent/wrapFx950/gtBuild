@@ -1,0 +1,20 @@
+###
+###  add include path and file list
+###
+
+#INCLUDE_PATH =
+#C_FILE_LIST  =
+#SUBDIRS      =
+#C_EXCLUDE_FILE_LIST =
+
+SUBDIRS =
+
+ifeq (DUNE, $(XBAR_VENDOR))
+    SUBDIRS += fx950
+endif
+
+
+
+##################################################
+##################################################
+include $(PROJ_BASE)/gtTopMake

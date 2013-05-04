@@ -1,0 +1,4 @@
+#disable sdhci related module for debug usage.
+#blacklist sdhci
+#blacklist mmc_core
+#blacklist ipv6

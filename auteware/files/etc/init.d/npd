@@ -1,0 +1,253 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          npd 
+# Required-Start:    $local_fs 
+# Required-Stop:     $local_fs 
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: NPD 
+# Description:       Network Platform Daemon
+### END INIT INFO
+
+
+# Do NOT "set -e"
+
+# PATH should only include /usr/* if it runs after the mountnfs.sh script
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/opt/bin
+DESC="Network Platform Daemon"
+NAME=npd
+DAEMON=/opt/bin/$NAME
+#DAEMON_ARGS="--options args"
+PIDFILE=/var/run/$NAME.pid
+SCRIPTNAME=/etc/init.d/$NAME
+
+# Exit if the package is not installed
+[ -x "$DAEMON" ] || exit 0
+
+# Load the VERBOSE setting and other rcS variables
+. /lib/init/vars.sh
+
+# Define LSB log_* functions.
+# Depend on lsb-base (>= 3.0-6) to ensure that this file is present.
+. /lib/lsb/init-functions
+
+#
+# Function that save NPD startup log message to storage
+#
+save_startup_log_to_storage()
+{
+    SNAPSHOTDIR="snapshot/`date +%Y%m%d%H%M%S`"
+    printf "Save asic startup log to storage..."
+    mkdir -p /mnt/$SNAPSHOTDIR
+    cp /var/run/bootlog.npd /mnt/$SNAPSHOTDIR
+    sor.sh cp $SNAPSHOTDIR/bootlog.npd 30
+    result=$?
+    if [ $result -eq 0 ]
+    then
+    	printf "done.\n"
+    else
+	printf "failed with error code($result).\n"
+    fi
+
+    return 0
+}
+
+#
+# Function that starts the daemon/service
+#
+
+check_asicstate()
+{
+printf "Checking ASIC state..."
+i=0;
+timepass=0 # time elapsed
+while true 
+do
+
+if [ -s /var/run/asic.state ] ; then
+asicstate=`cat /var/run/asic.state`
+if [ "$asicstate" = "1" ] ; then
+	printf " done. $timepass seconds waited.\n"
+#	save_startup_log_to_storage
+	return 0
+fi
+printf " [$asicstate] "
+fi
+
+i=$(($i+1));
+if [ $i -gt 1090 ] ; then # totally wait for 120s until timeout
+printf " timeout\n"
+save_startup_log_to_storage
+return 1;
+fi
+
+if [ $i -lt 10 ] ; then # wait for 9s
+    timepass=$i
+	sleeptime=0.9  
+elif [ $i -lt 50 ] ; then # wait for 24s 
+	timepass=$(echo "9+0.6*($i-10)" | bc)
+	timepass=${timepass%.*}
+    sleeptime=0.6
+elif [ $i -lt 130 ] ; then # wait for 24s
+	timepass=$(echo "33+0.3*($i-50)" | bc)
+	timepass=${timepass%.*}
+    sleeptime=0.3
+elif [ $i -lt 430 ] ; then # wait for 30s
+	timepass=$(echo "57+0.1*($i-130)" | bc)
+	timepass=${timepass%.*}
+    sleeptime=0.1
+elif [ $i -le 1090 ] ; then # wait for 33s
+	timepass=$(echo "87+0.05*($i-430)" | bc)
+	timepass=${timepass%.*}
+    sleeptime=0.05
+fi
+
+case $(($i%4)) in
+	0) printf "-";;
+	1) printf "\\";;
+	2) printf "|";;
+	3) printf "/";;
+esac
+
+printf " $(($timepass))s"
+
+# sleep for a while
+sleep $sleeptime
+
+# clear the process line
+printf "\b\b\b\b"
+if [ $timepass -gt 99 ] ; then
+	printf "\b\b"
+elif [ $timepass -gt 9 ] ; then
+	printf "\b"
+fi
+done
+}
+
+
+do_start()
+{
+	# Return
+	#   0 if daemon has been started
+	#   1 if daemon was already running
+	#   2 if daemon could not be started
+	#$DAEMON  1> /var/log/$NAME.log 2>&1 &
+	ulimit -c unlimited
+	nice -n-6 $DAEMON  1> /dev/null 2>&1 &
+	check_asicstate
+#	start-stop-daemon --start -b --quiet --pidfile $PIDFILE --exec $DAEMON --test > /dev/null \
+#		|| return 1
+#	start-stop-daemon --start -b --quiet --pidfile $PIDFILE --exec $DAEMON -- \
+#		$DAEMON_ARGS \
+#		|| return 2
+	# Add code here, if necessary, that waits for the process to be ready
+	# to handle requests from services started subsequently which depend
+	# on this one.  As a last resort, sleep for some time.
+}
+
+#
+# Function that stops the daemon/service
+#
+do_stop()
+{
+	# Return
+	#   0 if daemon has been stopped
+	#   1 if daemon was already stopped
+	#   2 if daemon could not be stopped
+	#   other if a failure occurred
+
+	#Only kill real npd process whose parent process id is 1
+	pkill -SIGKILL -P 1 $NAME
+
+	#start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE --name $NAME
+	#RETVAL="$?"
+	#[ "$RETVAL" = 2 ] && return 2
+	# Wait for children to finish too if this is a daemon that forks
+	# and if the daemon is only ever run from this initscript.
+	# If the above conditions are not satisfied then add some other code
+	# that waits for the process to drop all resources that could be
+	# needed by services started subsequently.  A last resort is to
+	# sleep for some time.
+	#start-stop-daemon --stop --quiet --oknodo --retry=0/30/KILL/5 --exec $DAEMON
+	#[ "$?" = 2 ] && return 2
+	# Many daemons don't delete their pidfiles when they exit.
+	#rm -f $PIDFILE
+	#return "$RETVAL"
+}
+
+#
+# Function that sends a SIGHUP to the daemon/service
+#
+do_reload() {
+	#
+	# If the daemon can reload its configuration without
+	# restarting (for example, when it is sent a SIGHUP),
+	# then implement that here.
+	#
+	start-stop-daemon --stop --signal 1 --quiet --pidfile $PIDFILE --name $NAME
+	return 0
+}
+
+##################
+# ldconfig must be done before launching npd, so that /opt/lib could be find.
+#
+ldconfig
+
+case "$1" in
+  start)
+	[ "$VERBOSE" != no ] && log_daemon_msg "Starting $DESC" "$NAME"
+	echo "Starting $DESC": "$NAME"
+	do_start
+	case "$?" in
+		0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+		2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+	esac
+	;;
+  stop)
+	[ "$VERBOSE" != no ] && log_daemon_msg "Stopping $DESC" "$NAME"
+	echo "Stoping $DESC": "$NAME"
+	do_stop
+	case "$?" in
+		0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+		2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+	esac
+	;;
+  #reload|force-reload)
+	#
+	# If do_reload() is not implemented then leave this commented out
+	# and leave 'force-reload' as an alias for 'restart'.
+	#
+	#log_daemon_msg "Reloading $DESC" "$NAME"
+	#do_reload
+	#log_end_msg $?
+	#;;
+  restart|force-reload)
+	#
+	# If the "reload" option is implemented then remove the
+	# 'force-reload' alias
+	#
+	log_daemon_msg "Restarting $DESC" "$NAME"
+	do_stop
+	case "$?" in
+	  0|1)
+		do_start
+		case "$?" in
+			0) log_end_msg 0 ;;
+			1) log_end_msg 1 ;; # Old process is still running
+			*) log_end_msg 1 ;; # Failed to start
+		esac
+		;;
+	  *)
+	  	# Failed to stop
+		log_end_msg 1
+		;;
+	esac
+	;;
+  *)
+	#echo "Usage: $SCRIPTNAME {start|stop|restart|reload|force-reload}" >&2
+	echo "Usage: $SCRIPTNAME {start|stop|restart|force-reload}" >&2
+	exit 3
+	;;
+esac
+
+:

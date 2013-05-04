@@ -1,0 +1,132 @@
+#*******************************************************************************
+# input parameters to this file are:
+#*******************************************************************************
+#
+#  TOOL - the CPU comiling tool -- gnu / diab / visual ...
+#  CPU_TOOL - the the CPU tool -- arm / ppc / intel ...
+#  CPU - the CPU type - PPC603 / PPC604 / ARMARCH5 / PPC860 / VC /
+#  USER_BASE - the directory where the CPSS code exists
+#  XBAR_VENDOR - the XBAR vendor - empty / DUNE / PRESTERA
+#  FA_VENDOR - the FA vendor - empty / PRESTERA
+#  COMPILATION_ROOT - directory to output the compiled fise and libs
+#  NO_PP_USED - is it non-PP compilation ? -- empty / NOT_USED
+#  USER_MAKE - name of the make file to run for the different compilation flags
+#
+#*******************************************************************************
+#  output parameters to this file are:
+#*******************************************************************************
+#
+# ADDED_CFLAGS - the flags to use when the C file are compiled
+#                may add next flags : INCLUDE_USER_APPL
+#
+# LIB_EXTRA - the order of the libraries to be linked in the image
+# MACH_EXTRA - the order of extra libraries to be linked in the image
+#
+#*******************************************************************************
+
+
+ifdef TOOL
+	ifeq ($(TOOL),)
+		TOOL = gnu
+	endif
+else
+	TOOL = gnu
+endif
+
+ifeq (arm, $(CPU_TOOL))
+	CPU_DIR = ARM$(ARM_CPU)
+else
+	CPU_DIR = $(CPU)
+endif
+
+
+ifeq ($(TOOL),visual)
+	ADDED_CFLAGS += /DINCLUDE_USER_APPL
+else
+	ADDED_CFLAGS += -DINCLUDE_USER_APPL
+endif
+
+SUBD = $(patsubst  %/,%,$(dir $(wildcard $(USER_BASE)/*/gtTopMake)))
+
+SUBD_FIX = $(subst \,/,$(SUBD))
+
+DO_LOOP = for i in $(SUBD_FIX); do gmake -f gtTopMake CPSS_FLAG=$(CFLAG_A) -C $$i $@; done
+DO_CLEAN = for i in $(SUBD_FIX); do gmake -f gtTopMake -C $$i $@; done
+
+ifndef COMPILATION_ROOT
+	COMPILATION_ROOT = $(USER_BASE)
+endif
+COMPILATION_ROOT_FIX = $(subst \,/,$(COMPILATION_ROOT))
+
+### handle the PP files ###
+PP_LIBS =$(wildcard $(COMPILATION_ROOT_FIX)/mainPpDrv/libs/$(CPU_DIR)/mainPp*.lib)
+PP_LIBS+=$(wildcard $(COMPILATION_ROOT_FIX)/mainPpDrv/libs/$(CPU_DIR)/*FdbHash.lib)
+PP_LIBS+=$(wildcard $(COMPILATION_ROOT_FIX)/mainPpDrv/libs/$(CPU_DIR)/*IpLpmEngine.lib)
+
+ifeq (RHODES, $(FPGA_TYPE))
+    FPGA_FILES = $(wildcard $(COMPILATION_ROOT_FIX)/mainRhodesDrv/libs/$(CPU_DIR)/mainRhodesDrv.lib)
+endif
+
+
+UTF_LIB=$(wildcard $(COMPILATION_ROOT_FIX)/mainUT/libs/$(CPU_DIR)/mainU*.lib)
+
+UTIL_FILES = $(wildcard $(COMPILATION_ROOT_FIX)/mainExtUtils/libs/$(CPU_DIR)/mainExtUtils.o)
+
+
+ifeq ($(NO_PP_USED),NOT_USED)
+	PP_LIBS =
+endif
+
+### handle the COMMON files ###
+COMMON_LIBS = $(COMPILATION_ROOT_FIX)/common/libs/$(CPU_DIR)/common.o
+
+### handle the FA files ###
+ifeq (PRESTERA, $(FA_VENDOR))
+	FA_FILES = $(COMPILATION_ROOT_FIX)/mainFaDrv/libs/$(CPU_DIR)/mainFaDrv.o
+endif
+
+### handle the XBAR files ###
+ifeq (DUNE, $(XBAR_VENDOR))
+	XBAR_FILES = $(COMPILATION_ROOT_FIX)/mainSandDrv/libs/$(CPU_DIR)/mainSandDrv.o
+endif
+ifeq (PRESTERA, $(XBAR_VENDOR))
+	XBAR_FILES = $(COMPILATION_ROOT_FIX)/mainXbarDrv/libs/$(CPU_DIR)/mainXbarDrv.o
+endif
+
+GALTIS_FILES = $(COMPILATION_ROOT_FIX)/mainGaltisWrapper/libs/$(CPU_DIR)/mainGaltisWrapper.o
+
+
+# DO NOT CHANGE libraries order
+# IT IS important for successfull link
+LIB_EXTRA += $(UTF_LIB) $(PP_LIBS)
+
+#currently nothing to add as "extra libraries"
+MACH_EXTRA += $(COMPILATION_ROOT_FIX)/cpssEnabler/libs/$(CPU_DIR)/cpssEnabler.o \
+	$(COMMON_LIBS) \
+	$(UTIL_FILES) \
+	$(XBAR_FILES) \
+	$(GALTIS_FILES) \
+	$(FA_FILES)
+
+ifeq (RHODES, $(FPGA_TYPE))
+MACH_EXTRA +=   FPGA_FILES
+endif
+
+full:
+	set -e;$(DO_LOOP)
+
+image_full:
+	gmake -f $(USER_BASE)/$(USER_MAKE) full
+
+re_image: image_full
+	make vxWorks.st
+
+image: clean image_full
+	make vxWorks.st
+
+clean_p:
+	set -e;$(DO_CLEAN)
+
+.PHONY: clean_image
+clean_image:
+	gmake -f $(USER_BASE)/$(USER_MAKE) clean_p

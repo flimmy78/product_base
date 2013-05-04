@@ -1,0 +1,232 @@
+#! /bin/bash
+
+OPTION=$1
+
+
+SDKVER=2.2.0
+DRVVER=2.2.0
+
+PATCHNAME=patch.cvm-eth.sdk-$SDKVER.txt
+
+
+# Default Location of EtherPci patch
+ETHERPCIFILE=$PWD/$PATCHNAME
+
+
+
+
+#### Functions ####
+function print_usage()
+{
+	echo "EtherPci Patch for OCTEON LINUX $SDKVER & PCI Driver Version $DRVVER"
+	echo -e "\nInstalls/Uninstalls the etherpci patch to provide ethernet ports"
+	echo "across pci for Octeon host PCI driver and the Octeon Linux ethernet driver." 
+	echo -e "\nUsage:\n\tetherpci <install | uninstall >\n"
+	echo -e "e.g.\ncmd> ./etherpci install - to install patches with current directory as location of EtherPci files"
+	echo -e "\n You can also test whether the patch will install/uninstall with success"
+	echo "by running the command: ./etherpci test <install|uninstall>"
+	echo -e "\n\n"
+	exit
+}
+
+
+
+
+
+function check_dir()
+{
+	if [[ ! -d $1 ]]
+	then
+		echo "Directory $1 not found";
+		exit;
+	fi
+}
+
+
+function check_success()
+{
+	if [[ $1 -ne 0 ]]
+	then
+		echo -e "Failed\n Error log:";
+		cat $2;
+		rm -rf $2
+		exit;
+	fi
+}
+
+
+
+
+function check_installed()
+{
+	package=$1
+	shift 1;
+	rpms=$@;
+
+	echo -n "Checking $package  installation..";
+	echo $rpms | grep $package > /dev/null 2>&1 ;
+	if [[ $? -ne 0 ]]
+	then
+		echo "$package  rpm not installed";
+		exit;
+	fi
+	echo "OK";
+
+
+}
+
+
+function check_installation()
+{
+	rpms=$@;
+	check_installed  OCTEON-SDK-$SDKVER      $rpms;
+	check_installed  OCTEON-LINUX-$SDKVER    $rpms;
+	check_installed  OCTEON-PCI-BASE-$DRVVER $rpms;
+	check_installed  OCTEON-PCI-NIC-$DRVVER  $rpms;
+
+
+	echo -n "Checking OCTEON_ROOT..";
+	wcnt=`echo $OCTEON_ROOT | wc -w`;
+	if [[ $wcnt -eq 0 ]]
+	then
+		echo "OCTEON_ROOT is not set";
+		exit;
+	fi
+	echo "OK.";
+
+	echo -n "Checking SDK directory.."
+	check_dir  $OCTEON_ROOT;
+	echo "OK";
+
+	sdkpatch=`oct-version | grep p1|wc -l`
+	if [ $sdkpatch -eq 1 ]
+	then
+		PATCHNAME=patch.cvm-eth.sdk-${SDKVER}-p1.txt
+	fi
+	echo "Patch is $PATCHNAME"	
+
+}
+
+
+
+
+
+
+function do_dryrun()
+{
+	echo -e "Installing etherpci patch (SDK Version: $SDKVER;  Driver Version: $DRVVER)\n";
+
+	echo -n "Retrieving RPM database information..";
+	rpms=`rpm -qa | grep OCTEON`;
+	echo "OK";
+
+	check_installation $rpms;
+
+	cd $OCTEON_ROOT;
+	if [ "$1"  == "install" ]
+	then
+		patch --dry-run -p0 < $ETHERPCIFILE > $PWD/dryrun.2 2>&1;
+		check_success $? $PWD/dryrun.2 
+		echo "Patch install test succeeded!"
+	elif [ "$1"  == "uninstall" ]
+	then
+		patch --dry-run -R -p0 < $ETHERPCIFILE  > $PWD/dryrun.2 2>&1;
+		check_success $? $PWD/dryrun.2
+		echo "Patch uninstall test succeeded!"
+	else
+		echo "Select install or uninstall option with test"
+		print_usage
+	fi
+
+	echo "Removing temporary files";
+	rm -rf $PWD/dryrun.*;
+	cd -;
+}
+
+
+
+
+
+function  do_install()
+{
+	echo -e "Installing etherpci patch (SDK Version: $SDKVER;  Driver Version: $DRVVER)\n";
+
+	echo -n "Retrieving RPM database information..";
+	rpms=`rpm -qa | grep OCTEON`;
+	echo "OK";
+
+	check_installation $rpms;
+
+
+	echo "Preparing to install octeon-ethernet patch";
+	do_dryrun "install"
+
+
+	echo "Patching Octeon Linux octeon-ethernet driver"
+	cd $OCTEON_ROOT;
+	patch -p0 < $ETHERPCIFILE  > $PWD/dryrun.2 2>&1;
+	check_success $? $PWD/dryrun.2
+
+	echo "Removing temporary files";
+	rm -rf $PWD/dryrun.*;
+
+
+	echo "Patch install status: SUCCESS.";
+	echo -e "\nNext steps:"
+	echo -e "\n Set the ETHERPCI flag in the Makefile for base and nic modules";
+	echo -e "\n Compile the Host PCI driver base module";
+	echo -e "\t cd $OCTEON_ROOT/components/driver/host/driver/linux; make";
+	echo -e "\n Compile the Host PCI driver NIC module";
+	echo -e "\t cd $OCTEON_ROOT/components/driver/host/driver/linux/octnic; make";
+	echo -e "\n Compile Octeon Linux ";
+	
+}
+
+
+
+
+
+
+function  do_uninstall()
+{
+	echo -e "Uninstalling etherpci patch\n";
+
+	echo -n "Retrieving RPM database information..";
+	rpms=`rpm -qa | grep OCTEON`;
+	echo "OK";
+
+	check_installation $rpms;
+
+	echo "Preparing to uninstall patch";
+	do_dryrun "uninstall"
+
+
+	echo "Removing Patches from Octeon Linux octeon-ethernet driver"
+	cd $OCTEON_ROOT;
+	patch -R -p0 < $ETHERPCIFILE > $PWD/dryrun.2 2>&1;
+	check_success $? $PWD/dryrun.2
+
+	echo "Removing temporary files";
+	rm -rf $PWD/dryrun.*;
+
+	echo "Patch uninstall status:  SUCCESS";
+	echo "Remember to remove the ETHERPCI flag from Makefiles of base and nic module"
+}
+
+
+
+
+if [[ "$OPTION" == "install" ]]
+then
+	do_install 
+elif [[ "$OPTION" == "uninstall" ]]
+then
+	do_uninstall
+elif [[ "$OPTION" == "test" ]]
+then
+	do_dryrun $2
+else
+	print_usage
+fi
+
+

@@ -1,0 +1,7 @@
+usr/bin/ldapsearch
+usr/lib/libldap-2.3.so.0
+usr/lib/libldap_r-2.3.so.0
+usr/lib/liblber-2.3.so.0
+usr/lib/liblber-2.3.so.0.2.18
+usr/lib/libldap_r-2.3.so.0.2.18
+usr/lib/libldap-2.3.so.0.2.18

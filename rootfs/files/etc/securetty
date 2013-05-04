@@ -1,0 +1,18 @@
+# /etc/securetty: list of terminals on which root is allowed to login.
+# See securetty(5) and login(1).
+console
+
+# for people with serial port consoles
+ttyS0
+
+# for devfs
+#tts/0
+
+# for telnet and ssh server, 10 root login will be allowed.
+#pts/0
+#pts/1
+#pts/2
+#
+# Standard consoles
+#tty1
+#tty2

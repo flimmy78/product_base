@@ -1,0 +1,133 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          sfd 
+# Required-Start:    $local_fs 
+# Required-Stop:     $local_fs 
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: SFD 
+# Description:       Simple Flood Detection Daemon
+### END INIT INFO
+
+
+# Do NOT "set -e"
+
+# PATH should only include /usr/* if it runs after the mountnfs.sh script
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/opt/bin
+DESC="Simple Flood Detection Daemon"
+NAME=sfd_daemon
+DAEMON=/opt/bin/$NAME
+#DAEMON_ARGS="--options args"
+PIDFILE=/var/run/$NAME.pid
+SCRIPTNAME=/etc/init.d/$NAME
+
+# Exit if the package is not installed
+[ -x "$DAEMON" ] || exit 0
+
+# Load the VERBOSE setting and other rcS variables
+. /lib/init/vars.sh
+
+# Define LSB log_* functions.
+# Depend on lsb-base (>= 3.0-6) to ensure that this file is present.
+. /lib/lsb/init-functions
+
+#
+# Function that save SFD startup log message to storage
+#
+save_startup_log_to_storage()
+{
+	SNAPSHOTDIR="snapshot/`date +%Y%m%d%H%M%S`"
+	printf "Save sfd startup log to storage..."
+	mkdir -p /mnt/$SNAPSHOTDIR
+	cp /var/run/bootlog.sfd /mnt/$SNAPSHOTDIR
+	sor.sh cp $SNAPSHOTDIR/bootlog.sfd 30
+	result=$?
+	if [ $result -eq 0 ]
+	then
+		printf "done.\n"
+	else
+		printf "failed with error code($result).\n"
+	fi
+
+	return 0
+}
+
+#
+# Function that starts the daemon/service
+#
+do_start()
+{
+	ulimit -c unlimited
+	mkdir -p /var/run/sfd
+	nice -n-6 $DAEMON 1> /var/log/$NAME.log 2> /var/log/$NAME.log &
+}
+
+#
+# Function that stops the daemon/service
+#
+do_stop()
+{
+	pkill -SIGKILL -P 1 $NAME
+}
+
+#
+# Function that sends a SIGHUP to the daemon/service
+#
+do_reload() {
+	start-stop-daemon --stop --signal 1 --quiet --pidfile $PIDFILE --name $NAME
+	return 0
+}
+
+##################
+# ldconfig must be done before launching sem, so that /opt/lib could be find.
+#
+ldconfig 2> /dev/null
+
+case "$1" in
+	start)
+	[ "$VERBOSE" != no ] && log_daemon_msg "Starting $DESC" "$NAME"
+	#echo "Starting $DESC": "$NAME"
+	do_start
+	case "$?" in
+		0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+		2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+	esac
+	;;
+	stop)
+	[ "$VERBOSE" != no ] && log_daemon_msg "Stopping $DESC" "$NAME"
+	#echo "Stoping $DESC": "$NAME"
+	do_stop
+	case "$?" in
+		0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+		2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+	esac
+	;;
+	restart|force-reload)
+	#
+	# If the "reload" option is implemented then remove the
+	# 'force-reload' alias
+	#
+	log_daemon_msg "Restarting $DESC" "$NAME"
+	do_stop
+	case "$?" in
+		0|1)
+		do_start
+		case "$?" in
+			0) log_end_msg 0 ;;
+			1) log_end_msg 1 ;; # Old process is still running
+			*) log_end_msg 1 ;; # Failed to start
+		esac
+		;;
+		*)
+		# Failed to stop
+		log_end_msg 1
+		;;
+	esac
+	;;
+	*)
+	echo "Usage: $SCRIPTNAME {start|stop|restart|force-reload}" >&2
+	exit 3
+	;;
+esac
+
+:

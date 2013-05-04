@@ -1,0 +1,158 @@
+Linux NIC Driver for OCTEON (Version 2.2.0)
+===========================================
+
+ The NIC package requires OCTEON-PCI-BASE version 2.2.0 to be installed.
+
+ The NIC driver is available as a linux kernel loadable module that uses
+ the features provided by the base driver. The base driver is available from
+ the OCTEON-PCI-BASE RPM package. 
+
+
+
+                           Directory Structure
+                           -------------------
+
+
+OCTEON-SDK/components/driver/host/driver/linux/octnic
+    |
+    |-- README.txt (Compilation instructions)
+    |
+    |-- Makefile
+    |
+    |-- (Linux specific NIC driver files)
+
+ The NIC module sources are kept in the directory shown above.
+
+
+
+OCTEON-SDK/applications/pci-core-app/nic
+    |
+    |-- Core application to support NIC functionality.
+
+
+ The pci-core-app/nic directory has the sources for a core application that
+ supports NIC functionality.
+
+
+
+
+                               Change History
+                               --------------
+
+ (NOTE: Additional bug fixes and functionality changes or improvements may
+        have been made to the OCTEON-PCI-BASE package. Please refer to the
+        release notes of the base package for any such changes.)
+
+ Release 2.2.0
+ =============
+ * Added support for CN66XX & CN68XX based NIC cards.
+
+
+ Release 2.1.0
+ =============
+ * Added support for CN63XX Pass2.x.
+ * Added support for CN68XX Pass1.
+ * Added support for CN63XX-based NIC cards NIC10E, NIC4E and NIC2E.
+ * Modified OCTEON interface to PCI PKO queue mapping to support large
+   number of ports in CN68XX.
+ * NIC app uses output ring number instead of PCI PKO port number to
+   forward packets to host.
+ * Known issues:
+   - NAPI performance is poor and does not scale well with multiple ports.
+
+
+ Release 2.0.0
+ =============
+ * Added support for CN63XX Pass1.
+ * Added support for Rx processing on multiple CPUs.
+ * Added support for NAPI for Rx processing.
+ * Jumbo frames upto 16000 bytes is supported.
+ * Added checksum offload support for IPv4 and IPv6 (NETIF_F_HW_CSUM).
+ * Added support for gather in Tx (NETIF_F_SG).
+ * Added support for CN56XX NIC 10E card.
+ * Fixes in NIC transmit path to handle backpressure and correct handling
+   if packets have to be dropped.
+ * EtherPCI now enables 4 devices by default (previously 2).
+ * Support for CN38XX is included but deprecated.
+ * 2.4.x kernel versions are no longer supported.
+
+
+
+ 
+
+ Release 1.0.0
+ =============
+ * Added support for CN56XX Pass2.1
+ * Support added for all 32 packet i/o ports now.
+ * Jumbo frames upto 9000 bytes supported.
+ * MAC Address and MTU changes propagated to NIC app.
+ * Link status is monitored from host.
+
+
+NOTE: There are no driver releases between 0.9.8 and 1.0.0.
+
+
+ Release 0.9.8
+ =============
+
+ * Added Support for CN56XX Pass2.
+ * EtherPCI support updated for CN56XX Pass2 (info ptr fix).
+
+
+
+ Release 0.9.7
+ =============
+ * Workaround for OCTEON CN56XX Pass1 with fixes for PCIE Errata 604, 606
+   & 716.
+
+
+ Release 0.9.6
+ =================
+ * Added support for OCTEON NicPro2 card.
+ * Added workaround for OCTEON 56XX Pass1.
+ * Integrated support for EtherPCI.
+ * Improved transmit performance for all packet sizes.
+
+ Bug fixes:
+   1. #1317  -  PCI NIC core app does not free WQE for link info instruction.
+   2. #1348  -  Kernel panic on NIC module load.
+
+
+
+
+ Release 0.9.5 
+ =============
+  * Support Added for CN58XX.
+  * Directory structure of NIC application modified. Common routines are now
+    in pci-core-app/common; NIC application remains in pci-core-app/base;
+  * Updated copyright and License.
+
+  Bug fixes:
+  1. #1163 - Host NIC driver incorrectly frees skbuff when returning TX_BUSY.
+  2. #1317 - PCI NIC core app does not free WQE for link info instruction
+
+
+
+ Release 0.9.4 - * Supports Hot Reset (Reset without unloading the OCTEON
+                   driver). Requires SDK 1.5.0.
+
+ Release 0.9.3 - * Release for SDK 1.5. Supports OCTEON PASS3.
+                   Fixes the following bugs:
+                   #705 - PCI error message fixed in SDK1.5 bootloader.
+                   #789 - Module load sequence failure
+                   #790 - Panic in NIC on module load.
+                   #819 - osi code has linux components
+                   #913 - Kernel warnings in 2.4 kernel.
+						
+ 
+ Release 0.9.2 - * PCI NIC module now supports multiple OCTEON devices and
+                   is hot-swap capable. It also monitors link status.
+				   Bug fixes #724, #725.
+
+ Release 0.9.1 - * PCI NIC module support for 64-bit systems and big endian
+                   systems added.
+
+ Release 0.9.0 - * Repackaged PCI driver. This package provides NIC  
+                   functionality for the OCTEON PCI driver.
+                   Bug #681 (NIC panic) fixed.
+                 * Requires SDK 1.4.0 and above.

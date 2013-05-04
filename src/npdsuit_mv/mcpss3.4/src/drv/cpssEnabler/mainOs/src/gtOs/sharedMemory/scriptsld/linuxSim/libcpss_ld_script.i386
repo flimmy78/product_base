@@ -1,0 +1,53 @@
+/* ldscript file to be used by ld for libcpss.so DSO for i386 architecture.
+*/
+
+SECTIONS
+{
+/* Read-only data section, access rights R */
+. = 0x20000000;
+.rodata : { *(.rodata) }
+.gnu.version : { *(.gnu.version) }
+.gnu.version_r : { *(.gnu.version_r) }
+.dynstr : { *(.dynstr) }
+.dynsym : { *(.dynsym) }
+.strtab : { *(.strtab) }
+.symtab : { *(.symtab) }
+.hash : { *(.hash) }
+.eh_frame : { *(.eh_frame) }
+
+/* Special PRIVATE section for GOT table,
+   Should have RW access rights (dynamic loader should refresh GOT+4 and GOT+8 on startup).
+
+   Warning!!! We cannot move .got sections into the shared area 'cause each client should have
+   private values inside: GOT+4 and GOT+8. There are reserved words which are used by dynamic linker
+   during symbols resolving.
+*/
+. = 0x21000000;
+.got : { *(.got) }
+.got.plt : { *(.got.plt) }
+/* Misc PRIVATE data with RW access in the same section */
+.dynamic : { *(.dynamic) }
+.rel.dyn : { *(.rel.dyn) }
+.ctors : { *(.ctors) }
+.dtors : { *(.dtors) }
+.jcr : { *(.jcr) }
+
+/* Code section, access rights RX */
+. = 0x22000000;
+.text : { *(.text) }
+.init : { *(.init) }
+.fini : { *(.fini) }
+.rel.plt : { *(.rel.plt) }
+.plt : { *(.plt) }
+
+/* Shared data section, access rights RW.
+   This section contain BSS and DATA sections of CPSS Shared Library, so it should be
+   shared for all clients. Shared Library initialization routines find this section by
+   begin address and remap it into the shared buffer.
+*/
+. = 0x26000000;
+.data : { *(.data) *(.data.rel) *(.data.rel.local) *(.rel.data.rel.local) *(.rel.data.rel)}
+.data.rel.ro : { *(.data.rel.ro) *(.data.rel.ro.local) *(.rel.data.rel.ro.local) *(.rel.data.rel.ro)}
+.bss : { *(.bss) }
+}
+

@@ -1,0 +1,1 @@
+../../test/cvmcs-test-config.h

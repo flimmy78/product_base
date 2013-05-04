@@ -1,0 +1,98 @@
+
+
+###
+###  add include path and file list
+###
+
+#INCLUDE_PATH =
+#C_FILE_LIST  =
+
+SUBDIRS   = version
+
+
+ifeq (VXWORKS, $(OS_RUN))
+
+  ifeq (DUNE, $(XBAR_VENDOR))
+    ifeq (DUNE, $(BSP_VENDOR))
+      SUBDIR = dune0011a
+    else
+      SUBDIR = genericDrv
+    endif
+  endif
+
+  ifeq (PPC603, $(CPU))
+        SUBDIR = genericDrv
+  endif
+  ifeq (PPC85XX, $(CPU))
+        SUBDIR = genericDrv
+  endif  
+  ifeq (PPC604, $(CPU))
+        SUBDIR = gt64260
+  endif
+  ifeq (ARMARCH4, $(CPU))
+       SUBDIR  = gt88e6218
+  endif
+ ifeq (ARMARCH5, $(CPU))
+    ifeq (GT_MNG_PCI, $(MANAGEMENT_BUS))
+       SUBDIR  = genericDrv
+    else
+       ifeq (GT_MNG_PCI_SMI, $(MANAGEMENT_BUS))
+          SUBDIR = genericDrv
+       else
+          ifeq (GT_MNG_PCI_SMI_I2C, $(MANAGEMENT_BUS))
+             SUBDIR = genericDrv
+          else
+             SUBDIR = gt88e6218
+          endif
+       endif
+    endif
+  endif
+endif
+
+
+ifeq (linux, $(OS_RUN))
+  ifeq (PPC603, $(CPU))
+        ifeq (6, $(KPATCHLEVEL))
+                SUBDIR = gtLinux_2_6_8245
+        endif
+        ifeq (4, $(KPATCHLEVEL))
+                SUBDIR = gtLinux8245
+        endif
+  endif
+  ifeq (PPC85XX, $(CPU))
+        ifeq (6, $(KPATCHLEVEL))
+                SUBDIR = genericLinuxDrv
+        endif
+  endif
+  ifeq (ARMARCH5, $(CPU))
+        ifeq (6, $(KPATCHLEVEL))
+                SUBDIR = genericLinuxDrv
+        endif
+        ifeq (4, $(KPATCHLEVEL))
+                SUBDIR = 
+        endif
+  endif
+  ifeq (PPC604, $(CPU))
+        SUBDIR = 
+  endif
+  ifeq (MIPS, $(CPU))
+        SUBDIRS += version gtLinuxMips 
+  endif
+endif
+
+ifeq (FreeBSD, $(OS_RUN))
+   SUBDIR = gtFreeBsd85xx
+endif
+
+ifeq (win32, $(OS_RUN))
+  SUBDIR = simWin32
+endif
+
+#Linux simulation section
+ifeq (1, $(LINUX_SIM))
+    SUBDIR = simWin32
+endif
+
+##################################################
+##################################################
+include $(PROJ_BASE)/gtTopMake

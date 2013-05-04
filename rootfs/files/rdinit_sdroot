@@ -1,0 +1,28 @@
+#!/bin/bash
+
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin
+
+mount_sd_rootfs()
+{
+echo "Preparing root file system"
+ls -l /dev/
+mknod /dev/mmcblk0 b 254 0
+mknod /dev/mmcblk0p1 b 254 1
+mknod /dev/mmcblk0p2 b 254 2
+ls -l /dev
+
+# Proc fs is mandatory for mounting rootfs 
+[ -d /proc ] || mkdir /proc
+mount -t proc proc /proc
+
+[ -d /rootfs ] || mkdir /rootfs
+mount /dev/mmcblk0p2 /rootfs
+
+}
+
+
+mount_sd_rootfs
+
+
+exec chroot /rootfs /sbin/init
+

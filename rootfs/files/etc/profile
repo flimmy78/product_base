@@ -1,0 +1,43 @@
+# /etc/profile: system-wide .profile file for the Bourne shell (sh(1))
+# and Bourne compatible shells (bash(1), ksh(1), ash(1), ...).
+
+#if [ "`id -u`" -eq 0 ]; then
+  PATH="/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+#else
+#  PATH="/opt/bin:/usr/local/bin:/usr/bin:/bin"
+#fi
+
+LD_LIBRARY_PATH="/opt/lib"
+export LD_LIBRARY_PATH
+
+if [ "$PS1" ]; then
+  if [ "$BASH" ]; then
+    PS1='\u@\h:\W\$ '
+  else
+    if [ "`id -u`" -eq 0 ]; then
+      PS1='# '
+    else
+      PS1='$ '
+    fi
+  fi
+fi
+
+export PATH
+
+eval "`dircolors -b`"
+alias ls='ls --color=auto'
+alias ll='ls -al'
+alias l='ls -aCF'
+alias la='ls -A'
+
+alias psmem='ps -e -o pid,f,stat,rss=RESID-MEM-in-KiB,size=SWAP-SPACE,vsize=VIRT-MEM-in-KiB,%mem,ruser,euser,fuser,suser,cmd --sort=-rss'
+alias pscpu='ps -e -m -o ppid,pid,sess,nlwp,f,lwp,stat,psr,ni,pri,lstart,etime,time,%cpu,user,comm'
+alias pssched='ps -e H -o lwp,stat,psr,sgi_p,ni,pri,rtprio,sched,policy,wchan=SLEEPING-KERNEL-FUNC-ADDR,stackp,esp,eip,comm'
+alias pssignal='ps -e H -o lwp,stat,psr,sgi_p,ni,pri,rtprio,sig,sigcatch,sigignore,sigmask,comm'
+
+
+
+
+ulimit -c unlimited
+
+umask 0000

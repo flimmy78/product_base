@@ -1,0 +1,1 @@
+../../components/driver/core/cvm-cntq-resources.h

@@ -1,0 +1,22 @@
+cc  -c ../gtOsVersion.c   -g  -Wall -I ~/Prestera/mainOs/h/
+cc  -c osLinuxGen.c       -g  -Wall -I ~/Prestera/mainOs/h/
+cc  -c osLinuxIo.c        -g  -Wall -I ~/Prestera/mainOs/h/
+cc  -c osLinuxMem.c       -g  -Wall -I ~/Prestera/mainOs/h/
+cc  -c osLinuxIntr.c      -g  -Wall -I ~/Prestera/mainOs/h/
+cc  -c osLinuxRand.c      -g  -Wall -I ~/Prestera/mainOs/h/
+cc  -c osLinuxStr.c       -g  -Wall -I ~/Prestera/mainOs/h/
+cc  -c osLinuxTask.c      -g  -Wall -I ~/Prestera/mainOs/h/
+cc  -c osLinuxSem.c       -g  -Wall -I ~/Prestera/mainOs/h/
+cc  -c osLinuxQueue.c     -g  -Wall -I ~/Prestera/mainOs/h/
+cc  -c osLinuxTimer.c     -g  -Wall -I ~/Prestera/mainOs/h/
+cc  -c ../../gtStack/linux/osLinuxInet.c   -g  -Wall -I ~/Prestera/mainOs/h/
+cc  -c ../../gtStack/linux/osLinuxSelect.c -g  -Wall -I ~/Prestera/mainOs/h/
+cc  -c ../../gtStack/linux/osLinuxSocket.c -g  -Wall -I ~/Prestera/mainOs/h/
+cc  -c ../../gtStack/linux/osLinuxFifos.c  -g  -Wall -I ~/Prestera/mainOs/h/
+rm -f osLinux.a
+ar -q osLinux.a *.o
+ar -q osLinux.a v2linux/l*.o
+/bin/cp -f osLinux.a ~/Prestera/mainIpc/src/presteraIpc/remote_wrapper/
+/bin/cp -f osLinux.a ~/Prestera/mainIpc/src/presteraIpc/marshal/
+/bin/cp -f osLinux.a ~/Prestera/mainIpc/src/presteraIpc/services/
+/bin/cp -f osLinux.a ~/Prestera/mainIpc/src/presteraIpc/transport/

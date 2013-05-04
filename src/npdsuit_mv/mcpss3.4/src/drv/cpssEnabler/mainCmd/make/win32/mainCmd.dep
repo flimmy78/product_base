@@ -1,0 +1,153 @@
+# Microsoft Developer Studio Generated Dependency File, included by mainCmd.mak
+
+..\..\src\cmdShell\cmdDb\cmdBase.c : \
+	"..\..\..\mainOs\h\gtOs\gtEnvDep.h"\
+	"..\..\..\mainOs\h\gtOs\gtGenTypes.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsMem.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsStr.h"\
+	"..\..\h\cmdShell\cmdDb\cmdBase.h"\
+	"..\..\h\cmdShell\common\cmdCommon.h"\
+	
+
+..\..\src\cmdShell\common\cmdVersion.c : \
+	"..\..\..\mainOs\h\gtOs\gtEnvDep.h"\
+	"..\..\..\mainOs\h\gtOs\gtGenTypes.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsIntr.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsIo.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsMem.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsQueue.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsRand.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsSem.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsStr.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsTask.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsTimer.h"\
+	"..\..\h\cmdShell\common\cmdVersion.h"\
+	"..\..\h\cmdShell\os\cmdOs.h"\
+	
+
+..\..\src\cmdShell\common\cmdWrapUtils.c : \
+	"..\..\..\mainOs\h\gtOs\gtEnvDep.h"\
+	"..\..\..\mainOs\h\gtOs\gtGenTypes.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsIo.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsStr.h"\
+	"..\..\h\cmdShell\common\cmdCommon.h"\
+	"..\..\h\cmdShell\common\cmdWrapUtils.h"\
+	
+
+..\..\src\cmdShell\os\win32\os_w32IO.c : \
+	"..\..\..\mainOs\h\gtOs\gtEnvDep.h"\
+	"..\..\..\mainOs\h\gtOs\gtGenTypes.h"\
+	"..\..\h\cmdShell\os\cmdIO.h"\
+	"c:\program files\microsoft visual studio\vc98\include\basetsd.h"\
+	
+
+..\..\src\cmdShell\os\win32\os_w32Mutex.c : \
+	"..\..\..\mainOs\h\gtOs\gtEnvDep.h"\
+	"..\..\..\mainOs\h\gtOs\gtGenTypes.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsSem.h"\
+	"..\..\h\cmdShell\os\cmdMutex.h"\
+	"c:\program files\microsoft visual studio\vc98\include\basetsd.h"\
+	
+
+..\..\src\cmdShell\os\win32\os_w32Serial.c : \
+	"..\..\..\mainOs\h\gtOs\gtEnvDep.h"\
+	"..\..\..\mainOs\h\gtOs\gtGenTypes.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsIo.h"\
+	"..\..\h\cmdShell\os\cmdSerial.h"\
+	"c:\program files\microsoft visual studio\vc98\include\basetsd.h"\
+	
+
+..\..\src\cmdShell\os\win32\os_w32Socket.c : \
+	"..\..\..\mainOs\h\gtOs\gtEnvDep.h"\
+	"..\..\..\mainOs\h\gtOs\gtGenTypes.h"\
+	"..\..\h\cmdShell\os\cmdSocket.h"\
+	"c:\program files\microsoft visual studio\vc98\include\basetsd.h"\
+	
+
+..\..\src\cmdShell\shell\cmdConsole.c : \
+	"..\..\..\mainOs\h\gtOs\gtEnvDep.h"\
+	"..\..\..\mainOs\h\gtOs\gtGenTypes.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsMem.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsStr.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsTask.h"\
+	"..\..\h\cmdShell\cmdDb\cmdBase.h"\
+	"..\..\h\cmdShell\common\cmdCommon.h"\
+	"..\..\h\cmdShell\common\cmdWrapUtils.h"\
+	"..\..\h\cmdShell\os\cmdIO.h"\
+	"..\..\h\cmdShell\shell\cmdConsole.h"\
+	"..\..\h\cmdShell\shell\cmdEngine.h"\
+	"..\..\h\cmdShell\shell\cmdStream.h"\
+	"..\..\h\cmdShell\shell\cmdSystem.h"\
+	
+
+..\..\src\cmdShell\shell\cmdEngine.c : \
+	"..\..\..\mainOs\h\gtOs\gtEnvDep.h"\
+	"..\..\..\mainOs\h\gtOs\gtGenTypes.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsStr.h"\
+	"..\..\h\cmdShell\cmdDb\cmdBase.h"\
+	"..\..\h\cmdShell\common\cmdCommon.h"\
+	"..\..\h\cmdShell\os\cmdIO.h"\
+	"..\..\h\cmdShell\shell\cmdEngine.h"\
+	"..\..\h\cmdShell\shell\cmdParser.h"\
+	"..\..\h\cmdShell\shell\cmdSystem.h"\
+	
+
+..\..\src\cmdShell\shell\cmdMain.c : \
+	"..\..\..\mainOs\h\gtOs\gtEnvDep.h"\
+	"..\..\..\mainOs\h\gtOs\gtGenTypes.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsGen.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsIo.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsSem.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsTask.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsTimer.h"\
+	"..\..\h\cmdShell\cmdDb\cmdBase.h"\
+	"..\..\h\cmdShell\common\cmdCommon.h"\
+	"..\..\h\cmdShell\os\cmdMutex.h"\
+	"..\..\h\cmdShell\os\cmdSocket.h"\
+	"..\..\h\cmdShell\shell\cmdConsole.h"\
+	"..\..\h\cmdShell\shell\cmdEngine.h"\
+	"..\..\h\cmdShell\shell\cmdMain.h"\
+	"..\..\h\cmdShell\shell\cmdParser.h"\
+	"..\..\h\cmdShell\shell\cmdServer.h"\
+	"..\..\h\cmdShell\shell\cmdStream.h"\
+	"..\..\h\cmdShell\shell\cmdSystem.h"\
+	
+
+..\..\src\cmdShell\shell\cmdParser.c : \
+	"..\..\..\mainOs\h\gtOs\gtEnvDep.h"\
+	"..\..\..\mainOs\h\gtOs\gtGenTypes.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsMem.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsSem.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsStr.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsTask.h"\
+	"..\..\h\cmdShell\common\cmdCommon.h"\
+	"..\..\h\cmdShell\os\cmdMutex.h"\
+	"..\..\h\cmdShell\shell\cmdParser.h"\
+	
+
+..\..\src\cmdShell\shell\cmdServer.c : \
+	"..\..\..\mainOs\h\gtOs\gtEnvDep.h"\
+	"..\..\..\mainOs\h\gtOs\gtGenTypes.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsIo.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsMem.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsSem.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsTask.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsTimer.h"\
+	"..\..\h\cmdShell\common\cmdCommon.h"\
+	"..\..\h\cmdShell\os\cmdMutex.h"\
+	"..\..\h\cmdShell\os\cmdSocket.h"\
+	"..\..\h\cmdShell\shell\cmdEngine.h"\
+	"..\..\h\cmdShell\shell\cmdServer.h"\
+	"..\..\h\cmdShell\shell\cmdStream.h"\
+	"..\..\h\cmdShell\shell\cmdSystem.h"\
+	
+
+..\..\src\cmdShell\shell\cmdStream.c : \
+	"..\..\..\mainOs\h\gtOs\gtEnvDep.h"\
+	"..\..\..\mainOs\h\gtOs\gtGenTypes.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsIo.h"\
+	"..\..\..\mainOs\h\gtOs\gtOsMem.h"\
+	"..\..\h\cmdShell\os\cmdSerial.h"\
+	"..\..\h\cmdShell\os\cmdSocket.h"\
+	"..\..\h\cmdShell\shell\cmdStream.h"\
+	

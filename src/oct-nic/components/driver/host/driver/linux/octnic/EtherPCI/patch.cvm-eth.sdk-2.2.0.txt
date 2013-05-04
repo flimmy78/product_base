@@ -1,0 +1,213 @@
+diff -Nau /root/Temp/octeon.orig/ethernet.c linux/kernel_2.6/linux/drivers/net/octeon/ethernet.c
+--- /root/Temp/octeon.orig/ethernet.c	2011-12-02 16:45:21.000000000 -0800
++++ linux/kernel_2.6/linux/drivers/net/octeon/ethernet.c	2011-12-02 16:50:22.000000000 -0800
+@@ -92,6 +92,15 @@
+ module_param(rx_napi_weight, int, 0444);
+ MODULE_PARM_DESC(rx_napi_weight, "The NAPI WEIGHT parameter.");
+ 
++
++#ifdef ETHERPCI
++#include <asm/octeon/cvmx-sli-defs.h>
++#include <asm/octeon/cvmx-pexp-defs.h>
++#include <asm/octeon/cvmx-dma-engine.h>
++int txcomp_port = -1;
++#endif
++
++
+ /**
+  * cvm_oct_poll_queue - Workqueue for polling operations.
+  */
+@@ -752,6 +761,9 @@
+ 
+ 	octeon_mdiobus_force_mod_depencency();
+ 	pr_notice("octeon-ethernet %s\n", OCTEON_ETHERNET_VERSION);
++#ifdef ETHERPCI
++	pr_notice("EtherPCI Enabled\n");
++#endif
+ 
+ 	pip = of_find_node_by_path("pip");
+ 	if (!pip) {
+@@ -773,6 +785,15 @@
+ 
+ 	cvmx_helper_initialize_packet_io_global();
+ 
++#ifdef ETHERPCI
++	{
++		cvmx_wqe_t  wqe;
++		cvmx_wqe_set_port(&wqe, txcomp_port);
++		txcomp_port = cvmx_wqe_get_port(&wqe);
++		CVMX_SYNCWS;
++	}
++#endif
++
+ 	/* Change the input group for all ports before input is enabled */
+ 	num_interfaces = cvmx_helper_get_number_of_interfaces();
+ 	for (interface = 0; interface < num_interfaces; interface++) {
+@@ -795,6 +816,17 @@
+ 
+ 	cvmx_helper_ipd_and_packet_input_enable();
+ 
++#if defined(ETHERPCI)
++	if(OCTEON_IS_MODEL(OCTEON_CN56XX_PASS2)) {
++		uint64_t  val64 = cvmx_read_csr(CVMX_IOB_INT_ENB);
++		pr_err("Disabling NP_DAT NP_SOP & NP_EOP for 56xx Pass2\n");
++		val64 &= ~(0x13ULL);
++		cvmx_write_csr(CVMX_IOB_INT_ENB, val64);
++	}
++	cvmx_dma_engine_initialize();
++#endif
++
++
+ 	/*
+ 	 * Initialize the FAU used for counting packet buffers that
+ 	 * need to be freed.
+@@ -812,6 +844,18 @@
+ 		if (imode == CVMX_HELPER_INTERFACE_MODE_ILK)
+ 			continue;
+ 
++#ifdef ETHERPCI
++		if(imode == CVMX_HELPER_INTERFACE_MODE_NPI) {
++			if (octeon_has_feature(OCTEON_FEATURE_PKND)) {
++				cvmx_sli_tx_pipe_t  slitxpipe;
++				slitxpipe.u64 = cvmx_read_csr(CVMX_PEXP_SLI_TX_PIPE);  
++				slitxpipe.s.nump = 4; 
++				cvmx_write_csr(CVMX_PEXP_SLI_TX_PIPE, slitxpipe.u64);  
++			}
++			num_ports = 4;
++		}
++#endif
++
+ 		for (interface_port = 0; num_ports > 0;
+ 		     interface_port++, num_ports--) {
+ 			struct octeon_ethernet *priv;
+@@ -882,7 +926,11 @@
+ 
+ 			case CVMX_HELPER_INTERFACE_MODE_NPI:
+ 				dev->netdev_ops = &cvm_oct_npi_netdev_ops;
+-				strcpy(dev->name, "npi%d");
++#if defined(ETHERPCI)
++				strcpy(dev->name, "pci%d");
++#else
++ 				strcpy(dev->name, "npi%d");
++#endif
+ 				break;
+ 
+ 			case CVMX_HELPER_INTERFACE_MODE_XAUI:
+@@ -946,6 +994,10 @@
+ #endif
+ 			}
+ 
++			if(priv->imode == CVMX_HELPER_INTERFACE_MODE_NPI) {
++				netif_carrier_on(dev);
++			}
++
+ 			if (!dev->netdev_ops) {
+ 				free_netdev(dev);
+ 			} else if (register_netdev(dev) < 0) {
+diff -Nau /root/Temp/octeon.orig/ethernet-napi.c linux/kernel_2.6/linux/drivers/net/octeon/ethernet-napi.c
+--- /root/Temp/octeon.orig/ethernet-napi.c	2011-12-02 16:45:21.000000000 -0800
++++ linux/kernel_2.6/linux/drivers/net/octeon/ethernet-napi.c	2011-12-02 16:38:58.000000000 -0800
+@@ -36,6 +36,17 @@
+ #define CVM_OCT_NAPI_HAS_CN68XX_SSO 0
+ #endif
+ 
++
++
++#if defined(ETHERPCI)
++#define PACKET_FROM_PCI(work)  (IS_PACKET_FROM_PCI(work, CVM_OCT_NAPI_HAS_CN68XX_SSO))
++extern int txcomp_port;
++#endif
++
++
++
++
++
+ /**
+  * cvm_oct_napi_poll - the NAPI poll function.
+  * @napi: The NAPI instance, or null if called from cvm_oct_poll_controller
+@@ -105,6 +116,16 @@
+ 
+ 		if (unlikely(work == NULL))
+ 			break;
++
++
++#ifdef ETHERPCI
++		if (PACKET_FROM_PCI(work)){
++			cvmx_wqe_set_len(work, cvmx_wqe_get_len(work) - 24);
++			work->packet_ptr.s.addr += 24;
++			work->packet_ptr.s.size -= 24;
++		}
++#endif
++
+ 		packet_ptr = work->packet_ptr;
+ 		pskb = cvm_oct_packet_to_skb(cvm_oct_get_buffer_ptr(packet_ptr));
+ 		prefetch(pskb);
+@@ -137,11 +158,21 @@
+ 				cvm_oct_enable_one_cpu();
+ 		}
+ 
++
++#if defined(ETHERPCI)
++		
++		/*
++		 * If WORD2[SOFTWARE] & ipprt = -1 then this WQE is a complete for
++		 * a TX packet. Normal PCI Rx packets will have port # between 32-35.
++		 */
++		if ( (work->word2.s.software) && (cvmx_wqe_get_port(work) == txcomp_port)) {
++#else
+ 		/*
+ 		 * If WORD2[SOFTWARE] then this WQE is a complete for
+ 		 * a TX packet.
+ 		 */
+ 		if (work->word2.s.software) {
++#endif
+ 			struct octeon_ethernet *priv;
+ 			union skb_shared_tx *shtx;
+ 			int packet_qos = work->word0.raw.unused;
+diff -Nau /root/Temp/octeon.orig/ethernet-rx.h linux/kernel_2.6/linux/drivers/net/octeon/ethernet-rx.h
+--- /root/Temp/octeon.orig/ethernet-rx.h	2011-09-23 10:32:44.000000000 -0700
++++ linux/kernel_2.6/linux/drivers/net/octeon/ethernet-rx.h	2011-12-02 16:48:20.000000000 -0800
+@@ -51,3 +51,18 @@
+ 		}
+ 	}
+ }
++
++static inline int
++IS_PACKET_FROM_PCI(cvmx_wqe_t  *wqe, int is_cn68xx)
++{
++	int port = cvmx_wqe_get_port(wqe);
++
++	if (is_cn68xx) {
++		return (port >= 0x100 && port <= 0x11f);
++	} else {
++		return (port >= 32 && port <= 35);
++	}
++}
++
++
++
+diff -Nau /root/Temp/octeon.orig/ethernet-xmit.c linux/kernel_2.6/linux/drivers/net/octeon/ethernet-xmit.c
+--- /root/Temp/octeon.orig/ethernet-xmit.c	2011-09-23 10:32:44.000000000 -0700
++++ linux/kernel_2.6/linux/drivers/net/octeon/ethernet-xmit.c	2011-12-02 16:38:58.000000000 -0800
+@@ -374,6 +374,9 @@
+ 		work->word1.tag = 0;
+ 		work->word2.u64 = 0;
+ 		work->word2.s.software = 1;
++#if defined(ETHERPCI)
++		cvmx_wqe_set_port(work, -1);
++#endif
+ 		cvmx_wqe_set_grp(work, pow_receive_group);
+ 		work->packet_ptr.u64 = (unsigned long)skb;
+ 	}
+diff -Nau /root/Temp/octeon.orig/Makefile linux/kernel_2.6/linux/drivers/net/octeon/Makefile
+--- /root/Temp/octeon.orig/Makefile	2011-09-23 10:32:44.000000000 -0700
++++ linux/kernel_2.6/linux/drivers/net/octeon/Makefile	2011-12-02 16:41:29.000000000 -0800
+@@ -11,6 +11,8 @@
+ # POW module.
+ #
+ 
++EXTRA_CFLAGS += -DETHERPCI
++
+ obj-$(CONFIG_OCTEON_MGMT_ETHERNET)	+= octeon_mgmt.o
+ obj-$(CONFIG_OCTEON_POW_ONLY_ETHERNET)	+= octeon-pow-ethernet.o
+ 

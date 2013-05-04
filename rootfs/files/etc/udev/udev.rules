@@ -1,0 +1,101 @@
+# There are a number of modifiers that are allowed to be used in some
+# of the different fields. They provide the following subsitutions:
+#
+# %n the "kernel number" of the device.
+#    For example, 'sda3' has a "kernel number" of '3'
+# %k the kernel name for the device
+# %M the kernel major number for the device
+# %m the kernel minor number for the device
+# %b the bus id for the device
+# %c the string returned by the PROGRAM
+# %s{filename} the content of a sysfs attribute
+# %% the '%' char itself
+#
+
+# workaround for devices which do not report media changes
+SUBSYSTEMS=="ide", KERNEL=="hd[a-z]", ATTR{removable}=="1", \
+	ENV{ID_MODEL}=="IOMEGA_ZIP*",	NAME="%k", OPTIONS+="all_partitions"
+SUBSYSTEMS=="ide", KERNEL=="hd[a-z]", ATTRS{media}=="floppy", \
+	OPTIONS+="all_partitions"
+
+# SCSI devices
+SUBSYSTEMS=="scsi", KERNEL=="sr[0-9]*",	NAME="scd%n", SYMLINK+="sr%n"
+
+# USB devices
+SUBSYSTEMS=="usb", KERNEL=="auer[0-9]*",	NAME="usb/%k"
+SUBSYSTEMS=="usb", KERNEL=="cpad[0-9]*",	NAME="usb/%k"
+SUBSYSTEMS=="usb", KERNEL=="dabusb*",		NAME="usb/%k"
+SUBSYSTEMS=="usb", KERNEL=="hiddev*",		NAME="usb/%k"
+SUBSYSTEMS=="usb", KERNEL=="legousbtower*",	NAME="usb/%k"
+SUBSYSTEMS=="usb", KERNEL=="lp[0-9]*",		NAME="usb/%k"
+SUBSYSTEMS=="usb", KERNEL=="ttyUSB*", \
+	ATTRS{product}=="Palm Handheld*|Handspring Visor|palmOne Handheld", \
+					SYMLINK+="pilot"
+
+# usbfs-like devices
+SUBSYSTEM=="usb_device",	PROGRAM="/bin/sh -c 'K=%k; K=$${K#usbdev}; printf bus/usb/%%03i/%%03i $${K%%%%.*} $${K#*.}'", ACTION=="add", \
+				NAME="%c"
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device",	NAME="bus/usb/$env{BUSNUM}/$env{DEVNUM}"
+
+
+# misc devices
+KERNEL=="hw_random",		NAME="hwrng"
+KERNEL=="tun",			NAME="net/%k"
+KERNEL=="evtchn",		NAME="xen/%k"
+
+KERNEL=="cpu[0-9]*",		NAME="cpu/%n/cpuid"
+KERNEL=="msr[0-9]*",		NAME="cpu/%n/msr"
+KERNEL=="microcode",		NAME="cpu/microcode"
+
+# rtc devices
+# kernel will generate rtc0, hwclock will read rtc,
+# so we create a link here
+KERNEL=="rtc[0-9]*",	NAME="%k",	SYMLINK+="rtc",	MODE="0664"
+
+# Merged permission.rules
+
+# vc devices (all members of the tty subsystem)
+KERNEL=="ptmx",			MODE="0666",	GROUP="root"
+KERNEL=="console",		MODE="0600",	GROUP="root"
+KERNEL=="tty",			MODE="0666",	GROUP="root"
+KERNEL=="tty[0-9]*",				GROUP="root"
+KERNEL=="pty*",			MODE="0666",	GROUP="tty"
+
+KERNEL=="random",		MODE="0666"
+KERNEL=="urandom",		MODE="0666"
+KERNEL=="mem",			MODE="0640",	GROUP="kmem"
+KERNEL=="kmem",			MODE="0640",	GROUP="kmem"
+KERNEL=="port",			MODE="0640",	GROUP="kmem"
+KERNEL=="full",			MODE="0666"
+KERNEL=="null",			MODE="0666"
+KERNEL=="zero",			MODE="0666"
+KERNEL=="inotify",		MODE="0666"
+KERNEL=="sgi_fetchop",		MODE="0666"
+KERNEL=="sonypi",		MODE="0666"
+KERNEL=="agpgart",				GROUP="video"
+KERNEL=="nvram",				GROUP="nvram"
+KERNEL=="rtc|rtc[0-9]*",			GROUP="audio"
+KERNEL=="tpm*",			MODE="0600",	OWNER="tss", GROUP="tss"
+KERNEL=="fuse",					GROUP="fuse"
+KERNEL=="kqemu",		MODE="0666"
+KERNEL=="kvm",					GROUP="kvm"
+KERNEL=="tun",			MODE="0666",
+
+
+
+
+
+### Autelan Devices
+#KERNEL=="bm",SUBSYSTEMS=="module",	NAME="bm0"
+#KERNEL=="mvPpDrv",SUBSYSTEMS=="module",	NAME="mvPP"
+#KERNEL=="cavium_ethernet",SUBSYSTEMS=="module",	NAME="oct0"
+#KERNEL=="wifi_ethernet",SUBSYSTEMS=="module",	NAME="wifi0"
+#KERNEL=="kapDrv",SUBSYSTEMS=="module",	NAME="kap0"
+#KERNEL=="linux_user_bde",SUBSYSTEMS=="module",	NAME="ubde"
+
+#KERNEL=="bm",	NAME="bm0"
+#KERNEL=="mvPpDrv",	NAME="mvPP"
+#KERNEL=="cavium_ethernet",	NAME="oct0"
+#KERNEL=="wifi_ethernet",	NAME="wifi0"
+#KERNEL=="kapDrv",	NAME="kap0"
+#KERNEL=="linux_user_bde",	NAME="ubde"

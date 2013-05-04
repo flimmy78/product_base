@@ -1,0 +1,13 @@
+# mv_8245 board
+
+export CPU_TOOL=intel
+#export CPU_FAMILY=intel
+export CPU=i386
+export CPU_DIR=i386
+#
+DEFAULT_MANAGEMENT_BUS=PCI_SMI
+DEFAULT_TOOLKIT_Linux=gnu
+DEFAULT_TOOLKIT_LinuxWM=gnu
+DEFAULT_TOOLKIT_FreeBSDWM=gnu
+DEFAULT_TOOLKIT_win32=vc
+#

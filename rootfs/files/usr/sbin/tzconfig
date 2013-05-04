@@ -1,0 +1,12 @@
+#! /bin/sh
+#copyright (C) 2001 Software in the Public Interest
+#
+# Licensed under the GPL v2
+# edit by liuyu 2011-6-18
+
+timestr=$1/$2;
+if [ $# -eq 2 ];then
+	#add timezone
+	echo $timestr > /etc/timezone
+	rm -f /etc/localtime && cp -f /usr/share/zoneinfo/$timestr /etc/localtime	
+fi

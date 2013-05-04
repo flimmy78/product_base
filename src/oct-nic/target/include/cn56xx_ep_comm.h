@@ -1,0 +1,1 @@
+../../components/driver/core/cn56xx_ep_comm.h

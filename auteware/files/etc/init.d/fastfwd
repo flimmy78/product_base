@@ -1,0 +1,48 @@
+#! /bin/sh
+
+#add by zhaohan 2012-7-12
+
+# 12C board
+if [ `cat /proc/product_info/board_type` = "4" ] ; then
+echo "load octeon_drv"
+mknod /dev/octeon_device c 127 0
+insmod /lib/modules/2.6.32.27-Cavium-Octeon/misc/octeon_drv.ko
+
+echo "reset slave cpu, please wait..."
+sleep 10
+echo "load slave cpu fastfwd, please wait..."
+sleep 8
+oct-pci-load 0x100000 /usr/bin/fastfwd
+
+echo "boot slave cpu fastfwd"
+sleep 3
+oct-pci-bootcmd 'bootoct 0x100000 coremask=0xfff mode=standalone'
+
+echo "insmod octnic"
+sleep 3
+insmod /lib/modules/2.6.32.27-Cavium-Octeon/misc/octnic.ko
+
+
+# 4X board
+elif [ `cat /proc/product_info/board_type` = "8" ] ; then
+echo "load octeon_drv"
+mknod /dev/octeon_device c 127 0
+insmod /lib/modules/2.6.32.27-Cavium-Octeon/misc/octeon_drv.ko
+
+echo "reset slave cpu, please wait..."
+sleep 10
+echo "load slave cpu fastfwd, please wait..."
+sleep 8
+oct-pci-load_68 0x100000 /usr/bin/fastfwd_68
+
+echo "boot slave cpu fastfwd"
+sleep 3
+oct-pci-bootcmd_68 'bootoct 0x100000 coremask=0xffffffff mode=standalone'
+
+echo "insmod octnic"
+sleep 3
+insmod /lib/modules/2.6.32.27-Cavium-Octeon/misc/octnic.ko
+
+
+fi
+

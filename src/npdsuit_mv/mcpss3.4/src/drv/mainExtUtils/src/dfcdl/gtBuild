@@ -1,0 +1,30 @@
+
+
+###
+###  add include path and file list
+###
+
+#INCLUDE_PATH =
+#C_FILE_LIST  =
+#SUBDIRS      =
+
+ifneq (PRESTERA, $(FA_VENDOR))
+   C_EXCLUDE_FILE_LIST = gtFaUplink.c
+endif
+
+ifeq (EXCLUDE_LIB, $(EXCLUDE_FA))
+    C_EXCLUDE_FILE_LIST = gtFaUplink.c gtDfcdl.c gtAutoDriverDfcdl.c
+endif
+
+### check if we may be in NONE FA system
+ifneq (PRESTERA , $(FA_VENDOR))
+    C_EXCLUDE_FILE_LIST = gtFaUplink.c gtDfcdl.c gtAutoDriverDfcdl.c
+endif
+
+
+LIB_NAME = cpssDfcdl.lib
+
+
+##################################################
+##################################################
+include $(PROJ_BASE)/gtTopMake

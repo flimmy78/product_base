@@ -1,0 +1,1455 @@
+# 
+# This file intends for make software system 
+
+export MAKE=make
+
+export PATH=/usr/local/bin:/usr/bin:/usr/sbin:/sbin:/bin
+ifdef xcat
+export COMPILER_PREFIX=arm-none-linux-gnueabi
+export XCATBUILDROOTDIR=/opt/xcat/buildroot/sysroot
+export XCATBUSYROOTDIR=/opt/xcat/busyroot/sysroot
+export BUILDROOTDIR=${XCATBUILDROOTDIR}
+export BUSYROOTDIR=${XCATBUSYROOTDIR}
+export BUILDDIR=xcatbuild
+export PATH:=/opt/arm-none-linux-gnueabi/bin/:${PATH}
+export ROOTFS_DIR=${PWD}/xcat-rootfs
+export XCAT_ROOTFS=${ROOTFS_DIR}/files
+export KERNEL_ROOT=${PWD}/src/xcat-kernel2.6.22.18
+export ROOTFS_KMOD_DIR=${XCAT_ROOTFS}/lib/modules/2.6.22.18
+export CPU_ARCH_FLAG=arm
+DBUS_INCLUDE=-I${BUILDROOTDIR}/usr/include/dbus-1.0 -I${BUILDROOTDIR}/usr/lib/dbus-1.0/include
+export DBUS_INCLUDE
+DBUS_LIBS=-ldbus-1
+export DBUS_LIBS
+DHCP_CONFIG_HOSTCC=arm-none-linux-gnueabi
+else
+MIPS_ADDITION_LIB_ROOT_PATH=/opt/mipslibs
+export MIPS_ADDITION_LIB_ROOT_PATH
+DBUS_INCLUDE=-I/opt/mipslibs/usr/include/dbus-1.0 -I/opt/mipslibs/usr/lib/dbus-1.0/include
+export DBUS_INCLUDE
+DBUS_LIBS=-ldbus-1
+export DBUS_LIBS
+#export CFLAGS+=-I${MIPS_ADDITION_LIB_ROOT_PATH}/usr/include 
+DHCP_CONFIG_HOSTCC=mips-linux-gnu
+
+ifdef octeon
+export OCT_ROOTFS_DIR=/data/home/chenbin/cvshome/busyroot/sysroot
+else
+export COMPILER_PREFIX=mips-linux-gnu
+export BUILDROOTDIR=${MIPS_ADDITION_LIB_ROOT_PATH}
+export BUILDDIR=mipsbuild
+export DBUS_EXEC_PREFIX = ${PWD}/rootfs/files/usr
+export DBUS_PATH:=$(shell if [ -d src/dbus-1.4.0 ] ; then echo "`pwd`/src/dbus-1.4.0" ; else echo ${OCT_ROOTFS_DIR} ; fi)
+export ROOTFS_DIR:=$(shell if [ -d rootfs ] ; then echo "`pwd`/rootfs" ; else echo ${OCT_ROOTFS_DIR} ; fi)
+export OCT_ROOTFS_DIR=${ROOTFS_DIR}
+endif
+
+ifndef NEWKERN
+$(info NEWKERN not defined)
+export NEWKERN=$(shell \
+if [ -d src/kernel2.6.21.7cn3 ] && [ ! -d src/kernel2.6.16.26cn ] && [ ! -d src/kernel2.6.21.7oct1.8.1 ] && [ ! -d src/kernel2.6.32.13cn ] ; then echo "1"; \
+elif  [ ! -d src/kernel2.6.21.7cn3 ] && [ -d src/kernel2.6.16.26cn ] && [ ! -d src/kernel2.6.21.7oct1.8.1 ] && [ ! -d src/kernel2.6.32.13cn ] ; then echo "0"; \
+elif  [ ! -d src/kernel2.6.21.7cn3 ] && [ ! -d src/kernel2.6.16.26cn ] && [ -d src/kernel2.6.21.7oct1.8.1 ] && [ ! -d src/kernel2.6.32.13cn ] ; then echo "2"; \
+elif  [ ! -d src/kernel2.6.21.7cn3 ] && [ ! -d src/kernel2.6.16.26cn ] && [ ! -d src/kernel2.6.21.7oct1.8.1 ] && [ -d src/kernel2.6.32.13cn ] ; then echo "3"; fi)
+endif
+
+
+ifeq (${NEWKERN},3)
+export OCTEON_ROOT=/opt/CN/SDK2.0
+export KERNEL_ROOT:=$(shell if [ -d src/kernel2.6.32.13cn ] ; then echo "`pwd`/src/kernel2.6.32.13cn" ; else echo ${OCT_KERNEL_ROOT} ; fi)
+export ROOTFS_KMOD_DIR=${ROOTFS_DIR}/files/lib/modules/2.6.21.7-Cavium-Octeon
+else ifeq (${NEWKERN},2)
+export OCTEON_ROOT=/opt/CN/SDK1.8.1
+export KERNEL_ROOT:=$(shell if [ -d src/kernel2.6.21.7oct1.8.1 ] ; then echo "`pwd`/src/kernel2.6.21.7oct1.8.1" ; else echo ${OCT_KERNEL_ROOT} ; fi)
+export ROOTFS_KMOD_DIR=${ROOTFS_DIR}/files/lib/modules/2.6.21.7-Cavium-Octeon
+else ifeq (${NEWKERN},1)
+export OCTEON_ROOT=/opt/CN/SDK1.7.3
+export KERNEL_ROOT:=$(shell if [ -d src/kernel2.6.21.7cn3 ] ; then echo "`pwd`/src/kernel2.6.21.7cn3" ; else echo ${OCT_KERNEL_ROOT} ; fi)
+export ROOTFS_KMOD_DIR=${ROOTFS_DIR}/files/lib/modules/2.6.21.7-Cavium-Octeon
+export CFLAGS += 
+else 
+export OCTEON_ROOT=/opt/CN/OCTEON-SDK
+export KERNEL_ROOT:=$(shell if [ -d src/kernel2.6.16.26cn ] ; then echo "`pwd`/src/kernel2.6.16.26cn" ; else echo ${OCT_KERNEL_ROOT} ; fi)
+export ROOTFS_KMOD_DIR=${ROOTFS_DIR}/files/lib/modules/2.6.16.26-Cavium-Octeon
+export CFLAGS += -g
+endif
+
+export KERNEL_DIR=${KERNEL_ROOT}
+export OCT_KERNEL_ROOT=${KERNEL_ROOT}
+#export OCTEON_CPPFLAGS_GLOBAL_ADD= -DUSE_RUNTIME_MODEL_CHECKS=1 -DCVMX_ENABLE_PARAMETER_CHECKING=0 -DCVMX_ENABLE_CSR_ADDRESS_CHECKING=0 -DCVMX_ENABLE_POW_CHECKS=0
+
+export PATH:=${OCTEON_ROOT}/tools/bin:${OCTEON_ROOT}/host/bin:${PATH}
+
+export OCTEON_MODEL=OCTEON_CN38XX_PASS3
+export XML_LIB_PATH = ${PWD}/rootfs/files/usr/lib
+
+$(info OCTEON_ROOT = ${OCTEON_ROOT})
+$(info KERNEL_ROOT = ${KERNEL_ROOT})
+
+endif
+
+export AR=${COMPILER_PREFIX}-ar
+export RANLIB=${COMPILER_PREFIX}-ranlib
+export OBJDUMP=${COMPILER_PREFIX}-objdump
+export STRIP=${COMPILER_PREFIX}-strip
+export SIZE=${COMPILER_PREFIX}-size
+export CC=${COMPILER_PREFIX}-gcc
+export CXX=${COMPILER_PREFIX}-g++
+export LD=${COMPILER_PREFIX}-ld
+export NM=${COMPILER_PREFIX}-nm
+
+
+
+
+export BUILD_DIR=${shell pwd}
+export EXPORT_OPT_DIR=${BUILD_DIR}/export/opt
+export LIB_EXPORT_DIR=${BUILD_DIR}/export/opt/lib
+export BIN_EXPORT_DIR=${BUILD_DIR}/export/opt/bin
+#export ETC_EXPORT_DIR=${BUILD_DIR}/export/opt/etc
+export WWW_EXPORT_DIR=${BUILD_DIR}/export/opt/www
+
+export KMOD_EXPORT_DIR=${BUILD_DIR}/export/kmod
+
+export TOPSRC_DIR=${BUILD_DIR}/src
+
+
+
+export MOTDFILE=${ROOTFS_DIR}/files/etc/motd
+export BUILDERFILE=${ROOTFS_DIR}/files/etc/version/builder
+export VERFILE=${ROOTFS_DIR}/files/etc/version/version
+export NAMFILE=${ROOTFS_DIR}/files/etc/version/name
+export PRODUCTFILE=./products
+export BUILDNOFILE=./buildno_v2.0
+export AWNAME=$(shell echo "AW`cat ${VERFILE}`.`cat ${BUILDNOFILE}`.`cat ${PRODUCTFILE}`")
+export IMGDIR=imgdir
+
+$(shell \
+	if [ -d .git ] ; then \
+		cat ${VERFILE} > ${IMGDIR} ; \
+	elif [ ! -e ${IMGDIR} ] ; then \
+		echo "`date +%Y%m%d`" > ${IMGDIR};  \
+	elif [ `cat ${IMGDIR}` != `cat ${VERFILE}` ]; then \
+		echo "`date +%Y%m%d`" > ${IMGDIR}; \
+	fi )
+export DESTDIR=$(shell echo "/srv/tftp/`cat ${IMGDIR}`")
+
+$(info =========================================================================)
+$(info ROOTFS_DIR = ${ROOTFS_DIR})
+$(info PATH is ${PATH} )
+$(info CFLAGS=${CFLAGS} )
+$(info DESTDIR is ${DESTDIR})
+$(info =========================================================================)
+
+#export IBUS_MOD="src/ibus"
+export ACCAPI_DIR=${TOPSRC_DIR}/accapi
+export BASHTOOLS_DIR="src/bashtools"
+export NPDSUIT_MV_MOD="src/npdsuit_mv"
+#export XCAT_BM_MOD="src/xcatbm"
+export NPDSUIT_BCM_MOD="src/npdsuit_bcm"
+export NPDSUIT_XCAT_MOD="src/npdsuit_xcat"
+export QUAGGA_MOD="src/quagga"
+export DCLI_MOD="src/dcli"
+export OCTETH_KMOD="src/cavium-ethernet"
+export E1000E_KMOD="src/e1000e/src"
+export DPI_KMOD="src/intercept-example"
+export WCPSS_MOD="src/wcpss"
+export IUH_MOD="src/ibus/app/ranapproxy"
+export IU_MOD="src/ibus/app/ranapproxy/iu"
+export WTPVERFILE=${WCPSS_MOD}/src/res/wtpcompatible*
+export ASD_MOD="src/asd"
+export STPSUIT_MOD="src/stpsuit"
+export HAD_MOD="src/had"
+export HBIP_MOD="src/hbip"
+export IGMP_MOD="src/igmp-snooping"
+export DLDP_MOD="src/dldp"
+export CCGI_MOD="src/AuteCS"
+export SRVM_MOD="src/service_management"
+export CHKPWD_MOD="src/checkpasswd-pam"
+export IPTABLES_MOD="src/iptables"
+export EBTABLES_MOD="src/ebtables"
+export CAPTIVE_MOD="src/captive_portal"
+export EAG_MOD="src/eag"
+export BCM_MOD=${NPDSUIT_BCM_MOD}/bcmd
+export BCM_TOPDIR=${TOPSRC_DIR}/npdsuit_bcm/bcmd
+export SNMP_ROOTDIR=src/net-snmp
+export SNMPMIBS_DIR="src/net-snmp/mibs"
+export TRAP_HELPER_MOD="src/net-snmp/trap-helper"
+export SUBAGENT_MOD="src/net-snmp/subagent"
+export ACSAMPLE_MOD="src/net-snmp/sample"
+export LIBNM_MOD="src/lib/nm"
+export DHCP_MOD="src/dhcp4/dhcp-4.0.2b3"
+export DHCP6_MOD="src/dhcp4/dhcp-4.1.1"
+export DCCN_MOD="src/dccnetlink"
+export DCCN_TOPSRC=${TOPSRC_DIR}/dccnetlink
+export PIMD_MOD="src/pimd"
+export DHCPSNP_MOD="src/dhcp-snooping"
+export RADIUSD_MOD="src/radiusd"
+export DBUS_MOD="src/dbus-1.4.0"
+
+
+PREREQ_DCLI=$(shell if [ -d ${DCLI_MOD} ] ; then echo "dcli"; fi )
+#$(warning Dcli is $(PREREQ_DCLI))
+CLEAN_DCLI=$(subst dcli,cleandcli,${PREREQ_DCLI})
+#$(warning Clean Dcli is ${CLEAN_DCLI} or ${PREREQ_DCLI})
+PREREQ_ASD=$(shell if [ -d ${ASD_MOD} ] ; then echo "asd"; fi)
+CLEAN_ASD=$(subst asd,cleanasd,${PREREQ_ASD})
+
+ifneq (${NEWKERN},1)
+PREREQ_OCTETHKMOD=$(shell if [ -d ${OCTETH_KMOD} ] ; then echo "cavium-ethernet"; fi)
+CLEAN_OCTETHKMOD=$(subst cavium-ethernet,cleancavium-ethernet,${PREREQ_OCTETHKMOD})
+else ifneq (${NEWKERN},3)
+PREREQ_OCTETHKMOD=$(shell if [ -d ${OCTETH_KMOD} ] ; then echo "cavium-ethernet"; fi)
+CLEAN_OCTETHKMOD=$(subst cavium-ethernet,cleancavium-ethernet,${PREREQ_OCTETHKMOD})
+
+else
+MAKE_KERNEL_BEFORE_MODULES=kernel
+endif
+
+PREREQ_SNMP=$(shell if [ -d ${SNMP_ROOTDIR} ] ; then echo "snmp"; fi)
+CLEAN_SNMP=$(subst snmp,cleansnmp,${PREREQ_SNMP})
+
+PREREQ_STP=$(shell if [ -d ${STPSUIT_MOD} ] ; then echo "stpsuit"; fi)
+CLEAN_STP=$(subst stpsuit,cleanstpsuit,${PREREQ_STP})
+PREREQ_HAD=$(shell if [ -d ${VRRP_MOD} ] ; then echo "had"; fi)
+CLEAN_HAD=$(subst had,cleanhad,${PREREQ_HAD})
+PREREQ_HBIP=$(shell if [ -d ${HBIP_MOD} ] ; then echo "hbip"; fi)
+CLEAN_HBIP=$(subst hbip,cleanhbip,${PREREQ_HBIP})
+PREREQ_IGMP=$(shell if [ -d ${IGMP_MOD} ] ; then echo "igmp"; fi)
+CLEAN_IGMP=$(subst igmp,cleanigmp,${PREREQ_IGMP})
+PREREQ_DLDP=$(shell if [ -d ${DLDP_MOD} ] ; then echo "dldp"; fi)
+CLEAN_DLDP=$(subst dldp,cleandldp,${PREREQ_DLDP})
+PREREQ_DCCN=$(shell if [ -d ${DCCN_MOD} ] ; then echo "dccn"; fi)
+CLEAN_DCCN=$(subst dccn,cleandccn,${PREREQ_DCCN})
+PREREQ_DCCNKMOD=$(shell if [ -d ${DCCN_MOD} ] ; then echo "dccnkmod"; fi)
+CLEAN_DCCNKMOD=$(shell if [ -d ${DCCN_MOD} ] ; then echo "cleandccnkmod"; fi)
+PREREQ_CCGI=$(shell if [ -d ${CCGI_MOD} ] ; then echo "ccgi"; fi)
+CLEAN_CCGI=$(subst ccgi,cleanccgi,${PREREQ_CCGI})
+PREREQ_SRVM=$(shell if [ -d ${SRVM_MOD} ] ; then echo "srvm"; fi)
+CLEAN_SRVM=$(subst srvm,cleansrvm,${PREREQ_SRVM})
+PREREQ_LIBNM=$(shell if [ -d ${LIBNM_MOD} ] ; then echo "libnm"; fi)
+CLEAN_LIBNM=$(subst libnm,cleanlibnm,${CLEAN_LIBNM})
+
+
+
+PREREQ_CHKPWD=$(shell if [ -d ${CHKPWD_MOD} ] ; then echo "chkpwd"; fi)
+CLEAN_CHKPWD=$(subst chkpwd,cleanchkpwd,${PREREQ_CHKPWD})
+PREREQ_NPDSUIT_MV=$(shell if [ -d ${NPDSUIT_MV_MOD} ] ; then echo "npdsuit_mv"; fi)
+CLEAN_NPDSUIT_MV=$(subst npdsuit_mv,cleannpdsuit_mv,${PREREQ_NPDSUIT_MV})
+PREREQ_QUAGGA=$(shell if [ -d ${QUAGGA_MOD} ] ; then echo "quagga"; fi)
+CLEAN_QUAGGA=$(subst quagga,cleanquagga,${PREREQ_QUAGGA})
+PREREQ_PIMD=$(shell if [ -d ${PIMD_MOD} ] ; then echo "pimd"; fi)
+CLEAN_PIMD=$(subst pimd,cleanpimd,${PREREQ_PIMD})
+PREREQ_WCPSS=$(shell if [ -d ${WCPSS_MOD} ] ; then echo "wcpss"; fi)
+CLEAN_WCPSS=$(subst wcpss,cleanwcpss,${PREREQ_WCPSS})
+PREREQ_WIFIKMOD=$(shell if [ -d ${WCPSS_MOD} ] ; then echo "wifikmod"; fi)
+CLEAN_WIFIKMOD=$(shell if [ -d ${WCPSS_MOD} ] ; then echo "cleanwifikmod"; fi)
+
+PREREQ_IPTABLES=$(shell if [ -d ${IPTABLES_MOD} ] ; then echo "iptables"; fi)
+CLEAN_IPTABLES=$(subst iptables,cleaniptables,${PREREQ_IPTABLES})
+
+PREREQ_EBTABLES=$(shell if [ -d ${EBTABLES_MOD} ] ; then echo "ebtables"; fi)
+CLEAN_EBTABLES=$(subst ebtables,cleanebtables,${PREREQ_EBTABLES})
+
+PREREQ_CAPTIVE=$(shell if [ -d ${CAPTIVE_MOD} ] ; then echo "captive"; fi)
+CLEAN_CAPTIVE=$(subst captive,cleancaptive,${PREREQ_CAPTIVE})
+
+PREREQ_EAG=$(shell if [ -d ${EAG_MOD} ] ; then echo "eag"; fi)
+CLEAN_EAG=$(subst eag,cleaneag,${PREREQ_EAG})
+
+PREREQ_BCM_NPDSUIT=$(shell if [ -d ${NPDSUIT_BCM_MOD} ] ; then echo "npdsuit_bcm"; fi)
+CLEAN_NPDSUIT_BCM=$(subst npdsuit_bcm,cleanbcm_npdsuit,${ PREREQ_BCM_NPDSUIT})
+CLEAN_BCMKMOD=$(shell if [ -d ${NPDSUIT_BCM_MOD} ] ; then echo "cleanbcmkmod"; fi) 
+CLEAN_MVKMOD=$(shell if [ -d ${NPDSUIT_MV_MOD} ] ; then echo "cleanmvkmod"; fi) 
+
+PREREQ_DHCP=$(shell if [ -d ${DHCP_MOD} ] ; then echo "dhcp"; fi)
+CLEAN_DHCP=$(subst dhcp,cleandhcp,${PREREQ_DHCP})
+PREREQ_DHCPSNP=$(shell if [ -d ${DHCPSNP_MOD} ] ; then echo "dhcpsnp"; fi)
+CLEAN_DHCPSNP=$(subst dhcpsnp,cleandhcpsnp,${PREREQ_DHCPSNP})
+
+PREREQ_DHCP6=$(shell if [ -d ${DHCP6_MOD} ] ; then echo "dhcp6"; fi)
+CLEAN_DHCP6=$(subst dhcp6,cleandhcp6,${PREREQ_DHCP6})
+
+PREREQ_RADIUSD=$(shell if [ -d ${RADIUSD_MOD} ] ; then echo "radiusd"; fi)
+CLEAN_RADIUSD=$(subst radiusd,cleanradiusd,${PREREQ_RADIUSD})
+
+ifdef xcat
+export CPSS_DIR=$(shell pwd)/${NPDSUIT_XCAT_MOD}/xcat_mcpss/src/drv
+endif
+
+.SILENT: default
+.PHONY: default
+default:
+	echo "==========================================================="
+	echo "Following targets are supported:"
+	echo
+	echo "==CVS Source code management targets"
+	echo 
+	echo "updatesrc		-Update cvs source code of apps"
+	echo "update			-Update cvs source code of apps and buildtools"
+	echo "archives		-Compress all source code and build an archive" 
+	echo
+	echo "==Application&related kernel modules targets"
+	echo 
+	echo "pubapps			-Compile all userspace applications and related kernel modules."
+	echo "dcli			-Make dcli module."
+	echo "npdsuit bcm or mv		-Make npd suit."
+	echo "wcpss			-Make wcpss."
+	echo "asd			-Make asd."
+	echo "cavium-ethernet		-Make cavium-ethernet."
+	echo "stpsuit			-Make rstp and mstp."
+	echo "had			-Make HA daemon."
+	echo "ccgi			-Make AuteCS ccgi."
+	echo
+	echo "==Cleanning targets"
+	echo 
+	echo "cleanapps		-Clean apps."
+	echo "cleandcli		-Clean dcli."
+	echo "cleannpdsuit		-Clean npdsuit."
+	echo "cleanwcpss		-Clean wcpss."
+	echo "cleanasd		-Clean asd."
+	echo "cleancavium-ethernet	-Clean Cavium-ethernet."
+	echo "cleanstpsuit		-Clean stpsuit."
+	echo "cleanhad			-Clean HA daemon."
+	echo "cleanccgi		-Clean ccgi."
+	echo "cleanbcm_npdsuit 		-Clean npdsuit bcm utilities."
+	echo 
+	echo "==System level targets"
+	echo 
+	echo "x7x5img			-Make x7x5 img with kernel2.6.16.26"
+	echo "x3img			-Make x3 img with kernel2.6.16.26"
+	echo "x3img2			-Make x3 img with kernel2.6.21.7cn3"
+	echo "awimgs			-Make x7x5 and x3img x3img2 within one build"
+	echo
+	echo "For other possible targets, please try: make TABKEY"
+	echo "==========================================================="
+
+
+updatesrc:
+	@if [ -d .git ] ; then \
+		echo "You are using a git project, please use git pull  to update src instead."; \
+		exit 1 ; \
+	fi
+	cd src && cvs update -Ad
+ifndef xcat
+	cd ${ROOTFS_DIR} && git pull
+endif
+	cd ${KERNEL_ROOT} && git pull
+
+update: updatesrc
+	@if [ -d .git ] ; then \
+		echo "You are using a git project, please use git pull  to update src instead."; \
+		exit 1 ; \
+	fi
+	cvs update -Ad
+
+versioncheck:
+	@echo "Checking which gcc in path is in use..."
+	@which mips64-octeon-linux-gnu-gcc
+	@echo "Checking which gcc version is in use..."
+	@mips64-octeon-linux-gnu-gcc -v
+
+ifneq (${PREREQ_WCPSS},)
+export DCLI_HAS_WCPSS=-D_D_WCPSS_ 
+else
+unexport DCLI_HAS_WCPSS
+endif
+CFLAGS += ${DCLI_HAS_WCPSS}
+
+#$(info DCLI_HAS_WCPSS = ${DCLI_HAS_WCPSS})
+
+define checkquagga
+	if [ -d ${QUAGGA_MOD} ]; \
+	then \
+		echo "Use private quagga header files." ;\
+		export QUAGGA_DIR=${BUILD_DIR}/${QUAGGA_MOD} ;\
+	elif [ -n "${QUAGGA_DIR}" ] ; \
+	then \
+		echo "No private quagga found, using public quagga header files env";  \
+		echo "Public QUAGGA_DIR is ${QUAGGA_DIR}"; \
+	else \
+		echo "No local or public quagga found. exit..."; \
+		exit 1; \
+	fi 
+endef
+
+dcli:dcli-pub libnm 
+	@echo "Building dcli module..."
+	@$(checkquagga) && $(MAKE) -C ${DCLI_MOD}/src/lib
+dcli-pub:
+	@echo "Building dclipub module..."
+	$(MAKE) -C ${DCLI_MOD}/src/pub
+	
+ccgi: libnm dcli-pub
+	@echo "Building ccgi ..."
+	$(MAKE) -C ${CCGI_MOD}/cgic205 OLDEAG=$(OLDEAG)
+	cp ${CCGI_MOD}/cgic205/*.cgi ${WWW_EXPORT_DIR}/ccgi-bin
+	cp -P ${CCGI_MOD}/cgic205/libcgic.so* ${LIB_EXPORT_DIR}
+	cp -RP ${CCGI_MOD}/htdocs ${WWW_EXPORT_DIR}/
+
+srvm:
+	@echo "Building service management ..."
+	$(MAKE) -C ${SRVM_MOD}/app
+	cp ${SRVM_MOD}/app/srvload ${BIN_EXPORT_DIR}
+	cp ${SRVM_MOD}/app/srvsave ${BIN_EXPORT_DIR}
+	cp ${SRVM_MOD}/app/srvcmd ${BIN_EXPORT_DIR}
+
+snmp: trap-helper libnm acsample
+	@echo "Building snmp extentions ..."
+	$(MAKE) -C ${SUBAGENT_MOD} subagent_plugin.so
+	cp ${SUBAGENT_MOD}/subagent_plugin.so ${LIB_EXPORT_DIR}
+	rm -rf ${ROOTFS_DIR}/files/usr/sbin/snmpd
+	rm -rf ${ROOTFS_DIR}/files/usr/bin/snmptrap
+	cp ${SNMP_ROOTDIR}/engine/bin/snmpd ${ROOTFS_DIR}/files/usr/sbin/
+	chmod +x ${ROOTFS_DIR}/files/usr/sbin/snmpd
+	cp ${SNMP_ROOTDIR}/engine/bin/snmptrap ${ROOTFS_DIR}/files/usr/bin/
+	chmod +x ${ROOTFS_DIR}/files/usr/bin/snmptrap
+	rm -rf ${ROOTFS_DIR}/files/usr/lib/libnetsnmp*
+	cp ${SNMP_ROOTDIR}/engine/lib/libnetsnmpagent.so.20.0.0 ${ROOTFS_DIR}/files/usr/lib/
+	ln -s libnetsnmpagent.so.20.0.0 ${ROOTFS_DIR}/files/usr/lib/libnetsnmpagent.so.20
+	ln -s libnetsnmpagent.so.20 ${ROOTFS_DIR}/files/usr/lib/libnetsnmpagent.so
+	cp ${SNMP_ROOTDIR}/engine/lib/libnetsnmphelpers.so.20.0.0 ${ROOTFS_DIR}/files/usr/lib/
+	ln -s libnetsnmphelpers.so.20.0.0 ${ROOTFS_DIR}/files/usr/lib/libnetsnmphelpers.so.20
+	ln -s libnetsnmphelpers.so.20 ${ROOTFS_DIR}/files/usr/lib/libnetsnmphelpers.so
+	cp ${SNMP_ROOTDIR}/engine/lib/libnetsnmpmibs.so.20.0.0 ${ROOTFS_DIR}/files/usr/lib/
+	ln -s libnetsnmpmibs.so.20.0.0 ${ROOTFS_DIR}/files/usr/lib/libnetsnmpmibs.so.20
+	ln -s libnetsnmpmibs.so.20 ${ROOTFS_DIR}/files/usr/lib/libnetsnmpmibs.so
+	cp ${SNMP_ROOTDIR}/engine/lib/libnetsnmptrapd.so.20.0.0 ${ROOTFS_DIR}/files/usr/lib/
+	ln -s libnetsnmptrapd.so.20.0.0 ${ROOTFS_DIR}/files/usr/lib/libnetsnmptrapd.so.20
+	ln -s libnetsnmptrapd.so.20 ${ROOTFS_DIR}/files/usr/lib/libnetsnmptrapd.so
+	cp ${SNMP_ROOTDIR}/engine/lib/libnetsnmp.so.20.0.0 ${ROOTFS_DIR}/files/usr/lib/
+	ln -s libnetsnmp.so.20.0.0 ${ROOTFS_DIR}/files/usr/lib/libnetsnmp.so.20
+	ln -s libnetsnmp.so.20 ${ROOTFS_DIR}/files/usr/lib/libnetsnmp.so
+#	cp -rf ${SNMPMIBS_DIR}/* ${ROOTFS_DIR}/files/usr/share/snmp/mibs/
+#	$(MAKE) -C ${SUBAGENT_MOD} 
+#	cp ${SUBAGENT_MOD}/subagent ${BIN_EXPORT_DIR}
+
+acsample: libnm dcli-pub
+	@echo "Building acsample..."
+	$(MAKE) -C ${ACSAMPLE_MOD}/
+	cp ${ACSAMPLE_MOD}/acsample $(BIN_EXPORT_DIR)
+
+trap-helper: libnm dcli-pub
+	@echo "Building trap-helper..."
+	$(MAKE) -C ${TRAP_HELPER_MOD}/ trap-helper
+	cp ${TRAP_HELPER_MOD}/trap-helper $(BIN_EXPORT_DIR)
+
+libnm: dcli-pub 
+	@echo "Building libnm..."
+	$(MAKE) -C $(LIBNM_MOD) libnm.so
+	cp $(LIBNM_MOD)/libnm.so $(LIB_EXPORT_DIR)
+	
+asd:
+	@echo "Building asd..."
+	$(MAKE) -C ${ASD_MOD}/src/app
+	cp ${ASD_MOD}/src/app/asd $(BIN_EXPORT_DIR)
+	cp -P ${ASD_MOD}/src/app/wapi/libw* $(LIB_EXPORT_DIR)
+	chmod 755 $(LIB_EXPORT_DIR)/libwssl.so*
+	chmod 755 $(LIB_EXPORT_DIR)/libwcrypto.so*
+	ln -sf libwssl.so.0.9.8 $(LIB_EXPORT_DIR)/libwssl.so
+	ln -sf libwcrypto.so.0.9.8 $(LIB_EXPORT_DIR)/libwcrypto.so
+
+wcpss: wid wsm
+	echo "Finished making wcpss."
+	cp ${WTPVERFILE} ${ROOTFS_DIR}/files/etc/version/
+
+wsm: wcpsspub_ac
+	@echo "Building wsm ..."
+	$(MAKE) -C ${WCPSS_MOD}/src/app/wsm
+	cp ${WCPSS_MOD}/src/app/wsm/wsm $(BIN_EXPORT_DIR)
+
+wid: wcpsspub_ac
+	@echo "Building wid ..."
+	$(MAKE) -C ${WCPSS_MOD}/src/app/wid
+	cp ${WCPSS_MOD}/src/app/wid/wid $(BIN_EXPORT_DIR)
+	
+iuhd: 
+	@echo "Building iuhd ..."
+	$(MAKE) -C ${IUH_MOD}/iuh
+	cp ${IUH_MOD}/iuh/iuhd $(BIN_EXPORT_DIR)
+dbus:
+	@echo "Building DBus ..."
+	$(MAKE) -C ${DBUS_MOD}
+	-cp ${DBUS_MOD}/bus/dbus-daemon ${BIN_EXPORT_DIR}
+	-cp ${DBUS_MOD}/dbus/.libs/libdbus-1.so* ${LIB_EXPORT_DIR} -d
+	-rm ${PWD}/rootfs/files/usr/lib/libdbus-1.so*
+	-rm ${PWD}/rootfs/files/usr/bin/dbus-daemon
+	#cp ${DBUS_MOD}/tools/dbus-cleanup-sockets ${PWD}/rootfs/files/usr/bin
+	#cp ${DBUS_MOD}/tools/dbus-launch ${PWD}/rootfs/files/usr/bin
+	#cp ${DBUS_MOD}/tools/dbus-monitor ${PWD}/rootfs/files/usr/bin
+	#cp ${DBUS_MOD}/tools/dbus-send ${PWD}/rootfs/files/usr/bin
+	#cp ${DBUS_MOD}/tools/dbus-uuidgen ${PWD}/rootfs/files/usr/bin
+
+ranapproxy: 
+	@echo "Building ranapproxy ..."
+	$(MAKE) -C ${IU_MOD}/
+	cp ${IU_MOD}/ranapproxy $(BIN_EXPORT_DIR)
+
+wtpd: wcpsspub_wtp
+	@echo "Building wtpd ..."
+	$(MAKE) -C ${WCPSS_MOD}/src/app/wtpd
+
+wcpsspub_ac:
+	@echo "Building wcpss public lib for AC side..."
+	$(MAKE) -C ${WCPSS_MOD}/src/app/pub
+	
+wcpsspub_wtp:
+	@echo "Building wcpss public lib for WTP side ..."
+	$(MAKE) -C ${WCPSS_MOD}/src/app/pub -f Makefile_wtp
+pimd:
+	@echo "Building pimd suit ..."
+	$(MAKE) -C ${PIMD_MOD}
+	cp ${PIMD_MOD}/pimd ${BIN_EXPORT_DIR}
+	cp ${PIMD_MOD}/res/pimd ${ROOTFS_DIR}/files/etc/init.d/
+	chmod +x ${ROOTFS_DIR}/files/etc/init.d/pimd
+	ln -sf ../init.d/pimd  ${ROOTFS_DIR}/files/etc/rc2.d/S64pimd
+
+snmpliblink:
+	$(MAKE) -C ${SNMP_ROOTDIR}/subagent makelink
+
+quagga: snmpliblink
+	@echo "Building quagga suit ..."
+	if [ ! -d ${QUAGGA_MOD}/${BUILDDIR} ] ; then \
+		pushd ${QUAGGA_MOD} ; \
+		./configpkg ${BUILDDIR}; \
+		popd ; \
+	fi 	
+	$(MAKE) -C ${QUAGGA_MOD}/${BUILDDIR}
+	cp ${QUAGGA_MOD}/${BUILDDIR}/vtysh/.libs/vtysh $(BIN_EXPORT_DIR) 
+	cp ${QUAGGA_MOD}/${BUILDDIR}/zebra/.libs/zebra $(BIN_EXPORT_DIR)
+	cp ${QUAGGA_MOD}/${BUILDDIR}/ripd/.libs/ripd $(BIN_EXPORT_DIR) 
+	cp ${QUAGGA_MOD}/${BUILDDIR}/ospfd/.libs/ospfd $(BIN_EXPORT_DIR)
+	cp ${QUAGGA_MOD}/${BUILDDIR}/ospf6d/.libs/ospf6d $(BIN_EXPORT_DIR)
+	cp ${QUAGGA_MOD}/${BUILDDIR}/isisd/.libs/isisd $(BIN_EXPORT_DIR)
+	cp ${QUAGGA_MOD}/${BUILDDIR}/ripngd/.libs/ripngd $(BIN_EXPORT_DIR)
+	cp ${QUAGGA_MOD}/${BUILDDIR}/lib/.libs/libzebra.so.0.0.0 $(LIB_EXPORT_DIR) 
+	ln -sf libzebra.so.0.0.0 $(LIB_EXPORT_DIR)/libzebra.so
+	ln -sf libzebra.so.0.0.0 $(LIB_EXPORT_DIR)/libzebra.so.0
+	ln -sf libzebra.so.0.0.0 $(LIB_EXPORT_DIR)/libzebra.so.0.0
+	cp ${QUAGGA_MOD}/${BUILDDIR}/ospfd/.libs/libospf.so.0.0.0 $(LIB_EXPORT_DIR)
+	ln -sf libospf.so.0.0.0 $(LIB_EXPORT_DIR)/libospf.so
+	ln -sf libospf.so.0.0.0 $(LIB_EXPORT_DIR)/libospf.so.0
+#	cp ${QUAGGA_MOD}/debsrc/quagga-0.99.5/ripd/ripd.conf.sample $(ETC_EXPORT_DIR)/ripd.conf
+#	cp ${QUAGGA_MOD}/debsrc/quagga-0.99.5/ospfd/ospfd.conf.sample $(ETC_EXPORT_DIR)/ospfd.conf
+#	cp ${QUAGGA_MOD}/debsrc/quagga-0.99.5/zebra/zebra.conf.sample $(ETC_EXPORT_DIR)/zebra.conf
+
+npdsuit_mv: bm mcpss npd
+	@echo "Moving npdsuit mv files into rootfs"
+	mv ${KMOD_EXPORT_DIR}/bm.ko ${ROOTFS_KMOD_DIR}/misc/
+	mv ${KMOD_EXPORT_DIR}/kapDrv.ko ${ROOTFS_KMOD_DIR}/misc/
+	mv ${KMOD_EXPORT_DIR}/mvPpDrv.ko ${ROOTFS_KMOD_DIR}/misc/
+	mv ${BIN_EXPORT_DIR}/npd ${ROOTFS_DIR}/files/opt/bin/
+	mv ${LIB_EXPORT_DIR}/libmcpss* ${ROOTFS_DIR}/files/opt/lib/
+	mv ${LIB_EXPORT_DIR}/libnam* ${ROOTFS_DIR}/files/opt/lib/
+	mv ${LIB_EXPORT_DIR}/libnbm* ${ROOTFS_DIR}/files/opt/lib/
+
+npdsuit_bcm: bmbcm kapbcm bcmd npdbcm
+	@echo "Moving npdsuit mv files into rootfs"
+	mv ${KMOD_EXPORT_DIR}/bm.ko ${ROOTFS_KMOD_DIR}/misc/
+	mv ${KMOD_EXPORT_DIR}/kapDrv.ko ${ROOTFS_KMOD_DIR}/misc/
+	mv ${KMOD_EXPORT_DIR}/linux-kernel-bde.ko ${ROOTFS_KMOD_DIR}/misc/
+	mv ${KMOD_EXPORT_DIR}/linux-user-bde.ko ${ROOTFS_KMOD_DIR}/misc/
+	mv ${BIN_EXPORT_DIR}/npd ${ROOTFS_DIR}/files/opt/bin/
+	mv ${LIB_EXPORT_DIR}/libmbcm* ${ROOTFS_DIR}/files/opt/lib/
+	mv ${LIB_EXPORT_DIR}/libnam* ${ROOTFS_DIR}/files/opt/lib/
+	mv ${LIB_EXPORT_DIR}/libnbm* ${ROOTFS_DIR}/files/opt/lib/
+
+xcatbm: kmod
+	@echo "Building bm for Xcat"
+	$(MAKE) -C ${NPDSUIT_XCAT_MOD}/xcatbm/src/kmod
+	$(MAKE) -C ${NPDSUIT_XCAT_MOD}/xcatbm/src/app
+
+xcatkap: kmod
+	@echo "Building xcat kernel asic pipe kernel module ..."
+	$(MAKE) -C ${NPDSUIT_XCAT_MOD}/kap/src/kmod
+
+xcatkmod: kmod
+	@echo "Building marvell xcat kernel module ..."
+	$(MAKE) -C ${NPDSUIT_XCAT_MOD}/xcat_mcpss/src/kmod/mvPpDrv
+	$(MAKE) -C ${NPDSUIT_XCAT_MOD}/xcat_mcpss/src/kmod/mvKernelExt/2_6
+
+xcatnam:
+	@echo "Building xcat nam module..."
+	$(MAKE) DRV_LIB_FLAG=CPSS_XCAT -C ${NPDSUIT_XCAT_MOD}/nam_ax7/src/lib
+
+xcatnbm:
+	@echo "Building xcat nbm module..."
+	$(MAKE) DRV_LIB_FLAG=CPSS_XCAT -C ${NPDSUIT_XCAT_MOD}/nbm_ax7/src/lib
+
+xcat_mcpss: xcatkmod xcatkap
+	@echo "Building xcat mcpss module..."
+	$(MAKE) -C ${NPDSUIT_XCAT_MOD}/xcat_mcpss/src/drv
+
+xcatnpd: xcatnam xcatnbm xcat_mcpss
+	@echo "Build xcat npd..."
+	$(MAKE) DRV_LIB_FLAG=CPSS_XCAT -C ${NPDSUIT_XCAT_MOD}/npd/src/app
+	@cp ${NPDSUIT_XCAT_MOD}/npd/src/res/init.npd ${ROOTFS_DIR}/files/etc/init.d/npd
+	@dos2unix ${ROOTFS_DIR}/files/etc/init.d/npd
+	@chmod a+x ${ROOTFS_DIR}/files/etc/init.d/npd
+	@[ ! -e ${ROOTFS_DIR}/files/etc/rc.d/S30npd ] || rm -rf ${ROOTFS_DIR}/files/etc/rc.d/S30npd
+	@ln -s ../init.d/npd ${ROOTFS_DIR}/files/etc/rc.d/S30npd
+
+npdsuit_xcat: xcatbm xcatkap xcatkmod xcatnpd
+	@echo "Moving npdsuit files into rootfs"
+	mv ${KMOD_EXPORT_DIR}/bm.ko ${ROOTFS_KMOD_DIR}/
+	mv ${KMOD_EXPORT_DIR}/kapDrv.ko ${ROOTFS_KMOD_DIR}/
+	mv ${KMOD_EXPORT_DIR}/mvPpDrv.ko ${ROOTFS_KMOD_DIR}/
+	mv ${KMOD_EXPORT_DIR}/mvKernelExt.ko ${ROOTFS_KMOD_DIR}/
+	mv ${BIN_EXPORT_DIR}/npd ${ROOTFS_DIR}/files/usr/bin/
+	mv ${LIB_EXPORT_DIR}/libmcpss* ${ROOTFS_DIR}/files/usr/lib/
+	mv ${LIB_EXPORT_DIR}/libnam* ${ROOTFS_DIR}/files/usr/lib/
+	mv ${LIB_EXPORT_DIR}/libnbm* ${ROOTFS_DIR}/files/usr/lib/
+
+dldp_xcat: 
+	@echo "Building DLDP..."
+	$(MAKE) -C ${DLDP_MOD}/src/lib
+	cp ${DLDP_MOD}/src/lib/dldp ${BIN_EXPORT_DIR}/
+	@cp ${DLDP_MOD}/src/res/init.dldp ${ROOTFS_DIR}/files/etc/init.d/dldp
+	@dos2unix ${ROOTFS_DIR}/files/etc/init.d/dldp
+	@chmod a+x ${ROOTFS_DIR}/files/etc/init.d/dldp
+	@[ ! -e ${ROOTFS_DIR}/files/etc/rc.d/S35dldp ] || rm -rf ${ROOTFS_DIR}/files/etc/rc.d/S35dldp
+	@ln -s ../init.d/dldp ${ROOTFS_DIR}/files/etc/rc.d/S35dldp
+
+nam:
+	@echo "Building nam module..."
+	$(MAKE) DRV_LIB_FLAG=CPSS -C ${NPDSUIT_MV_MOD}/nam_ax7/src/lib
+
+nambcm:
+	@echo "Building nam module......"
+	$(MAKE) DRV_LIB_FLAG=BCM -C ${NPDSUIT_BCM_MOD}/nam_ax7/src/lib
+
+nbm:
+	@echo "Building nbm module..."
+	$(MAKE) DRV_LIB_FLAG=CPSS -C ${NPDSUIT_MV_MOD}/nbm_ax7/src/lib
+
+nbmbcm:
+	@echo "Building nbm module......"
+	$(MAKE) DRV_LIB_FLAG=BCM -C ${NPDSUIT_BCM_MOD}/nbm_ax7/src/lib
+
+mcpss: mvkmod kap
+	@echo "Building mcpss..."
+	$(MAKE) -C ${NPDSUIT_MV_MOD}/mcpss/src/drv
+
+npd: nam nbm 
+	@echo "Building npd..."
+	$(MAKE) DRV_LIB_FLAG=CPSS -C ${NPDSUIT_MV_MOD}/npd/src/app
+
+npdbcm: nambcm nbmbcm
+	@echo "Building npd......"
+	$(MAKE) DRV_LIB_FLAG=BCM -C ${NPDSUIT_BCM_MOD}/npd/src/app
+
+bcmd: kbdemod ubdemod
+	@echo "Building bcm driver ..."
+	$(MAKE) -C $(BCM_MOD)/systems/linux/user/nsx64
+	#cp $(BCM_MOD)/systems/linux/user/nsx64/bcm.user $(BIN_EXPORT_DIR)/
+	cp -RP $(BCM_TOPDIR)/rc ${ROOTFS_DIR}/files/
+
+stpsuit:
+	@echo "Building stp suit..."
+	$(MAKE) -C ${STPSUIT_MOD}/src
+	cp ${STPSUIT_MOD}/src/OBJ/bridge ${BIN_EXPORT_DIR}/
+
+had:
+	@echo "Building HA daemon..."
+	$(MAKE) -C ${HAD_MOD}/src/lib
+	cp $(HAD_MOD)/src/lib/obj/had ${BIN_EXPORT_DIR}/
+hbip:
+	@echo "Building hbip deamon..."
+	$(MAKE) -C ${HBIP_MOD}/src/
+	cp ${HBIP_MOD}/src/obj/hbip ${BIN_EXPORT_DIR}/
+igmp:
+	@echo "Building igmp snooping ..."
+	$(MAKE) -C ${IGMP_MOD}/
+	cp ${IGMP_MOD}/igmp_snoop ${BIN_EXPORT_DIR}/
+
+dldp:
+	@echo "Building DLDP..."
+	$(MAKE) -C ${DLDP_MOD}/src/lib
+	cp ${DLDP_MOD}/src/lib/dldp ${BIN_EXPORT_DIR}/
+
+chkpwd:
+	@echo "Building checkpasswd-pam ..."
+	$(MAKE) -C ${CHKPWD_MOD}/checkpassword-pam-0.99
+	cp ${CHKPWD_MOD}/checkpassword-pam-0.99/checkpassword-pam ${BIN_EXPORT_DIR}
+
+captive:
+	@echo "Building captive portal ..."
+	-chmod 755 ${CAPTIVE_MOD}/device/bash/*.sh
+	-cp -rf ${CAPTIVE_MOD}/device/bash/*.sh ${ROOTFS_DIR}/files/usr/bin/
+
+eag:
+	echo "Building eag ..." 
+	$(MAKE) -C ${EAG_MOD}/pkg/src_multi_ins 
+	cp ${EAG_MOD}/pkg/src_multi_ins/eag		${ROOTFS_DIR}/files/opt/bin/ 
+	cp -RP ${EAG_MOD}/res/eag ${ROOTFS_DIR}/files/opt/
+	rm -rf ${ROOTFS_DIR}/files/opt/eag/www 
+	mv ${ROOTFS_DIR}/files/opt/eag/www_multi_ins ${ROOTFS_DIR}/files/opt/eag/www 
+	
+	
+dhcp: preparedirs
+	@echo "Building dhcp ..."
+	@echo $(DHCP_CONFIG_HOSTCC)
+	if [ ! -f ${DHCP_MOD}/Makefile ] ; then 		\
+		pushd ${DHCP_MOD} ; 				\
+		chmod +x ./configure;				\
+		./configure --host=$(DHCP_CONFIG_HOSTCC) --with-srv-lease-file=/var/lib/dhcp4/dhcpd.leases; \
+		popd ; 						\
+	fi
+	$(MAKE) -C ${DHCP_MOD}
+	cp ${DHCP_MOD}/server/dhcpd ${ROOTFS_DIR}/files/opt/bin
+	cp ${DHCP_MOD}/relay/dhcrelay ${ROOTFS_DIR}/files/opt/bin
+
+dhcp6: preparedirs
+	@echo "Building dhcp6 ..."
+	@echo $(DHCP_CONFIG_HOSTCC)
+	if [ ! -f ${DHCP6_MOD}/Makefile ] ; then 		\
+		pushd ${DHCP6_MOD} ; 				\
+		chmod +x ./configure;				\
+		./configure --host=$(DHCP_CONFIG_HOSTCC) --with-srv-lease-file=/var/lib/dhcp4/dhcp6d.leases; \
+		popd ; 						\
+	fi
+	$(MAKE) -C ${DHCP6_MOD}
+	cp ${DHCP6_MOD}/server/dhcpd ${ROOTFS_DIR}/files/opt/bin/dhcp6d
+	cp ${DHCP6_MOD}/relay/dhcrelay ${ROOTFS_DIR}/files/opt/bin/dhcrelay6
+
+radiusd:
+	@echo "Building radiusd ..."
+	if [ ! -f ${RADIUSD_MOD}/debsrc/freeradius-2.0.4+dfsg/Make.inc ] ; then \
+		pushd ${RADIUSD_MOD}; \
+		./configpkg; \
+		popd ; \
+	fi
+	$(MAKE) -C ${RADIUSD_MOD}/debsrc/freeradius-2.0.4+dfsg/
+	-mkdir ${ROOTFS_DIR}/files/opt/lib/radius
+	cp -RP ${RADIUSD_MOD}/debsrc/freeradius-2.0.4+dfsg/src/modules/lib/.libs/*.so   ${ROOTFS_DIR}/files/opt/lib/radius/
+	cp -RP ${RADIUSD_MOD}/debsrc/freeradius-2.0.4+dfsg/src/lib/.libs/libfreeradius-radius-2.0.4.so   ${ROOTFS_DIR}/files/opt/lib/
+	
+	cp -RP ${RADIUSD_MOD}/debsrc/freeradius-2.0.4+dfsg/src/modules/rlm_eap/libeap/.libs/libfreeradius-eap-2.0.4.so   ${ROOTFS_DIR}/files/opt/lib/
+	-ln -s ${ROOTFS_DIR}/files/opt/lib/libfreeradius-radius-2.0.4.so    ${ROOTFS_DIR}/files/opt/lib/libfreeradius-radius.so 
+	cp -RP ${RADIUSD_MOD}/debsrc/freeradius-2.0.4+dfsg/libltdl/.libs/libltdl.so.3.1.4    ${ROOTFS_DIR}/files/opt/lib/
+	-ln -s ${ROOTFS_DIR}/files/opt/lib/libltdl.so.3.1.4  ${ROOTFS_DIR}/files/opt/lib/libltdl.so
+	cp -RP ${RADIUSD_MOD}/debsrc/freeradius-2.0.4+dfsg/src/main/.libs/radiusd  ${ROOTFS_DIR}/files/opt/bin/
+	-mkdir ${ROOTFS_DIR}/files/opt/radius	
+	cp -r ${RADIUSD_MOD}/debsrc/raddb   ${ROOTFS_DIR}/files/opt/radius
+	cp -r ${RADIUSD_MOD}/debsrc/raddb/libmysqlclient_r.so.15   ${ROOTFS_DIR}/files/opt/lib/
+	cp -r ${RADIUSD_MOD}/debsrc/raddb/rlm_sql_mysql.so   ${ROOTFS_DIR}/files/opt/lib/radius/
+	-find ${ROOTFS_DIR}/files/opt/radius -name CVS | xargs rm -rf	
+	-mkdir ${ROOTFS_DIR}/files/opt/radius/raddb/dict
+	cp -RP ${RADIUSD_MOD}/debsrc/freeradius-2.0.4+dfsg/share/* ${ROOTFS_DIR}/files/opt/radius/raddb/dict/
+	#-chmod 755 -R ${RADIUSD_MOD}/debsrc/freeradius-2.0.4+dfsg/share/* ${ROOTFS_DIR}/files/opt/radius/raddb
+
+
+libdhcpsnp: preparedirs
+	@echo "Building dhcpsnp library..."
+	$(MAKE) -C ${DHCPSNP_MOD}/src/lib
+
+dhcpsnp: libdhcpsnp
+	@echo "Building dhcpsnp module..."
+	$(MAKE) -C ${DHCPSNP_MOD}/src/app
+	
+cleandhcpsnp:
+	@echo "Cleaning dhcpsnp module..."
+	$(MAKE) -C ${DHCPSNP_MOD}/src/lib clean
+	$(MAKE) -C ${DHCPSNP_MOD}/src/app clean
+	
+dccnkmod: kmod
+	@echo "Building dccnetlink ..."
+	$(MAKE) -C ${DCCN_MOD}/src/kmod
+	@mv ${KMOD_EXPORT_DIR}/dccn.ko ${ROOTFS_KMOD_DIR}/misc/
+	@ls -lah ${ROOTFS_KMOD_DIR}/misc/dccn.ko
+	
+dccn: dccnkmod
+	@echo "Building dccnapp"
+	$(MAKE) -C ${DCCN_MOD}/src/app
+
+libsubdirs:
+	[ -d ${ROOTFS_DIR}/files/opt/lib/ebtables ] || mkdir ${ROOTFS_DIR}/files/opt/lib/ebtables
+	[ -d ${ROOTFS_DIR}/files/opt/lib/iptables ] || mkdir ${ROOTFS_DIR}/files/opt/lib/iptables
+	[ -d ${ROOTFS_DIR}/files/opt/lib/ipset ] || mkdir ${ROOTFS_DIR}/files/opt/lib/ipset
+
+iptables: libsubdirs ipset ipp2p
+	@echo "Building iptables ..."
+	$(MAKE) -C ${IPTABLES_MOD}/debsrc/iptables-1.3.6.0debian1/iptables
+	cp ${IPTABLES_MOD}/debsrc/iptables-1.3.6.0debian1/iptables/iptables ${ROOTFS_DIR}/files/opt/bin/
+	cp ${IPTABLES_MOD}/debsrc/iptables-1.3.6.0debian1/iptables/iptables-save ${ROOTFS_DIR}/files/opt/bin/
+	cp ${IPTABLES_MOD}/debsrc/iptables-1.3.6.0debian1/iptables/iptables-restore ${ROOTFS_DIR}/files/opt/bin/
+	cp ${IPTABLES_MOD}/debsrc/iptables-1.3.6.0debian1/iptables/ip6tables ${ROOTFS_DIR}/files/opt/bin/
+	cp ${IPTABLES_MOD}/debsrc/iptables-1.3.6.0debian1/iptables/ip6tables-save ${ROOTFS_DIR}/files/opt/bin/
+	cp ${IPTABLES_MOD}/debsrc/iptables-1.3.6.0debian1/iptables/ip6tables-restore ${ROOTFS_DIR}/files/opt/bin/
+	cp ${IPTABLES_MOD}/debsrc/iptables-1.3.6.0debian1/iptables/extensions/lib*.so ${ROOTFS_DIR}/files/opt/lib/iptables/
+
+ebtables: libsubdirs
+	@echo "Building ebtables ..."
+	$(MAKE) -C ${EBTABLES_MOD}/ebtables-v2.0.9-1/
+	cp ${EBTABLES_MOD}/ebtables-v2.0.9-1/ebtables ${ROOTFS_DIR}/files/opt/bin/
+	cp ${EBTABLES_MOD}/ebtables-v2.0.9-1/ebtables-restore ${ROOTFS_DIR}/files/opt/bin/
+	cp ${EBTABLES_MOD}/ebtables-v2.0.9-1/libebtc.so ${ROOTFS_DIR}/files/opt/lib/ebtables/
+	cp ${EBTABLES_MOD}/ebtables-v2.0.9-1/extensions/libebt*.so ${ROOTFS_DIR}/files/opt/lib/ebtables/
+
+
+link-kernel-se-files:
+ifeq (${NEWKERN},3)
+	./copy-se2kernel.sh link ${KERNEL_ROOT} 
+endif
+	@echo ${PATH}
+
+revert-kernel-se-files:
+ifeq (${NEWKERN},3)
+	find  ${KERNEL_ROOT}/arch/mips/include/asm/octeon -type l -delete
+	find  ${KERNEL_ROOT}/arch/mips/cavium-octeon/executive -type l -delete
+#	(cd kernel_2.6/linux-svn; svn revert -R arch/mips/include/asm/octeon arch/mips/cavium-octeon/executive )
+endif
+	@echo ${PATH}
+
+${KERNEL_ROOT}/.config: link-kernel-se-files 
+	cp ${KERNEL_ROOT}/octeon.config ${KERNEL_ROOT}/.config
+
+kernel: ${KERNEL_ROOT}/.config
+	@echo "Making kernel ..."
+	-rm ${KERNEL_ROOT}/usr/initramfs_data.cpio*
+ifdef xcat
+	make -C ${KERNEL_ROOT} uImage -j 20
+else
+	make -C ${KERNEL_ROOT}
+endif
+
+kmod: ${KERNEL_ROOT}/.config ${MAKE_KERNEL_BEFORE_MODULES}
+	@echo "Making kernel built-in modules ..."
+	make -C ${KERNEL_ROOT} modules
+	[ -d ${ROOTFS_KMOD_DIR} ] || mkdir -p ${ROOTFS_KMOD_DIR}
+	[ -d ${ROOTFS_KMOD_DIR}/kernel ] || mkdir -p ${ROOTFS_KMOD_DIR}/kernel
+	[ -d ${ROOTFS_KMOD_DIR}/misc ] || mkdir -p ${ROOTFS_KMOD_DIR}/misc
+
+ipset: kmod
+	@echo "Building ipset ..."
+	$(MAKE) -C ${IPTABLES_MOD}/external/ipset-2.3.3a/
+	cp ${IPTABLES_MOD}/external/ipset-2.3.3a/kernel/*.ko ${KMOD_EXPORT_DIR}/
+	cp ${IPTABLES_MOD}/external/ipset-2.3.3a/ipset ${ROOTFS_DIR}/files/opt/bin/
+	cp ${IPTABLES_MOD}/external/ipset-2.3.3a/*.so  ${ROOTFS_DIR}/files/opt/lib/ipset/
+
+ipp2p: kmod
+	@echo "Building iptables external modules -- ipp2p ..."
+	$(MAKE) -C ${IPTABLES_MOD}/external/ipp2p-0.99.15/
+	cp ${IPTABLES_MOD}/external/ipp2p-0.99.15/*.ko ${KMOD_EXPORT_DIR}
+	cp ${IPTABLES_MOD}/external/ipp2p-0.99.15/*.so ${ROOTFS_DIR}/files/opt/lib/iptables/
+
+
+mvkmod: kmod 
+	@echo "Building marvell kernel module ..."
+	$(MAKE) -C ${NPDSUIT_MV_MOD}/mcpss/src/kmod/mvPpDrv
+
+kap: kmod
+	@echo "Building kernel asic pipe kernel module ..."
+	$(MAKE) -C ${NPDSUIT_MV_MOD}/kap/src/kmod
+
+kapbcm: kmod
+	@echo "Building kernel asic pipe kernel module ..."
+	$(MAKE) -C ${NPDSUIT_BCM_MOD}/kap/src/kmod
+
+bm: kmod
+	@echo "Building bm..."
+	$(MAKE) -C ${NPDSUIT_MV_MOD}/bm/src/kmod
+	$(MAKE) -C ${NPDSUIT_MV_MOD}/bm/src/app
+	cp ${NPDSUIT_MV_MOD}/bm/src/app/bmutil ${BIN_EXPORT_DIR}/
+
+bmbcm: kmod
+	@echo "Building bm for bcm..."
+	$(MAKE) -C ${NPDSUIT_BCM_MOD}/bm/src/kmod
+	$(MAKE) -C ${NPDSUIT_BCM_MOD}/bm/src/app
+	cp ${NPDSUIT_BCM_MOD}/bm/src/app/bmutil ${BIN_EXPORT_DIR}/
+
+cavium-ethernet: kmod
+	@echo "Building cavium-ethernet driver kernel module."
+	$(MAKE) -C ${OCTETH_KMOD} 
+	cp ${OCTETH_KMOD}/*.ko ${KMOD_EXPORT_DIR}/
+	@echo "Building ipfwd kernel module for enhance cavium-ethernet driver."
+	$(MAKE) -C src/ipfwd
+	cp src/ipfwd/*.ko ${KMOD_EXPORT_DIR}/
+	@echo "###################Building DPI driver.**********************"
+	$(MAKE) -C ${DPI_KMOD} 
+	cp ${DPI_KMOD}/*.ko ${KMOD_EXPORT_DIR}/
+e1000e: kmod
+	@echo "Building e1000e driver kernel module."
+	$(MAKE) -C ${E1000E_KMOD}
+	cp ${E1000E_KMOD}/e1000e.ko ${KMOD_EXPORT_DIR}/
+wifikmod: kmod
+	@echo "Building wifi-ehternet ..."
+	$(MAKE) -C ${WCPSS_MOD}/src/kmod/wifi-ethernet/
+	cp ${WCPSS_MOD}/src/kmod/wifi-ethernet/wifi-ethernet.ko ${KMOD_EXPORT_DIR}/
+
+kbdemod: kmod
+	@echo "Building bcm kbde module ..."
+	$(MAKE) -C $(BCM_MOD)/systems/bde/linux/bdekmod/kernel
+
+ubdemod: kmod
+	@echo "Building bcm ubde module ..."
+	$(MAKE) -C $(BCM_MOD)/systems/bde/linux/bdekmod/user
+
+ifneq (${EXP},1)
+define UPDATEBUILDNO
+	make updatebuildno
+endef
+else
+define UPDATEBUILDNO
+	echo "Skip update buildno"
+endef
+endif
+
+updatebuildno:
+	@if [ -d .git ] ; then \
+		git pull ; \
+	else \
+		cvs update -A -C ${BUILDNOFILE} ; \
+		if [ ! -f ${BUILDNOFILE} ] ; then \
+			echo "###################################" ; \
+			echo "${BUILDNOFILE} is missing, " ; \
+			echo "Maybe buildnofile has been changed, please update buildtools and try again." ; \
+			exit 1 ; \
+		fi \
+	fi
+	@echo $$((`cat ${BUILDNOFILE}` +1 )) > ${BUILDNOFILE}
+	@if [ -d .git ] ; then \
+		git add ${BUILDNOFILE} ; \
+		git commit -m "Increased buildno to `cat ${BUILDNOFILE}`" ; \
+		git push ; \
+	else \
+		cvs commit -m "Build `cat ${BUILDNOFILE}` was performed." ${BUILDNOFILE} ; \
+	fi
+
+motd:
+	@if [ -f  allbuildnoflag ] ; then \
+		alreadyupdated=`cat allbuildnoflag` ; \
+		if [ "$$alreadyupdated" = "0" ] ; then \
+			${UPDATEBUILDNO} ; \
+			echo 1 > allbuildnoflag ; \
+		fi \
+	else \
+		${UPDATEBUILDNO} ; \
+	fi
+	@echo "`cat ${NAMFILE}` `cat ${VERFILE}` build `cat ${BUILDNOFILE}` `cat ${PRODUCTFILE}` `date`" > ${MOTDFILE}
+	@echo "`whoami`@`hostname`:`tty`" > ${BUILDERFILE}
+	cp ${BUILDNOFILE} ${ROOTFS_DIR}/files/etc/version/buildno
+	cp ${PRODUCTFILE} ${ROOTFS_DIR}/files/etc/version/
+	cat ${MOTDFILE}
+
+bashtools:
+	-cp -rf ${BASHTOOLS_DIR}/*.sh ${ROOTFS_DIR}/files/usr/bin/
+	-cp -rf ${BASHTOOLS_DIR}/*.awk ${ROOTFS_DIR}/files/opt/awk/
+	-cp -rf ${SRVM_MOD}/res/*.sh ${ROOTFS_DIR}/files/usr/bin/
+	-rm -rf ${ROOTFS_DIR}/files/opt/services
+	-cp -rf ${BASHTOOLS_DIR}/services ${ROOTFS_DIR}/files/opt/
+	[ -d ${ROOTFS_DIR}/files/usr/bin/cgi-bin ] || mkdir ${ROOTFS_DIR}/files/usr/bin/cgi-bin
+	-cp -rf ${BASHTOOLS_DIR}/cgi-bin/* ${ROOTFS_DIR}/files/usr/bin/cgi-bin
+	-chmod 755 ${ROOTFS_DIR}/files/usr/bin/cgi-bin/*
+	-find ${ROOTFS_DIR}/files/opt -name CVS | xargs rm -rf
+	-chmod 755 ${ROOTFS_DIR}/files/usr/bin/*
+	-chmod 755 ${ROOTFS_DIR}/files/opt/services/init/*
+	if [ "x$(OLDEAG)" == "x1" ]; then\
+		cp -rf ${BASHTOOLS_DIR}/services/init/eag_init_old ${ROOTFS_DIR}/files/opt/services/init/eag_init;\
+	fi
+
+
+
+pubkmod: ${PREREQ_OCTETHKMOD} ${PREREQ_WIFIKMOD} ${PREREQ_IPTABLES} ${PREREQ_EBTABLES} ${PREREQ_CAPTIVE} ${PREREQ_EAG} ${PREREQ_DCCNKMOD}
+	@echo "Copying kernel modules ..."
+	-cd ${KERNEL_ROOT} && find . -name "*.ko" | xargs cp --parents --target-directory="${ROOTFS_KMOD_DIR}/kernel";
+	-cp -RP export/kmod/* ${ROOTFS_KMOD_DIR}/misc
+
+x3kmod: ${PREREQ_OCTETHKMOD} ${PREREQ_WIFIKMOD}  
+	@echo "Copying kernel modules ..."
+	-cd ${KERNEL_ROOT} && find . -name "*.ko" | xargs cp --parents --target-directory="${ROOTFS_KMOD_DIR}/kernel";
+	-cp -RP export/kmod/* ${ROOTFS_KMOD_DIR}/misc
+#	-rm -rf ${ROOTFS_KMOD_DIR}/kernel/net/ipv6
+	-rm -rf ${ROOTFS_KMOD_DIR}/kernel/net/netfilter
+	-rm -rf ${ROOTFS_KMOD_DIR}/kernel/net/ipv4/netfilter
+	-rm -rf ${ROOTFS_KMOD_DIR}/kernel/drivers/pcmcia
+	-rm -rf ${ROOTFS_KMOD_DIR}/kernel/drivers/net/ppp*
+
+
+pubkmod2:
+	@echo "Finished make kernel moduels for 2.6.21.7 kernel"
+
+
+preparedirs:
+	[ -d ${ROOTFS_DIR}/files/dev ] || mkdir -p ${ROOTFS_DIR}/files/dev
+	[ -e ${ROOTFS_DIR}/files/dev/console ] || mknod ${ROOTFS_DIR}/files/dev/console c 5 1 
+	[ -e ${ROOTFS_DIR}/files/dev/null ] || mknod ${ROOTFS_DIR}/files/dev/null c 1 3 
+	[ -e ${ROOTFS_DIR}/files/dev/ttyS0 ] || mknod ${ROOTFS_DIR}/files/dev/ttyS0 c 4 64 
+	[ -d ${ROOTFS_DIR}/files/dev/shm ] || mkdir -p ${ROOTFS_DIR}/files/dev/shm
+	[ -d ${ROOTFS_DIR}/files/dev/pts ] || mkdir -p ${ROOTFS_DIR}/files/dev/pts
+	[ -d ${ROOTFS_DIR}/files/opt ] || mkdir -p ${ROOTFS_DIR}/files/opt
+	[ -d ${ROOTFS_DIR}/files/opt/bin ] || mkdir -p ${ROOTFS_DIR}/files/opt/bin
+	[ -d ${ROOTFS_DIR}/files/opt/lib ] || mkdir -p ${ROOTFS_DIR}/files/opt/lib
+	[ -d ${ROOTFS_DIR}/files/opt/etc ] || mkdir -p ${ROOTFS_DIR}/files/opt/etc
+	[ -d ${ROOTFS_DIR}/files/opt/awk ] || mkdir -p ${ROOTFS_DIR}/files/opt/awk
+	[ -d ${ROOTFS_DIR}/files/lib/init/rw ] || mkdir -p ${ROOTFS_DIR}/files/lib/init/rw
+	[ -d ${ROOTFS_DIR}/files/var ] || mkdir -p ${ROOTFS_DIR}/files/var
+	[ -d ${ROOTFS_DIR}/files/var/run ] || mkdir -p ${ROOTFS_DIR}/files/var/run
+	[ -d ${ROOTFS_DIR}/files/var/lib ] || mkdir -p ${ROOTFS_DIR}/files/var/lib
+	[ -d ${ROOTFS_DIR}/files/root ] || mkdir -p ${ROOTFS_DIR}/files/root
+	[ -d export ] || mkdir export
+	[ -d export/opt ] || mkdir export/opt
+	[ -d export/opt/bin ] || mkdir export/opt/bin
+	[ -d export/opt/lib ] || mkdir export/opt/lib
+	[ -d export/opt/lib/iptables ] || mkdir export/opt/lib/iptables
+	[ -d export/opt/lib/ipset ] || mkdir export/opt/lib/ipset
+	[ -d export/opt/awk ] || mkdir export/opt/awk	
+	[ -d export/opt/www ] || mkdir export/opt/www
+	[ -d export/opt/www/ccgi-bin ] || mkdir export/opt/www/ccgi-bin
+	[ -d export/kmod ] || mkdir export/kmod
+
+
+pubapps: preparedirs ${PREREQ_QUAGGA} ${PREREQ_PIMD} ${PREREQ_DCLI} ${PREREQ_WCPSS} ${PREREQ_ASD} ${PREREQ_IGMP} ${PREREQ_DLDP} ${PREREQ_STP} ${PREREQ_SRVM} ${PREREQ_CHKPWD} ${PREREQ_SNMP} ${PREREQ_HAD} ${PREREQ_HBIP} ${PREREQ_DHCP} ${PREREQ_DHCP6} ${PREREQ_DHCPSNP} ${PREREQ_DCCN} ${PREREQ_RADIUSD} bashtools 
+
+
+	@echo "Copying pubapps files ..."
+	cp -RP export/opt/bin ${ROOTFS_DIR}/files/opt
+	cp -RP export/opt/lib ${ROOTFS_DIR}/files/opt
+
+x7x5web: 
+	@echo "Making cgi for x7x5 web ..."
+	$(MAKE) -C ${CCGI_MOD}/cgic205
+	cp ${CCGI_MOD}/cgic205/*.cgi ${WWW_EXPORT_DIR}/ccgi-bin
+	cp -P ${CCGI_MOD}/cgic205/libcgic.so* ${LIB_EXPORT_DIR}
+	cp -RP ${CCGI_MOD}/htdocs ${WWW_EXPORT_DIR}/
+	-find ${WWW_EXPORT_DIR} -name CVS | xargs rm -rf
+	@echo "Copying x7x5 web files info rootfs"
+	cp -RP ${WWW_EXPORT_DIR} ${ROOTFS_DIR}/files/opt/
+	cp -RP ${LIB_EXPORT_DIR}/libcgic.so* ${ROOTFS_DIR}/files/opt/lib/
+
+x3web:x7x5web
+	rm -rf ${ROOTFS_DIR}/files/opt/www/htdocs/images/7605
+	rm -rf ${ROOTFS_DIR}/files/opt/www/htdocs/images/crmsu
+	rm -rf ${ROOTFS_DIR}/files/opt/www/htdocs/images/GTX
+	rm -rf ${ROOTFS_DIR}/files/opt/www/htdocs/images/new5000
+	rm -rf ${ROOTFS_DIR}/files/opt/www/htdocs/images/panel
+	rm -rf ${ROOTFS_DIR}/files/opt/www/htdocs/images/SFP
+	rm -rf ${ROOTFS_DIR}/files/opt/www/htdocs/images/sys5000
+	rm -rf ${ROOTFS_DIR}/files/opt/www/htdocs/images/XFP
+
+reinitweb:
+	-rm -rf ${ROOTFS_DIR}/files/opt/www
+	-rm -rf ${ROOTFS_DIR}/files/opt/lib/libcgic.so*
+
+reinitnpdsuit:
+	-rm -rf ${ROOTFS_DIR}/files/opt/bin/npd
+	-rm -rf ${ROOTFS_DIR}/files/opt/lib/libmcpss*
+	-rm -rf ${ROOTFS_DIR}/files/opt/lib/libmbcm*
+	-rm -rf ${ROOTFS_DIR}/files/opt/lib/libnam*
+	-rm -rf ${ROOTFS_DIR}/files/opt/lib/libnbm*
+#	-rm -rf ${ROOTFS_KMOD_DIR}/misc/bm.ko
+#	-rm -rf ${ROOTFS_KMOD_DIR}/misc/kapDrv.ko
+#	-rm -rf ${ROOTFS_KMOD_DIR}/misc/mvPpDrv.ko
+#	-rm -rf ${ROOTFS_KMOD_DIR}/misc/linux-kernel-bde.ko
+#	-rm -rf ${ROOTFS_KMOD_DIR}/misc/linux-user-bde.ko
+
+reinitpubkmod:
+	-rm -rf ${KMOD_EXPORT_DIR}/*
+	-rm -rf ${ROOTFS_DIR}/files/lib/modules/*
+
+reinitnfsuit:
+	-rm -rf ${ROOTFS_DIR}/files/opt/bin/iptables*
+	-rm -rf ${ROOTFS_DIR}/files/opt/bin/ipset
+	-rm -rf ${ROOTFS_DIR}/files/opt/lib/iptables
+	-rm -rf ${ROOTFS_DIR}/files/opt/lib/ipset
+	-rm -rf ${ROOTFS_DIR}/files/usr/bin/cp_*.sh
+	-rm -rf ${ROOTFS_DIR}/files/usr/bin/portal_*.sh
+	-rm -rf ${ROOTFS_DIR}/files/usr/bin/record_*.sh
+	-rm -rf ${ROOTFS_DIR}/files/etc/init.d/eag
+	-rm -rf ${ROOTFS_DIR}/files/opt/eag
+
+reinitxfiles: reinitnpdsuit reinitweb reinitpubkmod reinitnfsuit
+	@echo "Cleaned x specified files..."
+
+compressimg:
+	@echo "Copy generated vmlinux file to ${DESTDIR}"
+	if [ ! -d ${DESTDIR} ]; then mkdir -p ${DESTDIR} ; chmod 777 ${DESTDIR} ; fi
+	cp ${KERNEL_ROOT}/vmlinux ${DESTDIR}/${IMGNAME}.ELF
+	ls -lh ${DESTDIR}/${IMGNAME}*
+	-rm -rf release
+	mkdir release
+	cp ${KERNEL_ROOT}/vmlinux release/
+	@echo "Making image for u-boot." 
+	./makeimg.sh ${IMGNAME}
+	ls -lh release
+	cp release/AW.IMG ${DESTDIR}/${IMGNAME}.IMG
+	@echo "WWW_DAILYBUILDDIR is ${WWW_DAILYBUILDDIR}"
+	@if [ -n "${WWW_DAILYBUILDDIR}" ] ; then  [ -d ${WWW_DAILYBUILDDIR} ] || mkdir ${WWW_DAILYBUILDDIR}; cp release/AW.IMG ${WWW_DAILYBUILDDIR}/${IMGNAME}.IMG ; fi
+	ls -lh ${DESTDIR}/${IMGNAME}*
+
+x3img2: pubapps 
+	@echo "Reinit x specified files ..."
+	make reinitxfiles
+	@echo "Making npdsuit bcm"
+	make NEWKERN=1 npdsuit_bcm
+	@echo "Making web console for x3"
+	make x3web	
+	@echo "Preparing product info"
+	@echo X3 > ${PRODUCTFILE}
+	make motd
+	make -C ${ROOTFS_DIR}/pkgs cleanpkgs
+	make NEWKERN=1 kernel
+	make NEWKERN=1 IMGNAME="AW`cat ${VERFILE}`.`cat ${BUILDNOFILE}`.`cat ${PRODUCTFILE}`.NEWKERN" compressimg
+	mv src/kernel2.6.21.7cn3/vmlinux release/AW.X3.ELF
+
+x3img: pubapps 
+	@echo "Reinit x specified files ..."
+	make reinitxfiles
+	@echo "clean mv files"
+	-make cleannpdsuit_mv
+	@echo "Making npdsuit bcm"
+	make npdsuit_bcm
+	@echo "Making x3kmod"
+	make x3kmod
+	@echo "Making web console for x3"
+	make x3web	
+	@echo "Preparing product info"
+	@echo X3 > ${PRODUCTFILE}
+	make motd
+	make -C ${ROOTFS_DIR}/pkgs installleastpkgs	
+	make -C ${KERNEL_ROOT}
+	make IMGNAME="AW`cat ${VERFILE}`.`cat ${BUILDNOFILE}`.`cat ${PRODUCTFILE}`" compressimg
+	mv ${KERNEL_ROOT}/vmlinux release/AW.X3.ELF
+
+x7x5img: pubapps 
+	@echo "Making DBUS"
+	make dbus
+	@echo "Reinit x specified files ..."
+	make reinitxfiles
+	@echo "clean bcm files"
+	-make cleanbcm_npdsuit
+	@echo "Making npdsuit marvell"
+	make npdsuit_mv
+	@echo "Making e1000e module"
+	make e1000e
+	@echo "Making pubkmod"
+	make pubkmod
+	@echo "Making web console for x7x5"
+	make x7x5web
+	@echo "Preparing product info"
+	@echo X7X5 > ${PRODUCTFILE}
+	make motd
+	make -C ${ROOTFS_DIR}/pkgs installpkgs	
+ifdef mtrace
+	make -C ${ROOTFS_DIR}/pkgs inst_mtrace
+endif
+	make -C ${KERNEL_ROOT}
+	make IMGNAME="AW`cat ${VERFILE}`.`cat ${BUILDNOFILE}`.`cat ${PRODUCTFILE}`" compressimg
+	mv ${KERNEL_ROOT}/vmlinux release/AW.X7X5.ELF
+
+ifeq (${R},1)
+define UPDATEMOTD
+	make motd
+	make -C ${KERNEL_ROOT}
+endef
+else
+define UPDATEMOTD
+	echo "Skip update buildno"
+endef
+endif
+
+recompressimg:
+	${UPDATEMOTD}
+	make IMGNAME="AW`cat ${VERFILE}`.`cat ${BUILDNOFILE}`.`cat ${PRODUCTFILE}`" compressimg
+	mv ${KERNEL_ROOT}/vmlinux release/AW.X7X5.ELF
+
+allbuildno:
+	-rm -rf allbuildnoflag
+	@echo 0 > allbuildnoflag
+
+awimgs: allbuildno x3img x7x5img
+	-rm -rf allbuildnoflag
+	@echo "Finished making images"
+	@ls -lh ${DESTDIR}/AW`cat ${VERFILE}`.`cat ${BUILDNOFILE}`*
+
+experiment: 
+	@echo "================================================="
+	@echo "This target is only for quick debug usage,"
+	@echo "which might cause unexpected problems. "
+	@echo "Use it when you know what you are doing."
+	@echo "================================================="
+	@echo "Makeing experimental elf"
+	make -C ${KERNEL_ROOT}
+	@echo "Copying elf"
+	-rm -rf release
+	mkdir release
+	cp ${KERNEL_ROOT}/vmlinux release/AW.X3.ELF
+	cp ${KERNEL_ROOT}/vmlinux release/AW.X7X5.ELF
+
+cleandcli:cleandclipub_ac 
+	$(MAKE) -C ${DCLI_MOD}/src/lib clean
+cleandclipub_ac:
+	$(MAKE) -C ${DCLI_MOD}/src/pub clean
+
+
+cleanchkpwd:
+	$(MAKE) -C ${CHKPWD_MOD}/checkpassword-pam-0.99 clean
+
+cleannpdsuit_mv:
+	$(MAKE) -C ${NPDSUIT_MV_MOD}/nam_ax7/src/lib clean
+	$(MAKE) -C ${NPDSUIT_MV_MOD}/nbm_ax7/src/lib clean
+	$(MAKE) -C ${NPDSUIT_MV_MOD}/npd/src/app clean
+	$(MAKE) -C ${NPDSUIT_MV_MOD}/mcpss/src/drv clean
+
+cleannpdsuit_xcat:
+	make xcat=1 cleannpdsuitxcatapps
+
+cleannpdsuitxcatapps:
+	$(MAKE) -C ${NPDSUIT_XCAT_MOD}/nam_ax7/src/lib clean
+	$(MAKE) -C ${NPDSUIT_XCAT_MOD}/nbm_ax7/src/lib clean
+	$(MAKE) -C ${NPDSUIT_XCAT_MOD}/npd/src/app clean
+	$(MAKE) -C ${NPDSUIT_XCAT_MOD}/xcat_mcpss/src/drv clean
+	
+cleantrap-helper:
+	$(MAKE) -C ${TRAP_HELPER_MOD}/ clean
+
+cleanacsample:
+	$(MAKE) -C ${ACSAMPLE_MOD} clean
+
+cleansnmp: cleantrap-helper cleanacsample
+	$(MAKE) -C ${SUBAGENT_MOD} clean
+
+cleanwcpss:
+	$(MAKE) -C ${WCPSS_MOD}/src/app/pub clean
+	$(MAKE) -C ${WCPSS_MOD}/src/app/wid clean
+	$(MAKE) -C ${WCPSS_MOD}/src/app/wsm clean
+	
+cleaniuhd:
+	$(MAKE) -C ${IUH_MOD}/iuh clean
+cleandbus:
+	$(MAKE) -C ${DBUS_MOD} clean
+	-rm ${BIN_EXPORT_DIR}/dbus-daemon 
+	-rm ${LIB_EXPORT_DIR}/libdbus-1.so* 
+
+cleanranapproxy:
+	$(MAKE) -C ${IU_MOD}/ clean
+
+cleanwifikmod:
+	$(MAKE) -C ${WCPSS_MOD}/src/kmod/wifi-ethernet/ clean
+
+
+cleanasd:
+	$(MAKE) -C ${ASD_MOD}/src/app clean
+
+cleanquagga:
+	echo "Cleanning quagga ..."
+	#$(MAKE) -C ${QUAGGA_MOD}/${BUILDDIR} clean
+	rm -rf ${QUAGGA_MOD}/${BUILDDIR}
+
+cleancavium-ethernet:
+	echo "Cleanning cavium ethernet ..."
+	$(MAKE) -C ${OCTETH_KMOD} clean
+	$(MAKE) -C src/ipfwd clean
+clean_e1000e:
+	@echo "Cleanning e1000e module ... "
+	$(MAKE) -C ${E1000E_KMOD} clean
+
+cleanstpsuit:		
+	echo "Cleaning stp suit..."
+	$(MAKE) -C ${STPSUIT_MOD}/src clean
+
+cleanhad:
+	echo "Cleaning HA daemon..."
+	${MAKE} -C ${HAD_MOD}/src/lib clean
+
+cleanhbip:
+	echo "Cleaning HBIP daemon..."
+	${MAKE} -C ${HBIP_MOD}/src/ clean
+
+cleanigmp:
+	echo "Cleaning igmp snooping..."
+	$(MAKE) -C ${IGMP_MOD}/ clean
+
+cleandldp:
+	echo "Cleaning DLDP..."
+	$(MAKE) -C ${DLDP_MOD}/src/lib clean
+
+cleanccgi:
+	echo "Cleanning ccgi ..."  
+	$(MAKE) -C ${CCGI_MOD}/cgic205 clean 
+	-$(MAKE) -C ${CCGI_MOD}/cgic205/portal clean
+	-$(MAKE) -C ${CCGI_MOD}/cgic205/snmp_agent clean
+
+cleanlibnm:
+	echo "Cleaning libnm ..."
+	$(MAKE) -C $(LIBNM_MOD) clean
+
+cleansrvm:
+	echo "Cleanning srvm ..."
+	$(MAKE) -C ${SRVM_MOD}/app clean
+
+cleaniptables:
+	echo "Cleanning iptables ..."
+	$(MAKE) -C ${IPTABLES_MOD}/debsrc/iptables-1.3.6.0debian1/iptables clean
+	$(MAKE) -C ${IPTABLES_MOD}/external/ipset-2.3.3a clean
+	$(MAKE) -C ${IPTABLES_MOD}/external/ipp2p-0.99.15 clean
+
+cleankernel:  revert-kernel-se-files
+	$(MAKE) -C ${KERNEL_ROOT} clean
+
+cleanmvkmod:
+	$(MAKE) -C ${NPDSUIT_MV_MOD}/mcpss/src/kmod/mvPpDrv clean
+	$(MAKE) -C ${NPDSUIT_MV_MOD}/kap/src/kmod clean
+	$(MAKE) -C ${NPDSUIT_MV_MOD}/bm/src/kmod clean
+	$(MAKE) -C ${NPDSUIT_MV_MOD}/bm/src/app clean
+
+cleanxcatkmod:
+	make xcat=1 cleanxcatuImagekmod
+
+cleanxcatuImagekmod:
+	$(MAKE) -C ${NPDSUIT_XCAT_MOD}/xcat_mcpss/src/kmod/mvPpDrv clean
+	$(MAKE) -C ${NPDSUIT_XCAT_MOD}/xcat_mcpss/src/kmod/mvKernelExt/2_6 clean
+	$(MAKE) -C ${NPDSUIT_XCAT_MOD}/kap/src/kmod clean
+	$(MAKE) -C ${NPDSUIT_XCAT_MOD}/xcatbm/src/kmod clean
+
+cleankmod: ${CLEANIPTABLES} ${CLEAN_WIFIKMOD} ${CLEAN_MVKMOD} ${CLEAN_BCMKMOD} ${CLEAN_OCTETHKMOD} ${CLEAN_DCCNKMOD}
+	echo "Cleaning kernel modules ..."
+
+cleancaptive:
+	@echo "Cleaning captive portal ..."
+
+cleaneag:
+	@echo "Cleaning easy access gateway ..."
+	-$(MAKE) -C ${EAG_MOD}/pkg distclean
+	-$(MAKE) -C ${EAG_MOD}/pkg/src_multi_ins clean
+
+cleandhcp:
+	@echo "Cleanning dhcp ..."
+	if [ -f ${DHCP_MOD}/Makefile ] ; then 	\
+		pushd ${DHCP_MOD}; 		\
+		make clean ; 			\
+		rm -rf Makefile ;	\
+		popd ; 				\
+	else  					\
+		echo "clean dhcp but not configured." ; \
+	fi
+
+cleandhcp6:
+	@echo "Cleanning dhcp6 ..."
+	if [ -f ${DHCP6_MOD}/Makefile ] ; then 	\
+		pushd ${DHCP6_MOD}; 		\
+		make clean ; 			\
+		rm -rf Makefile ;	\
+		popd ; 				\
+	else  					\
+		echo "clean dhcp6 but not configured." ; \
+	fi
+	-rm ${ROOTFS_DIR}/files/opt/bin/dhcp6d
+	-rm ${ROOTFS_DIR}/files/opt/bin/dhcrelay6
+	
+
+cleanpimd:
+	echo "Cleanning pimd ..."
+	$(MAKE) -C ${PIMD_MOD} clean
+
+cleandccnkmod:
+	@echo "Cleaning dccnetlink kmod..."
+	-$(MAKE) -C ${DCCN_MOD}/src/kmod clean
+
+cleandccn: cleandccnkmod
+	@echo "Cleaning dccnetlink ..."
+	-$(MAKE) -C ${DCCN_MOD}/src/app clean
+
+
+cleanradiusd:
+	@echo "Cleaning radiusd utilities ..."
+	-$(MAKE) -C ${RADIUSD_MOD}/debsrc/freeradius-2.0.4+dfsg distclean
+
+	
+cleanbcm_npdsuit: 
+	$(MAKE) cleanbcmkmod
+	@echo "Cleaning bcm utilities ..."
+	$(MAKE) -C $(BCM_MOD)/systems/linux/user/nsx64 clean
+	-@rm -rf $(BCM_MOD)/build
+	$(MAKE) -C ${NPDSUIT_BCM_MOD}/nam_ax7/src/lib clean
+	$(MAKE) -C ${NPDSUIT_BCM_MOD}/nbm_ax7/src/lib clean
+	$(MAKE) -C ${NPDSUIT_BCM_MOD}/npd/src/app clean
+
+cleanbcmkmod:
+	@echo "Cleaning bcm kmod utilities ..."
+	$(MAKE) -C $(BCM_MOD)/systems/bde/linux/bdekmod/kernel clean
+	$(MAKE) -C $(BCM_MOD)/systems/bde/linux/bdekmod/user clean
+	$(MAKE) -C ${NPDSUIT_BCM_MOD}/kap/src/kmod clean
+	$(MAKE) -C ${NPDSUIT_BCM_MOD}/bm/src/kmod clean
+	$(MAKE) -C ${NPDSUIT_BCM_MOD}/bm/src/app clean
+
+cleanapps: ${CLEAN_QUAGGA} ${CLEAN_DCLI} ${CLEAN_NPDSUIT_MV} ${CLEAN_WCPSS} ${CLEAN_ASD} ${CLEAN_STP} ${CLEAN_IGMP} ${CLEAN_DLDP} ${CLEAN_CCGI} ${CLEAN_HAD} ${CLEAN_HBIP} ${CLEAN_SRVM} ${CLEAN_IPTABLES} ${CLEAN_CAPTIVE} ${CLEAN_EAG} ${CLEAN_DHCP} ${CLEAN_DHCP6} ${CLEAN_CHKPWD} ${CLEAN_SNMP} ${CLEAN_DCCN} ${CLEAN_NPDSUIT_BCM} ${CLEAN_RADIUSD}
+	-rm -rf $(LIB_EXPORT_DIR)/* $(BIN_EXPORT_DIR)/* $(KMOD_EXPORT_DIR)/*
+
+cleanall: cleanapps cleankmod cleankernel
+
+buildroot2rootfs: busyroot2rootfs ${BUILDROOTDIR}/.timestamp .buildroot2rootfstimestamp
+	[ -d ${ROOTFS_DIR}/files/usr/lib ] || mkdir -p ${ROOTFS_DIR}/files/usr/lib
+	-cp -RPf ${BUILDROOTDIR}/usr/lib/* ${ROOTFS_DIR}/files/usr/lib/
+	[ -d ${ROOTFS_DIR}/files/usr/bin ] || mkdir -p ${ROOTFS_DIR}/files/usr/bin
+	-cp -RPf ${BUILDROOTDIR}/usr/bin/* ${ROOTFS_DIR}/files/usr/bin/
+	-[ -d ${ROOTFS_DIR}/usr/sbin ] || mkdir -p ${ROOTFS_DIR}/files/usr/sbin
+	-cp -RPf ${BUILDROOTDIR}/usr/sbin/* ${ROOTFS_DIR}/files/usr/sbin/
+	-cp -RPf ${BUILDROOTDIR}/etc/* ${ROOTFS_DIR}/files/etc/
+	-touch .buildroot2rootfstimestamp
+
+busyroot2rootfs: ${BUSYROOTDIR}/.timestamp .busyroot2rootfstimestamp
+	[ -d ${ROOTFS_DIR} ] || mkdir -p ${ROOTFS_DIR}
+	[ -d ${ROOTFS_DIR}/files ] || mkdir -p ${ROOTFS_DIR}/files
+	-cp -P ${BUSYROOTDIR}/files/*i* ${ROOTFS_DIR}/files/
+	[ -d ${ROOTFS_DIR}/files/bin ] || mkdir -p ${ROOTFS_DIR}/files/bin
+	-cp -P ${BUSYROOTDIR}/files/bin/* ${ROOTFS_DIR}/files/bin/
+	[ -d ${ROOTFS_DIR}/files/etc ] || mkdir -p ${ROOTFS_DIR}/files/etc
+	-cp -RP ${BUSYROOTDIR}/files/etc/* ${ROOTFS_DIR}/files/etc/
+	[ -d ${ROOTFS_DIR}/files/sbin ] || mkdir -p ${ROOTFS_DIR}/files/sbin
+	-cp -P ${BUSYROOTDIR}/files/sbin/* ${ROOTFS_DIR}/files/sbin/
+	[ -d ${ROOTFS_DIR}/files/lib ] || mkdir -p ${ROOTFS_DIR}/files/lib
+	-cp -P ${BUSYROOTDIR}/files/lib/* ${ROOTFS_DIR}/files/lib/
+	[ -d ${ROOTFS_DIR}/files/proc ] || mkdir -p ${ROOTFS_DIR}/files/proc
+	[ -d ${ROOTFS_DIR}/files/sys ] || mkdir -p ${ROOTFS_DIR}/files/sys
+	[ -d ${ROOTFS_DIR}/files/tmp ] || mkdir -p ${ROOTFS_DIR}/files/tmp
+	[ -d ${ROOTFS_DIR}/files/etc/version ] || mkdir -p ${ROOTFS_DIR}/files/etc/version
+	[ -d ${ROOTFS_DIR}/files/mnt] || mkdir -p ${ROOTFS_DIR}/files/mnt
+	-touch .busyroot2rootfstimestamp
+
+.busyroot2rootfstimestamp:
+	@touch $@
+
+.buildroot2rootfstimestamp:
+	@touch $@
+
+cleanrootfs:
+	rm .busyroot2rootfstimestamp
+	rm .buildroot2rootfstimestamp
+
+xcatuImage: preparedirs quagga dcli busyroot2rootfs buildroot2rootfs
+	@echo S3 > ${PRODUCTFILE}
+	@echo 1.3.0 > ${VERFILE}
+	@echo Auteware > ${NAMFILE}
+	@make motd
+	@make kernel 
+	@make xcat=1 npdsuit_xcat
+	@make xcat=1 dldp_xcat
+	@echo "Copying apps files ..."
+	@cp -RP export/opt/bin ${ROOTFS_DIR}/files/usr
+	@cp -RP export/opt/lib ${ROOTFS_DIR}/files/usr
+	@make kernel 
+	ls -lh ${KERNEL_ROOT}/arch/arm/boot/
+	@echo "Finished building xcat uIamge."
+	@cp ${KERNEL_ROOT}/arch/arm/boot/uImage ${DESTDIR}/"AW`cat ${VERFILE}`.`cat ${BUILDNOFILE}`.`cat ${PRODUCTFILE}`.IMG"
+	ls -lah ${DESTDIR}/
+
+xcatimg:
+	make xcat=1 xcatuImage
+	make xcat=1 bashtools
+
+archives:
+	@echo "Cleanning all obj files..."
+	@make cleanall
+	@echo "Cleanning release files..."
+	-@rm -rf release
+	@echo "Cleanning export files..."
+	-@rm -rf export
+	@echo "Cleanning dynamic kernel module files..."
+	-@rm -rf rootfs/files/lib/modules
+	@echo "Cleanning opt files..."
+	-@rm -rf rootfs/files/opt
+	@echo "Compress all files..."
+	@tar -cvjf ../`date +%Y%m%d%H%M%S`.tar.bz2 ./
+	@echo "Make archives done."
+	@ls -lah ../
+

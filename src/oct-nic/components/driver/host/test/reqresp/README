@@ -1,0 +1,27 @@
+Request/Response user-space test program.
+========================================
+
+
+
+
+./oct_test [-d <dma_mode> ] [-r <resp_order> ] [-m <resp_mode> ]
+           [-q <input queue> ]  [-o <octeon id> ] [-n <pkt_count> ]
+           [-t <datagen_type> ]
+           [-s {min | max} <request data size> ]
+           [-c {min | max} <buffer count> ]
+
+./oct_test -h  Prints this help message
+ use -v option for more verbose help
+
+
+
+After 1 run of the alltests option, you should see 329728 requests sent
+successfully for a total 9,175,151,272 bytes and 2,098,148 gather entries.
+
+Output from oct_stats after 1 run on a single queue.
+
+Packets:  (329728 Total | 0 Dropped | 329728 Last)
+Bytes: (Total 9175151272 | Last 9175151272). Gather entries: 2098148
+
+
+

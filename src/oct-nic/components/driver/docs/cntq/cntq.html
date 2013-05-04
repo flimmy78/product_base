@@ -1,0 +1,484 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+xmlns:w="urn:schemas-microsoft-com:office:word"
+xmlns="http://www.w3.org/TR/REC-html40">
+
+<head>
+<meta http-equiv=Content-Type content="text/html; charset=utf-8">
+<meta name=ProgId content=Word.Document>
+<meta name=Generator content="Microsoft Word 11">
+<meta name=Originator content="Microsoft Word 11">
+<link rel=File-List href="cntq_files/filelist.xml">
+<title>Counter Queues - Cavium Octeon PCI Driver</title>
+<!--[if gte mso 9]><xml>
+ <w:WordDocument>
+  <w:GrammarState>Clean</w:GrammarState>
+  <w:ValidateAgainstSchemas/>
+  <w:SaveIfXMLInvalid>false</w:SaveIfXMLInvalid>
+  <w:IgnoreMixedContent>false</w:IgnoreMixedContent>
+  <w:AlwaysShowPlaceholderText>false</w:AlwaysShowPlaceholderText>
+  <w:BrowserLevel>MicrosoftInternetExplorer4</w:BrowserLevel>
+ </w:WordDocument>
+</xml><![endif]--><!--[if gte mso 9]><xml>
+ <w:LatentStyles DefLockedState="false" LatentStyleCount="156">
+ </w:LatentStyles>
+</xml><![endif]-->
+<style>
+<!--
+ /* Font Definitions */
+ @font-face
+	{font-family:Helvetica;
+	panose-1:2 11 6 4 2 2 2 2 2 4;
+	mso-font-charset:0;
+	mso-generic-font-family:swiss;
+	mso-font-pitch:variable;
+	mso-font-signature:536902279 -2147483648 8 0 511 0;}
+@font-face
+	{font-family:Courier;
+	panose-1:2 7 4 9 2 2 5 2 4 4;
+	mso-font-alt:"Courier New";
+	mso-font-charset:0;
+	mso-generic-font-family:modern;
+	mso-font-format:other;
+	mso-font-pitch:fixed;
+	mso-font-signature:3 0 0 0 1 0;}
+ /* Style Definitions */
+ p.MsoNormal, li.MsoNormal, div.MsoNormal
+	{mso-style-parent:"";
+	margin:0in;
+	margin-bottom:.0001pt;
+	mso-pagination:widow-orphan;
+	font-size:12.0pt;
+	font-family:"Times New Roman";
+	mso-fareast-font-family:"Times New Roman";
+	color:black;}
+p
+	{mso-margin-top-alt:auto;
+	margin-right:0in;
+	mso-margin-bottom-alt:auto;
+	margin-left:0in;
+	mso-pagination:widow-orphan;
+	font-size:12.0pt;
+	font-family:"Times New Roman";
+	mso-fareast-font-family:"Times New Roman";
+	color:black;}
+span.GramE
+	{mso-style-name:"";
+	mso-gram-e:yes;}
+@page Section1
+	{size:8.5in 11.0in;
+	margin:1.0in 1.25in 1.0in 1.25in;
+	mso-header-margin:.5in;
+	mso-footer-margin:.5in;
+	mso-paper-source:0;}
+div.Section1
+	{page:Section1;}
+ /* List Definitions */
+ @list l0
+	{mso-list-id:30349844;
+	mso-list-template-ids:1503165306;}
+@list l1
+	{mso-list-id:95177988;
+	mso-list-template-ids:-1282255456;}
+@list l2
+	{mso-list-id:421991461;
+	mso-list-template-ids:108951690;}
+@list l2:level1
+	{mso-level-start-at:5;
+	mso-level-tab-stop:.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l3
+	{mso-list-id:937176659;
+	mso-list-template-ids:-1149589560;}
+@list l3:level1
+	{mso-level-start-at:4;
+	mso-level-tab-stop:.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l4
+	{mso-list-id:1170678491;
+	mso-list-template-ids:-538949850;}
+@list l5
+	{mso-list-id:1422332783;
+	mso-list-template-ids:1439436178;}
+@list l5:level1
+	{mso-level-start-at:5;
+	mso-level-tab-stop:.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l5:level2
+	{mso-level-start-at:3;
+	mso-level-tab-stop:1.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l6
+	{mso-list-id:1950623370;
+	mso-list-template-ids:1698972038;}
+@list l6:level1
+	{mso-level-start-at:5;
+	mso-level-tab-stop:.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l6:level2
+	{mso-level-start-at:3;
+	mso-level-tab-stop:1.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+ol
+	{margin-bottom:0in;}
+ul
+	{margin-bottom:0in;}
+-->
+</style>
+<!--[if gte mso 10]>
+<style>
+ /* Style Definitions */
+ table.MsoNormalTable
+	{mso-style-name:"Table Normal";
+	mso-tstyle-rowband-size:0;
+	mso-tstyle-colband-size:0;
+	mso-style-noshow:yes;
+	mso-style-parent:"";
+	mso-padding-alt:0in 5.4pt 0in 5.4pt;
+	mso-para-margin:0in;
+	mso-para-margin-bottom:.0001pt;
+	mso-pagination:widow-orphan;
+	font-size:10.0pt;
+	font-family:"Times New Roman";
+	mso-ansi-language:#0400;
+	mso-fareast-language:#0400;
+	mso-bidi-language:#0400;}
+</style>
+<![endif]-->
+<meta name=CREATED content="20060821;11464500">
+<meta name=CHANGED content="20060821;12315800">
+<!--[if gte mso 9]><xml>
+ <u1:DocumentProperties>
+  <u1:Author>Manoj</u1:Author>
+  <u1:Template>Normal</u1:Template>
+  <u1:LastAuthor>Manoj</u1:LastAuthor>
+  <u1:Revision>2</u1:Revision>
+  <u1:TotalTime>31</u1:TotalTime>
+  <u1:Created>2006-08-21T18:07:00Z</u1:Created>
+  <u1:LastSaved>2006-08-21T18:07:00Z</u1:LastSaved>
+  <u1:Pages>1</u1:Pages>
+  <u1:Words>876</u1:Words>
+  <u1:Characters>4994</u1:Characters>
+  <u1:Company> </u1:Company>
+  <u1:Lines>41</u1:Lines>
+  <u1:Paragraphs>11</u1:Paragraphs>
+  <u1:CharactersWithSpaces>5859</u1:CharactersWithSpaces>
+  <u1:Version>11.8036</u1:Version>
+ </u1:DocumentProperties>
+</xml><![endif]--><!--[if gte mso 9]><xml>
+ <u2:WordDocument>
+  <u2:SpellingState>Clean</u2:SpellingState>
+  <u2:GrammarState>Clean</u2:GrammarState>
+  <u2:PunctuationKerning/>
+  <u2:ValidateAgainstSchemas/>
+  <u2:SaveIfXMLInvalid>false</u2:SaveIfXMLInvalid>
+  <u2:IgnoreMixedContent>false</u2:IgnoreMixedContent>
+  <u2:AlwaysShowPlaceholderText>false</u2:AlwaysShowPlaceholderText>
+  <u2:Compatibility>
+   <u2:BreakWrappedTables/>
+   <u2:SnapToGridInCell/>
+   <u2:WrapTextWithPunct/>
+   <u2:UseAsianBreakRules/>
+   <u2:DontGrowAutofit/>
+  </u2:Compatibility>
+  <u2:BrowserLevel>MicrosoftInternetExplorer4</u2:BrowserLevel>
+ </u2:WordDocument>
+</xml><![endif]--><!--[if gte mso 9]><xml>
+ <u3:LatentStyles DefLockedState="false" LatentStyleCount="156">  </u3:LatentStyles>
+</xml><![endif]-->
+</head>
+
+<body lang=EN-US style='tab-interval:.5in'>
+
+<div class=Section1>
+
+<p class=MsoNormal style='mso-margin-top-alt:auto;mso-margin-bottom-alt:auto'><span
+style='font-size:10.0pt;font-family:Helvetica'>&nbsp;</span></p>
+
+<p class=MsoNormal align=center style='mso-margin-top-alt:auto;mso-margin-bottom-alt:
+auto;text-align:center'><b><span style='font-size:13.5pt;font-family:Helvetica'>Counter
+Queues (CNTQ)</span></b></p>
+
+<p class=MsoNormal style='mso-margin-top-alt:auto;mso-margin-bottom-alt:auto'><b><span
+style='font-family:Helvetica'>&nbsp;1. Introduction</span></b></p>
+
+<p><span style='font-family:Helvetica'>The CNTQ (or DMA counter queues) are two
+queues maintained with support from the Octeon host and core PCI drivers.
+Octeon provides two DMA engines which <span class=GramE>allows</span> applications
+running on the core to send data to host memory using DMA operations. Each
+counter queue is associated with one of Octeon's PCI DMA engine. The Octeon
+hardware does not directly operate on these queues (unlike the DROQ). The
+Octeon core PCI driver writes into the CNTQ using Octeon's PCI DMA commands.
+The Octeon Host PCI driver reads data from the counter queues and dispatches it
+to applications. </span></p>
+
+<p><span style='font-family:Helvetica'>The CNTQ ring is implemented as a flat
+circular queue with no record format like descriptors. So a packet can be
+written at any location in the CNTQ ring. The write and read pointers into this
+block of memory is maintained by the host and core PCI drivers. The drivers
+also keep track of the available space in the CNTQ. </span></p>
+
+<p style='margin-bottom:12.0pt'><o:p>&nbsp;</o:p></p>
+
+<p class=MsoNormal style='mso-margin-top-alt:auto;mso-margin-bottom-alt:auto'><b><span
+style='font-family:Helvetica'>2. Creation of CNTQ</span></b></p>
+
+<p><span style='font-family:Helvetica'>The counter queues are created when the
+CNTQ module of host PCI driver is loaded. The module allocates physically
+contiguous memory for the two counter queues. It also updates local structures
+to keep track of activity in the counter queues. For each counter queue, the
+host PCI driver has,</span></p>
+
+<p style='margin-left:.5in;text-indent:-.25in;mso-list:l0 level1 lfo1;
+tab-stops:list .5in'><![if !supportLists]><span style='mso-list:Ignore'>1.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><![endif]><span
+style='font-family:Helvetica'>The virtual address of the start of the counter
+queue. </span></p>
+
+<p style='margin-left:.5in;text-indent:-.25in;mso-list:l0 level1 lfo1;
+tab-stops:list .5in'><![if !supportLists]><span style='mso-list:Ignore'>2.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><![endif]><span
+style='font-family:Helvetica'>The offset into the queue where the next packet
+is expected. </span></p>
+
+<p style='margin-left:.5in;text-indent:-.25in;mso-list:l0 level1 lfo1;
+tab-stops:list .5in'><![if !supportLists]><span style='mso-list:Ignore'>3.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><![endif]><span
+style='font-family:Helvetica'>Number of bytes consumed by packets that have
+arrived in the queue. </span></p>
+
+<p>The core PCI driver keeps track of the</p>
+
+<p style='margin-left:.5in;text-indent:-.25in;mso-list:l4 level1 lfo2;
+tab-stops:list .5in'><![if !supportLists]><span style='mso-list:Ignore'>1.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><![endif]><span
+style='font-family:Helvetica'>The physical address of the start of the counter
+queue. </span></p>
+
+<p style='margin-left:.5in;text-indent:-.25in;mso-list:l4 level1 lfo2;
+tab-stops:list .5in'><![if !supportLists]><span style='mso-list:Ignore'>2.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><![endif]><span
+style='font-family:Helvetica'>The offset into the queue where the next packet
+will be written. </span></p>
+
+<p style='margin-left:.5in;text-indent:-.25in;mso-list:l4 level1 lfo2;
+tab-stops:list .5in'><![if !supportLists]><span style='mso-list:Ignore'>3.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><![endif]><span
+style='font-family:Helvetica'>Number of bytes available in the queue for the
+next packet. </span></p>
+
+<p><span style='font-family:Helvetica'>When the core PCI driver receives a
+packet to be written into one of the Counter queues, it checks if it has space
+for the packet. If it does, it creates a PCI command where the remote address
+is the next location in the queue where a packet can be written. If writing the
+packet into the queue requires wrapping around the end of the ring to the
+start, the core driver will take care of it by splitting the packet data
+between the end and the start of the ring. The host PCI driver is interrupted
+when the DMA operation completes. </span></p>
+
+<p style='margin-bottom:12.0pt'><o:p>&nbsp;</o:p></p>
+
+<div align=center>
+
+<table class=MsoNormalTable border=1 cellspacing=3 cellpadding=0 width=294
+ style='width:220.5pt;mso-cellspacing:2.2pt;mso-padding-alt:3.0pt 3.0pt 3.0pt 3.0pt'>
+ <COL WIDTH=278>
+ <tr style='mso-yfti-irow:0;mso-yfti-firstrow:yes'>
+  <td width=278 valign=top style='width:208.5pt;padding:3.0pt 3.0pt 3.0pt 3.0pt'>
+  <p align=center style='text-align:center'><span style='font-size:10.0pt;
+  font-family:Courier'>Length </span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1'>
+  <td width=278 valign=top style='width:208.5pt;padding:3.0pt 3.0pt 3.0pt 3.0pt'>
+  <p align=center style='text-align:center'><span style='font-size:10.0pt;
+  font-family:Courier'>Response Header</span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2;mso-yfti-lastrow:yes'>
+  <td width=278 valign=top style='width:208.5pt;padding:3.0pt 3.0pt 3.0pt 3.0pt'>
+  <p align=center style='text-align:center'><span style='font-size:10.0pt;
+  font-family:Courier'>Data Bytes</span></p>
+  </td>
+ </tr>
+</table>
+
+</div>
+
+<p align=center style='margin-bottom:12.0pt;text-align:center'><o:p>&nbsp;</o:p></p>
+
+<p align=center style='text-align:center'><span style='font-size:10.0pt;
+font-family:Courier'>Figure 1: CNTQ Packet Format</span></p>
+
+<p align=center style='margin-bottom:12.0pt;text-align:center'><o:p>&nbsp;</o:p></p>
+
+<p><span style='font-family:Helvetica'>3. CNTQ Packet processing</span></p>
+
+<p><span style='font-family:Helvetica'>A CNTQ interrupt arrives from Octeon
+when one of the following conditions <span class=GramE>are</span> met:</span></p>
+
+<p style='margin-left:.5in;text-indent:-.25in;mso-list:l1 level1 lfo3;
+tab-stops:list .5in'><![if !supportLists]><span style='mso-list:Ignore'>1.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><![endif]><span
+style='font-family:Helvetica'>The no. of packets available for processing has
+exceeded a threshold set by the driver. </span></p>
+
+<p style='margin-left:.5in;text-indent:-.25in;mso-list:l1 level1 lfo3;
+tab-stops:list .5in'><![if !supportLists]><span style='mso-list:Ignore'>2.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><![endif]><span
+style='font-family:Helvetica'>There are packets in the CNTQ (not up to the
+packet threshold) and a time-limit for interrupts set by the driver has
+expired. </span></p>
+
+<p><span style='font-family:Helvetica'>In both cases, the interrupt handler
+calls the octeon_process_<span class=GramE>cntq(</span>) routine which handles
+CNTQ specific processing. This routine reads the no. of packets that have
+arrived on this CNTQ by reading the corresponding PCI_DMA_CNT register.</span></p>
+
+<p><span style='font-family:Helvetica'>As shown in Figure 1, CNTQ packets have
+three fields: the length field, the response header and the packet data. CNTQ
+packets can be of different sizes but the Octeon device ensures that the packet
+always end at an address that is a multiple of 8 bytes.</span></p>
+
+<p><span style='font-family:Helvetica'>The length field is 8 bytes long and
+holds the actual length of the data in the packet. The response header is also
+8 bytes long. Its format is explained in the PCI base driver's documentation.
+As mentioned before, a packet can be written starting at any 8 byte aligned
+address in the CNTQ ring. The offset in the CNTQ ring where a packet is
+expected is given by the host read index field in the CNTQ structure. The driver
+first reads the first 8 bytes of the packet (the length field) to get the
+length of packet data. This length rounded off to the next 8 byte multiple plus
+16 bytes is the total length of the packet. </span></p>
+
+<p><span style='font-family:Helvetica'>To optimize performance, the first thing
+to be checked for a packet is its dispatch function. A lookup for dispatch
+function is done using the opcode from the response header. If a dispatch
+function exists for this packet, then further processing is done on the packet.
+Else the host read index is moved forward by the no. of 8 byte blocks used by
+this packet and the driver starts processing of the next packet.</span></p>
+
+<p><span style='font-family:Helvetica'>The CNTQ packets are dispatched using
+the recv_pkt format. The recv_pkt format is defined in cavium_defs.h. If a
+recv_pkt cannot be allocated for dispatching the current packet, the packet is
+discarded and the read index is moved forward as in the case when no dispatch
+function is found. </span></p>
+
+<p><span style='font-family:Helvetica'>Unlike DROQ's where only the buffer
+address is copied to recv_pkt, for CNTQ packets a new buffer with size equal to
+the length of the packet data is allocated. This is because if only the address
+was passed, the driver cannot rely on the upper layers to copy the data in a
+finite time and the driver cannot credit this space to the Octeon core
+software. Copying the contents to a new buffer assures that the CNTQ ring space
+can be credited to Octeon core software.</span></p>
+
+<p><span style='font-family:Helvetica'>If allocation fails for the buffer the
+packet is discarded and the read index moved forward. If allocation succeeds
+the packet data is copied to this new buffer and the recv_pkt buffer pointer
+points to this new buffer. Since Octeon can wrap-around the ring when writing
+packets to it, the driver always checks every packet to see if it can read the
+packet data as one block of memory which is always more efficient. If there is
+a wrap-around, the driver copies the packet data up to the end of the ring and
+then copies the remainder from the start of the ring. The recv_pkt is
+dispatched by calling the dispatch function. It is the responsibility of the
+receiving upper layer application to free the recv_pkt and its buffers.</span></p>
+
+<p><span style='font-family:Helvetica'>After all the packets have been
+dispatched (or discarded as the case may be), the driver sends a CNTQ_CREDIT
+instruction to the Octeon core software to credit the no. of 8 byte blocks, the
+sum of the length of all packets divided by 8 - that were processed. The octeon
+core software can now post more packets in this free space in the CNTQ ring. </span></p>
+
+<p style='margin-bottom:12.0pt'><o:p>&nbsp;</o:p></p>
+
+<p class=MsoNormal style='mso-margin-top-alt:auto;mso-margin-bottom-alt:auto'><b><span
+style='font-family:Helvetica'>4. Host driver API</span></b><o:p></o:p></p>
+
+<p class=MsoNormal style='mso-margin-top-alt:auto;mso-margin-bottom-alt:auto;
+margin-left:.5in;font-weight:medium'><span style='font-family:Helvetica'>The
+host PCI driver's CNTQ module does the initialization of the counter queues at
+module load time. The CNTQ's are deleted when the octcntq module is unloaded.
+Applications can register a dispatch function to receive packets with opcodes
+of their interest. The driver API is octeon_register_dispatch_<span
+class=GramE>fn(</span>). </span><o:p></o:p></p>
+
+<p class=MsoNormal style='mso-margin-top-alt:auto;mso-margin-bottom-alt:auto;
+margin-left:.5in;font-weight:medium'><span style='font-family:Helvetica'>uint32_t
+<b>octeon_register_dispatch_<span class=GramE>fn<span style='font-weight:normal'>(</span></span></b>uint32_t
+<b><i>octeon_id</i></b>, octeon_opcode_t <b><i>opcode</i></b>,
+octeon_dispatch_fn_t <b><i>fn</i></b>, void *<b><i>fn_arg</i></b>);</span><o:p></o:p></p>
+
+<p class=MsoNormal style='mso-margin-top-alt:auto;mso-margin-bottom-alt:auto;
+margin-left:.5in;font-weight:medium'><span style='font-family:Helvetica'>The
+API is called with the octeon device id - <b><i>octeon_id</i></b>, the dispatch
+function pointer - <span class=GramE><b><i>fn</i></b></span>, the opcode for
+which this dispatch function should be called – <b><i>opcode, </i></b>and an
+optional argument that will be passed to the dispatch function.</span><o:p></o:p></p>
+
+<p class=MsoNormal style='mso-margin-top-alt:auto;mso-margin-bottom-alt:auto;
+margin-left:.5in;font-weight:medium'><span style='font-family:Helvetica'>To
+unregister the dispatch function, the application should call the
+octeon_unregister_dispatch_<span class=GramE>fn(</span>) API with the Octeon
+device id and the opcode for which the dispatches should be stopped.</span><o:p></o:p></p>
+
+<p class=MsoNormal style='mso-margin-top-alt:auto;mso-margin-bottom-alt:auto;
+margin-left:.5in;font-weight:medium'><span style='font-family:Helvetica'>uint32_t
+<b>octeon_unregister_dispatch_<span class=GramE>fn<span style='font-weight:
+normal'>(</span></span></b>uint32_t <b><i>octeon_id</i></b>, octeon_opcode_t <b><i>opcode</i></b>);</span><o:p></o:p></p>
+
+<p class=MsoNormal style='mso-margin-top-alt:auto;margin-bottom:12.0pt;
+font-weight:medium'><o:p>&nbsp;</o:p></p>
+
+<ol start=5 type=1>
+ <li class=MsoNormal style='mso-margin-top-alt:auto;mso-margin-bottom-alt:auto;
+     mso-list:l2 level1 lfo5;tab-stops:list .5in'><b><span style='font-family:
+     Helvetica'>Core driver API</span></b></li>
+</ol>
+
+<p style='margin-left:.5in'><span style='font-family:Helvetica'>5.1. Send a
+packet to CNTQ</span></p>
+
+<p style='margin-left:.5in'><span class=GramE><span style='font-family:Helvetica'>int</span></span><span
+style='font-family:Helvetica'> <b>cvm_cntq_send_packet</b>(cvm_cntq_pkt_t *<b><i>cntq_pkt</i></b>);</span></p>
+
+<p style='margin-left:.5in'><span style='font-family:Helvetica'>A core
+application that wants to <span class=GramE>sent</span> data to a CNTQ sends it
+in a format defined by cvm_cntq_pkt_t. It is recommended that the application
+calls cvm_alloc_cntq_<span class=GramE>packet(</span>) to allocate the packet.
+The format of a CNTQ packet is described in Figure 1. The cvm_cntq_pkt_t en
+encapsulates the CNTQ packet format along with some headers required by the
+core driver. To see more details about this structure refer to </span></p>
+
+<p style='margin-left:.5in'><span style='font-family:Helvetica'>CN3XXX-SDK/components/driver/core/cvm-cntq.h.</span></p>
+
+<p style='margin-left:.5in'><span style='font-family:Helvetica'>5.2. Allocate a
+CNTQ packet.</span></p>
+
+<p style='margin-left:.5in'><span style='font-family:Helvetica'>cvm_cntq_pkt_t
+*<b>cvm_alloc_cntq_<span class=GramE>packet<span style='font-weight:normal'>(</span></span></b>CVMX_DMA_QUEUE_TYPE
+<b><i>pri</i></b>, uint32_t <b><i>bufsize</i></b>);</span></p>
+
+<p style='margin-left:.5in'><span style='font-family:Helvetica'>A core
+application can call this routine to allocate a CNTQ packet. The size of data
+is passed in <b><i>bufsize</i></b>. The parameter <b><i>pri</i></b> determines
+which of the two counter queues will be used to send this packet.</span></p>
+
+<p><span style='font-family:Helvetica'>5.3. Free a CNTQ packet.</span></p>
+
+<p style='margin-left:1.0in'><span class=GramE><span style='font-family:Helvetica'>void</span></span><span
+style='font-family:Helvetica'> <b>cvm_cntq_free_packet</b>(cvm_cntq_pkt_t *<b><i>buf</i></b>);</span></p>
+
+<p style='margin-left:1.0in'><span style='font-family:Helvetica'>Call this API
+to free a previously allocated CNTQ packet.</span></p>
+
+<p style='margin-bottom:12.0pt'><o:p>&nbsp;</o:p></p>
+
+</div>
+
+</body>
+
+</html>

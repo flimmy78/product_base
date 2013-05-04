@@ -1,0 +1,56 @@
+diff -Naur components/driver/core/cvm-cntq.c components-port-one/driver/core/cvm-cntq.c
+--- components/driver/core/cvm-cntq.c	2011-12-13 12:09:34.000000000 +0530
++++ components-port-one/driver/core/cvm-cntq.c	2011-12-13 12:10:10.000000000 +0530
+@@ -155,6 +155,7 @@
+    dma_hdr.s.c  = cntq_pkt->pri;
+    dma_hdr.s.ca = 1;
+    dma_hdr.s.nl = 1;
++   dma_hdr.s.lport = OCTEON_PCIE_PORT;
+ 
+    local_ptr.u64    = 0;
+    local_ptr.s.addr = CVM_DRV_GET_PHYS(&(cntq_pkt->len));
+diff -Naur components/driver/core/cvm-ddoq.c components-port-one/driver/core/cvm-ddoq.c
+--- components/driver/core/cvm-ddoq.c	2011-12-13 12:09:34.000000000 +0530
++++ components-port-one/driver/core/cvm-ddoq.c	2011-12-13 12:10:10.000000000 +0530
+@@ -225,6 +225,7 @@
+ 
+ 	dmacmd.u64   = 0;
+ 	dmacmd.s.c   = 0;
++	dmacmd.s.lport = OCTEON_PCIE_PORT;
+ 	dmacmd.s.nl  = *lidx;
+ 	dmacmd.s.nr  = *ridx;
+ 	CVMX_SYNCWS;
+diff -Naur components/driver/core/cvm-driver-defs.h components-port-one/driver/core/cvm-driver-defs.h
+--- components/driver/core/cvm-driver-defs.h	2011-12-13 12:09:34.000000000 +0530
++++ components-port-one/driver/core/cvm-driver-defs.h	2011-12-13 12:10:10.000000000 +0530
+@@ -41,6 +41,8 @@
+ 
+ #define MAX_DRV_CORES		32
+ 
++/* In order to use PCIe port #1, set this macro to 1 */
++#define OCTEON_PCIE_PORT        0 //1
+ 
+ 
+ #ifdef __BYTE_ORDER
+diff -Naur components/driver/core/cvm-pci-loadstore.c components-port-one/driver/core/cvm-pci-loadstore.c
+--- components/driver/core/cvm-pci-loadstore.c	2011-12-13 12:09:34.000000000 +0530
++++ components-port-one/driver/core/cvm-pci-loadstore.c	2011-12-13 12:10:10.000000000 +0530
+@@ -76,7 +76,7 @@
+ static void
+ cn68xx_setup_pci_load_store()
+ {
+-	int                            i, pcie_port = 0;
++	int                            i, pcie_port = OCTEON_PCIE_PORT;
+ 	cvmx_sli_mem_access_subidx_t   mem_access;
+ 
+ 	pci_mem_subdid_base = 0x80011b0000000000ULL;
+@@ -88,7 +88,8 @@
+  
+    
+ 	/* Setup mem access 12-15 for port 0, 16-19 for port 1, supplying 36 bits of address space */
+-	for (i=12 + pcie_port*4; i<16 + pcie_port*4; i++)
++	//for (i=12 + pcie_port*4; i<16 + pcie_port*4; i++)
++	for (i=12; i<16; i++)
+ 	{
+ 		cvmx_write_csr(CVMX_PEXP_SLI_MEM_ACCESS_SUBIDX(i), mem_access.u64);
+ 		mem_access.cn68xx.ba += 1; /* Set each SUBID to extend the addressable range */

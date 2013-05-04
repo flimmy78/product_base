@@ -1,0 +1,41 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          stop-bootlogd-single
+# Required-Start:    $remote_fs $all
+# Required-Stop:
+# Default-Start:     S
+# Default-Stop:
+# Short-Description: Stop bootlogd in single user mode
+# Description:       See the bootlogd script
+### END INIT INFO
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+NAME=stop-bootlogd-single
+DAEMON=/sbin/bootlogd
+
+[ -x "$DAEMON" ] || exit 0
+
+case "$1" in
+  start)
+	single=false
+	for word in $(cat /proc/cmdline); do
+		case "$word" in
+		S|single|1)
+			single=true
+		;;
+		esac
+	done
+	if [ true = "$single" ] ; then
+		/etc/init.d/bootlogd stop
+	fi
+	;;
+  stop|restart|force-reload)
+	# No-op
+	;;
+  *)
+	echo "Usage: $NAME {start|stop|restart|force-reload}" >&2
+	exit 3
+	;;
+esac
+
+:

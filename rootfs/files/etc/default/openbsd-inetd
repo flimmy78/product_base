@@ -1,0 +1,4 @@
+#!/bin/bash
+
+[ -d /mnt/wtp ] || mkdir -p /mnt/wtp
+

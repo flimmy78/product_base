@@ -1,0 +1,244 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          discover
+# Required-Start:    mountdevsubfs checkroot $local_fs
+# Required-Stop: 
+# Default-Start:     S
+# Default-Stop:
+### END INIT INFO
+
+set -e
+
+test -x /sbin/discover || exit 0
+
+# Only work with discover version 1, not with version 2
+case "`/sbin/discover --version`" in
+   "discover version 1"*)
+      break
+      ;;
+   *)
+      exit 0
+      ;;
+esac
+
+# file that determines the discover program's default behavior
+CONFFILE=/etc/discover.conf
+
+# list of modules for which to skip loading attempts
+SKIPFILE=/etc/discover-autoskip.conf
+
+# file that controls this init script's management of device symlinks
+INITFILE=/etc/default/discover
+
+# module we're loading, if it crashes then we know the culprit and can skip it
+CRASHFILE=/lib/discover/crash
+
+# cache, used more than once
+KVERS=$(uname -r)
+
+case "$1" in
+    start|restart) ;;
+    stop|reload|force-reload) exit 0 ;;
+    *) echo "Usage: $0 {start|restart}"; exit 1 ;;
+esac
+
+# Load init script parameters.
+if [ -r $INITFILE ]; then
+    . $INITFILE
+fi
+
+if [ -f /lib/lsb/init-functions ]; then
+  . /lib/lsb/init-functions
+else
+  log_begin_msg()   { echo "$@"; }
+  log_success_msg() { echo "$@"; }
+  log_warning_msg() { echo "$@"; }
+fi
+. /etc/default/rcS
+
+discover_uniq() {
+  local result=""
+
+  while read module; do
+    if ! ( echo "$result" | grep -q "$module " ); then
+      result="$result $module "
+    fi
+  done
+
+  echo "$result"
+}
+
+if [ -f $CRASHFILE ]
+then
+    # The system crashed trying to load a module during the last boot
+    # cycle, so add an appropriate "skip" line to the skip file:
+    echo "skip $(<$CRASHFILE)" >> $SKIPFILE
+    rm -f $CRASHFILE
+    sync
+fi
+
+read_configuration()
+{
+    filename="$1"
+
+    if [ ! -f "$1" ]; then return; fi
+    
+    while read action arg argb; do
+        case "$action" in
+            enable | disable) DISCOVER_ARGS="$DISCOVER_ARGS --$action=$arg" ;;
+            skip) SKIPLIST="$SKIPLIST $arg"
+            ;;
+            boot) TYPES="$TYPES $(echo $arg | sed 's/,/ /g')" ;;
+            map)
+                under=$(echo $arg | sed 's/-/_/g')
+                case "$KVERS" in 
+                    2.6.* | 2.5.*) argb=$(echo $argb | sed 's/-/_/g') ;;
+                esac
+                eval "map_$under=$argb"
+            ;;
+        esac
+    done < "$filename"
+}
+
+read_configuration "$CONFFILE"
+
+case "$KVERS" in
+    2.6.* | 2.5.*) read_configuration "$CONFFILE-2.6" ;;
+esac
+
+read_configuration "$SKIPFILE"
+
+SKIPFILE_DIR="/etc/discover.d"
+if [ -d "$SKIPFILE_DIR" ]; then
+    for part in $(run-parts --list "$SKIPFILE_DIR" 2>/dev/null || true); do
+        read_configuration "$part"
+    done
+
+    case "$KVERS" in
+        2.6.* | 2.5.*)
+            if [ -d "$SKIPFILE_DIR/2.6" ]; then
+                for part in $(run-parts --list "$SKIPFILE_DIR/2.6" 2>/dev/null || true); do
+                    read_configuration "$part"
+                done
+            fi
+        ;;
+    esac
+fi
+
+# Detect hardware:
+log_begin_msg "Detecting hardware..."
+MODULES=$(discover $DISCOVER_ARGS --module $TYPES | discover_uniq)
+# Get rid of ide-scsi for kernels that don't need it. This is a horrible hack,
+# but since we're retiring this version anyway I don't care
+case "$KVERS" in
+    2.[0-4].*) true;;
+    *) MODULES=$(echo $MODULES | sed -e 's/ide-scsi //' -e 's/-/_/g');;
+esac
+
+if [ "$VERBOSE" != no ]; then
+    log_success_msg "Discovered hardware for these modules: $MODULES"
+fi
+
+skip()
+{
+    echo "$SKIPLIST" | grep -wq -e "$1"
+}
+            
+get_aliases_regexp() {
+  searchmod="$(echo $1 | sed -e 's#\(-\|_\)#(-|_)#g')"
+  search=""
+  
+  if [ -e "/etc/modprobe.conf" ]; then search="$search /etc/modprobe.conf"; fi
+  if [ -e "/etc/modules.conf" ]; then search="$search /etc/modules.conf"; fi
+
+  if [ -n "$search" ]; then
+    grep -h '^alias' $search | ( while read dummy alias module; do
+      if [ "$dummy" = alias ]; then
+        if [ "$1" = "$alias" ]; then
+          echo -n "|$module"
+        elif [ "$1" = "$module" ]; then
+          echo -n "|$alias"
+        fi
+      fi
+    done ) | sed 's/*/\\*/g' | # Quote regex chars
+    ( case "$KVERS" in 
+        2.6.* | 2.5.*) sed 's/-/_/g' ;;
+        *) cat ;;
+      esac
+    )
+  fi
+}
+
+# Determine if the module is already loaded
+is_loaded() {
+    module="$1"
+    aliases="$(get_aliases_regexp $1)"
+    # No cut(1) without /usr
+    sed 's/ .*$//' /proc/modules | grep -qE "^(${module}${aliases})\$"
+}
+
+# Load the appropriate modules:
+for MODULE in $MODULES
+do
+    # See if we should skip $MODULE:
+    if [ "$MODULE" = ignore ] || [ "$MODULE" = unknown ]
+    then
+        continue
+    fi
+
+    over=$(echo $MODULE | sed 's/-/_/g')
+    MAPPED=$(eval "echo \$map_$over")
+    if [ -n "$MAPPED" ]; then
+        MODULE=$MAPPED
+    fi
+    
+    if skip $MODULE
+    then
+        if [ "$VERBOSE" != no ]; then
+            log_warning_msg "$MODULE disabled in configuration."
+        fi
+        continue
+    fi
+    
+    case "$MODULE" in
+      Server:*)
+        continue
+      ;;
+    esac
+
+    if is_loaded "$MODULE" ; then
+        if [ "$VERBOSE" != no ]; then
+            log_warning_msg "Skipping already loaded module $MODULE."
+        fi
+        continue
+    fi
+
+    if ! (modprobe -n ${MODULE}) > /dev/null 2>&1
+    then
+        if [ "$VERBOSE" != no ]; then
+            log_warning_msg "Skipping unavailable/built-in $MODULE module."
+        fi
+        continue
+    fi
+
+    if [ "$VERBOSE" != no ]; then
+	log_success_msg "Loading $MODULE module..."
+    fi
+
+    # Note the module being loaded in $CRASHFILE. If loading
+    # the module crashes the machine, this file will exist at the next
+    # boot, and we'll add an appropriate "skip" line to the conffile so we
+    # don't try to load it again.
+    echo $MODULE > $CRASHFILE
+    sync
+
+    # '|| true' make sure we start up, even if one module fails to load.
+    modprobe $MODULE || true
+
+    # The module loaded without incident, so we can safely remove the crash
+    # file.
+    rm -f $CRASHFILE
+    sync
+done
+
+# vim:ai:et:sts=4:sw=4:tw=0:

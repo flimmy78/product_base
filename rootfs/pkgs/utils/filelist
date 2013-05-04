@@ -1,0 +1,11 @@
+usr/bin/ldd
+usr/bin/vi
+usr/bin/vim
+usr/bin/vim.tiny
+sbin/badblocks
+sbin/losetup
+sbin/startpar
+sbin/findfs
+sbin/unix_chkpwd
+sbin/showmount
+usr/sbin/logrotate

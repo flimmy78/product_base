@@ -1,0 +1,51 @@
+#! /bin/sh
+#
+# pure-ftpd	starts and stops the pure-ftpd ftp daemon
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+NAME=pure-ftpd
+DESC="ftp server"
+: ${SSDAEMONLOGOPTS:="--quiet"}
+
+
+DAEMON=/usr/sbin/pure-ftpd
+
+
+test -x $DAEMON || exit 0
+
+IPOPTION="-S xx.xx.xx"
+DEBUGOPTION="-d"
+#FORTUNOPTION="-F /etc/pure-ftpd/fortun"
+WRAPPER=" -1 -B -c 20 -C 3 $DEBUGOPTIONS -E $FORTUNOPTION -f daemon -H -l puredb:/etc/pure-ftpd/pureftpd.pdb -L 50:3 -R "
+# Default ftp account: wtp@w1t23p  with homedir /mnt/wtp
+
+echo "FTP SERVER" > /mnt/wtp/.banner
+
+case "$1" in
+  start)
+	echo -n "Starting $DESC: "
+	start-stop-daemon --start $SSDAEMONLOGOPTS  \
+		--exec /usr/sbin/pure-ftpd -- $WRAPPER 
+	;;
+  stop)
+	echo -n "Stopping $DESC: "
+	start-stop-daemon --stop $SSDAEMONLOGOPTS --oknodo \
+		--pidfile /var/run/pure-ftpd.pid
+	echo "$NAME."
+	;;
+  restart|force-reload)
+	echo -n "Restarting $DESC: "
+	start-stop-daemon --stop $SSDAEMONLOGOPTS --oknodo \
+		--pidfile /var/run/pure-ftpd.pid
+	sleep 1
+	start-stop-daemon --start $SSDAEMONLOGOPTS  \
+		--exec /usr/sbin/pure-ftpd -- $WRAPPER 
+	;;
+  *)
+	N=/etc/init.d/$NAME
+	echo "Usage: $N {start|stop|restart|force-reload}" >&2
+	exit 1
+	;;
+esac
+
+exit 0

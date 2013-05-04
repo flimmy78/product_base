@@ -1,0 +1,9 @@
+#This file change the defualt hashsize of module ip_conntrack
+install ip_conntrack /sbin/modprobe --ignore-install ip_conntrack hashsize=1048576 && sysctl net.ipv4.netfilter.ip_conntrack_tcp_timeout_established=1200
+
+
+# Obsoleted config.
+# Change pmtud behavio since ip_conntrack will cause reassembling of all ip fragments. 
+# Move back to sysctl.conf since ebr will not work correctly with these config. 
+#install ip_conntrack /sbin/modprobe --ignore-install ip_conntrack hashsize=1048576 && sysctl net.ipv4.ipfrag_inform_nhmtu_instead=0 && sysctl net.ipv4.ipfrag_ingress_pmtu=0
+#remove ip_conntrack /sbin/modprobe -r --ignore-remove ip_conntrack && sysctl net.ipv4.ipfrag_inform_nhmtu_instead=1 && sysctl net.ipv4.ipfrag_ingress_pmtu=1

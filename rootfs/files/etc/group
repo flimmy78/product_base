@@ -1,0 +1,16 @@
+root:x:0:
+daemon:x:1:
+bin:x:2:
+sys:x:3:
+adm:x:4:
+sudo:x:27:
+www-data:x:33:
+ssh:x:103:
+messagebus:x:104:
+ntp:x:112:
+snort:x:117:
+vtyadmin:x:118:
+vtyview:x:119:
+cpgrp:x:120: 
+ftpusers:x:1096:
+nogroup:x:65534:

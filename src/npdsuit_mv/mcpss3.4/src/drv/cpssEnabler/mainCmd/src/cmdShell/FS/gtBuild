@@ -1,0 +1,25 @@
+
+
+###
+###  add include path and file list
+###
+
+#INCLUDE_PATH =
+#C_FILE_LIST  =
+#SUBDIRS      =
+C_EXCLUDE_FILE_LIST = cmdFS_NIX.c
+
+ifneq (yes, $(CMD_FS))
+    C_FILE_LIST =
+endif
+
+ifeq (1,$(SHARED_MEMORY))
+	LIB_NAME = mainCmd.lib
+endif
+
+ifneq (,$(wildcard cmdFS_RAM_embed_files.inc))
+AD_CFLAGS += $(FD)CMDFS_RAM_EMBEDDED_DATA
+endif
+
+##################################################
+include $(PROJ_BASE)/gtTopMake
