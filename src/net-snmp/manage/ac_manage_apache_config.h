@@ -1,5 +1,0 @@
-#ifndef  _AC_MANAGE_APACHE_CONFIG_H_
-#define  _AC_MANAGE_APACHE_CONFIG_H_
-
-
-#endif /* _AC_MANAGE_APACHE_CONFIG_H_ */

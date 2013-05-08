@@ -1,6 +1,0 @@
-#!/bin/bash
-
-pushd mipsbuild
-make $@
-popd
-

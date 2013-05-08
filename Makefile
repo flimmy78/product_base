@@ -155,73 +155,74 @@ $(info DESTDIR is ${DESTDIR})
 $(info =========================================================================)
 
 #export IBUS_MOD="src/ibus"
-export ACCAPI_DIR=${TOPSRC_DIR}/accapi
-export BASHTOOLS_DIR="src/bashtools"
-export NPDSUIT_MV_MOD="src/npdsuit_mv"
-export SEM_MOD="src/sem"
+export ACCAPI_DIR=${TOPSRC_DIR}/dg/accapi
+export ACCAPI_PB_DIR=${TOPSRC_DIR}/accapi_pb
+export BASHTOOLS_DIR=src/bashtools
+export NPDSUIT_MV_MOD=src/npdsuit_mv
+export SEM_MOD=src/sem
 #export XCAT_BM_MOD="src/xcatbm"
-export NPDSUIT_BCM_MOD="src/npdsuit_bcm"
-export NPDSUIT_XCAT_MOD="src/npdsuit_xcat"
-export KSEM_MOD="src/ksem"
-export QUAGGA_MOD="src/quagga"
-export DCLI_MOD="src/dcli"
-export BM_KMOD="src/bm"
-export KES_MOD="src/kes/"
-export OCTETH_KMOD="src/cavium-ethernet"
-export RPA_MOD="src/rpa"
-export PFM_MOD="src/pfm"
-export SFD_MOD="src/sfd"
-export E1000E_KMOD="src/e1000e/src"
+export NPDSUIT_BCM_MOD=src/npdsuit_bcm
+export NPDSUIT_XCAT_MOD=src/npdsuit_xcat
+export KSEM_MOD=src/ksem
+export QUAGGA_MOD=src/dg/quagga
+export DCLI_MOD=src/dg/dcli
+export BM_KMOD=src/bm
+export KES_MOD=src/kes/
+export OCTETH_KMOD=src/cavium-ethernet
+export RPA_MOD=src/rpa
+export PFM_MOD=src/pfm
+export SFD_MOD=src/dg/sfd
+export E1000E_KMOD=src/e1000e/src
 export OCTEON_BOOTDIR="src/oct-nic"
-export DBA_MOD="src/dba/"
-export PPPOE_KERNEL_MOD="src/pppoe/kernel"
+export DBA_MOD="src/dg/dba/"
+export PPPOE_KERNEL_MOD="src/dg/pppoe/kernel"
+export PPPOE_MOD="src/dg/pppoe"
 export DPI_KMOD="src/intercept-example"
 export CAVIUM_RATELIMIT_APP="src/cavium_ratelimit/app"
 export CAVIUM_RATELIMIT_MOD="src/cavium_ratelimit/kmod"
-export WCPSS_MOD="src/wcpss"
-export IUH_MOD="src/ibus/app/ranapproxy/iuh"
-export IU_MOD="src/ibus/app/ranapproxy/iu"
-export SCCP_LIB_MOD="src/ibus/lib/sccp/lib"
+export WCPSS_MOD="src/dg/wcpss"
+export IUH_MOD="src/dg/ibus/app/ranapproxy/iuh"
+export IU_MOD="src/dg/ibus/app/ranapproxy/iu"
+export SCCP_LIB_MOD="src/dg/ibus/lib/sccp/lib"
 export WTPVERFILE=${WCPSS_MOD}/src/res/wtpcompatible*
-export ASD_MOD="src/asd"
-export STPSUIT_MOD="src/stpsuit"
-export HAD_MOD="src/had"
-export HMD_MOD="src/hmd"
-export BSD_MOD="src/bsd"
-export WBMD_MOD="src/wbmd"
-export HBIP_MOD="src/hbip"
-export IGMP_MOD="src/igmp-snooping"
-export DLDP_MOD="src/dldp"
-export CCGI_MOD="src/AuteCS"
-export SRVM_MOD="src/service_management"
-export CHKPWD_MOD="src/checkpasswd-pam"
-export IPTABLES_MOD="src/iptables"
-export EBTABLES_MOD="src/ebtables"
-export CAPTIVE_MOD="src/captive_portal"
-export EAG_MOD="src/eag"
+export ASD_MOD="src/dg/asd"
+export STPSUIT_MOD="src/dg/stpsuit"
+export HAD_MOD="src/dg/had"
+export HMD_MOD="src/dg/hmd"
+export BSD_MOD="src/dg/bsd"
+export WBMD_MOD="src/dg/wbmd"
+export HBIP_MOD="src/dg/hbip"
+export IGMP_MOD="src/dg/igmp-snooping"
+export DLDP_MOD="src/dg/dldp"
+export CCGI_MOD="src/dg/AuteCS"
+export SRVM_MOD="src/dg/service_management"
+export CHKPWD_MOD="src/dg/checkpasswd-pam"
+export IPTABLES_MOD=src/dg/iptables
+export EBTABLES_MOD="src/dg/ebtables"
+export CAPTIVE_MOD="src/dg/captive_portal"
+export EAG_MOD="src/dg/eag"
 export BCM_MOD=${NPDSUIT_BCM_MOD}/bcmd
 export BCM_TOPDIR=${TOPSRC_DIR}/npdsuit_bcm/bcmd
-export PPPOE_MOD="src/pppoe"
-export SNMP_ROOTDIR=src/net-snmp
-export SNMPMIBS_DIR="src/net-snmp/mibs"
-export SNMPMANAGE_MOD="src/net-snmp/manage"
-export TRAP_HELPER_MOD="src/net-snmp/trap-helper"
-export SUBAGENT_MOD="src/net-snmp/subagent"
-export ACSAMPLE_MOD="src/net-snmp/sample"
-export DRP_MOD="src/net-snmp/drp"
-export LIBNM_MOD="src/lib/nm"
-export DHCP_MOD="src/dhcp4/dhcp-4.0.2b3"
-export DHCP6_MOD="src/dhcp4/dhcp-4.1.1"
+export SNMP_ROOTDIR=src/dg/net-snmp
+export SNMPMIBS_DIR=${SNMP_ROOTDIR}/mibs
+export SNMPMANAGE_MOD=${SNMP_ROOTDIR}/manage
+export TRAP_HELPER_MOD=${SNMP_ROOTDIR}/trap-helper
+export SUBAGENT_MOD=${SNMP_ROOTDIR}/subagent
+export ACSAMPLE_MOD=${SNMP_ROOTDIR}/sample
+export DRP_MOD=${SNMP_ROOTDIR}/drp
+export LIBNM_MOD="src/dg/lib/nm"
+export DHCP_MOD="src/dg/dhcp4/dhcp-4.0.2b3"
+export DHCP6_MOD="src/dg/dhcp4/dhcp-4.1.1"
 export DCCN_MOD="src/dccnetlink"
 export DCCN_TOPSRC=${TOPSRC_DIR}/dccnetlink
-export PIMD_MOD="src/pimd"
-export DHCPSNP_MOD="src/dhcp-snooping"
-export RADIUSD_MOD="src/radiusd"
+export PIMD_MOD="src/dg/pimd"
+export DHCPSNP_MOD="src/dg/dhcp-snooping"
+export RADIUSD_MOD="src/dg/radiusd"
 export IPFWD_LEARN_KMOD="src/fast-forward/control_plane/ipfwd_learn"
 export SE_AGENT_MOD="src/fast-forward/control_plane/se_agent"
 export FASTFWD_MOD="src/fast-forward/data_plane/fast-fwd"
-export DBUS_MOD="src/dbus-1.4.0"
-export SYSLOG_MOD="src/syslog-ng"
+export DBUS_MOD="src/dg/dbus-1.4.0"
+export SYSLOG_MOD="src/dg/syslog-ng"
 
 PREREQ_DCLI=$(shell if [ -d ${DCLI_MOD} ] ; then echo "dcli"; fi )
 #$(warning Dcli is $(PREREQ_DCLI))
@@ -1177,14 +1178,14 @@ preparedirs: prepare_config
 
 prepare_config:
 	@echo " prepare configs for private" 
-	@echo "/* Automatically generated  header file.*/" > src/accapi/config/auteware_config.h
-	@echo "/* Automatically generated  header file for NPD.*/" > src/accapi/config/npd_config.h
+	@echo "/* Automatically generated  header file.*/" > ${ACCAPI_PB_DIR}/config/auteware_config.h
+	@echo "/* Automatically generated  header file for NPD.*/" > ${ACCAPI_PB_DIR}/config/npd_config.h
 ifeq (${WEB},1)
-	@echo "#define __WITH_AUTEWARE_WEB 1" >> src/accapi/config/auteware_config.h
+	@echo "#define __WITH_AUTEWARE_WEB 1" >> ${ACCAPI_PB_DIR}/config/auteware_config.h
 endif
 
 ifeq (${CSCD},1)
-	@echo "#define __WITH_NPD_CSCD 1" >> src/accapi/config/npd_config.h
+	@echo "#define __WITH_NPD_CSCD 1" >> ${ACCAPI_PB_DIR}/config/npd_config.h
 endif
 
 pubapps: preparedirs  ${PREREQ_DBUS} ${PREREQ_PFM} ${PREREQ_SFD} ${PREREQ_QUAGGA} ${PREREQ_DCLI} ${PREREQ_HBIP}  ${PREREQ_HMD} ${PREREQ_BSD} ${PREREQ_WCPSS} ${PREREQ_ASD} ${PREREQ_HAD} ${PREREQ_IUH} ${PREREQ_RANAPPROXY} ${PREREQ_SRVM} ${PREREQ_SNMP} ${PREREQ_DHCP} ${PREREQ_DHCP6} ${PREREQ_DHCPSNP} ${PREREQ_IGMP} ${PREREQ_SE_AGENT} ${PREREQ_PPPOE} ${PREREQ_SYSLOG} bashtools 
