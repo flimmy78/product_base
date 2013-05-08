@@ -7,7 +7,7 @@ LDFLAGS = -g -L$(LIB_EXPORT_DIR) -L$(BUILDROOTDIR)/usr/lib
 LDLIBS = -lpthread -lsqlite3
 
 
-INCLUDES += -I$(ACCAPI_DIR)
+INCLUDES += -I$(ACCAPI_PB_DIR)
 
 INCLUDES += -I/opt/mipslibs/usr/include
 

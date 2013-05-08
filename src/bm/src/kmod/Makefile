@@ -9,7 +9,7 @@ KDIR      := ${OCT_KERNEL_ROOT}
 INCLUDE   := -isystem $(KDIR)/include -I {OCTEON_ROOT}/executive
 MODCFLAGS := -DMODULE -D__KERNEL__ -Wall ${INCLUDE}
 
-EXTRA_CFLAGS += -I${ACCAPI_DIR}
+EXTRA_CFLAGS += -I${ACCAPI_PB_DIR}
 
 all: 
 	$(MAKE) V=1 -C ${KDIR} M=`pwd` modules

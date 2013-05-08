@@ -48,7 +48,7 @@ LDFLAGS = -g -shared -Wl,-soname,$(NPD_AM_SHLIB_SONAME)
 
 
 
-INCLUDES += -I$(ACCAPI_DIR) 
+INCLUDES += -I$(ACCAPI_PB_DIR) 
 
 NPD_AM_OBJS = nam_eth.o nam_qos.o nam_asic.o nam_vlan.o nam_trunk.o nam_dynamic_trunk.o nam_arp.o nam_utilus.o nam_fdb.o nam_intf.o nam_pvlan.o nam_acl.o nam_log.o nam_mirror.o nam_rx.o nam_tx.o nam_stp.o nam_route.o nam_diag.o nam_tunnel.o nam_dldp.o nam_wifi.o nam_prot_vlan.o nam_hw_diag.o
 

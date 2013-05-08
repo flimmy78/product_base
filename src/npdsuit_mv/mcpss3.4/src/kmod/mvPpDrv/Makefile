@@ -37,7 +37,7 @@ KBUILD_CFLAGS += -Iinclude -I$(SRC_BASE)/drv/mainPpDrv/h -I$(SRC_BASE)/drv/commo
 KBUILD_CFLAGS += -I$(DIST_HOME)/include
 KBUILD_CFLAGS += -I$(XCOMP_ROOT_PATH)/usr/include
 #for use #include "sysdef/npd_sysdef.h" 
-KBUILD_CFLAGS += -I$(ACCAPI_DIR)
+KBUILD_CFLAGS += -I$(ACCAPI_PB_DIR)
 
 EXTRA_FLAGS += KBUILD_CFLAGS
 

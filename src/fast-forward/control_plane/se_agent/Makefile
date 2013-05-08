@@ -34,7 +34,7 @@ PCI_DRIVER_DIR = $(OCTNIC_DIR)/components/driver
 LIBS_LIST += $(PCI_DRIVER_DIR)/bin/liboctapi.a -lpthread
 
 CFLAGS_LOCAL = -g -O2 -W -Wall -Wno-unused \
-				-I$(ACCAPI_DIR) \
+				-I$(ACCAPI_PB_DIR) \
 				-I$(PCI_DRIVER_DIR)/host/include \
 				-I$(PCI_DRIVER_DIR)/host/api \
 				-I$(PCI_DRIVER_DIR)/common

@@ -34,7 +34,7 @@ LDLIBS += -lmcpss -lrt
 endif
 
 #CFLAGS += -DDBUS_API_SUBJECT_TO_CHANGE
-INCLUDES += -I$(ACCAPI_DIR)
+INCLUDES += -I$(ACCAPI_PB_DIR)
 INCLUDES += -I$(DCCN_TOPSRC)/src/include
 
 # add for dhcp snooping db
@@ -45,7 +45,7 @@ INCLUDES += -I/opt/mipslibs/usr/include
 
 C_FLAGS = -g -Wall  #-ansi
 C_FLAGS += -lpthread
-C_FLAGS += -I$(ACCAPI_DIR)
+C_FLAGS += -I$(ACCAPI_PB_DIR)
 C_FLAGS += -I/opt/mipslibs/usr/include/libxml2
 
 NPD_OBJS = npd_main.o npd_dbus.o npd_log.o npd_product.o npd_c_slot.o npd_e_slot.o npd_vlan.o npd_trunk.o \

@@ -6,9 +6,9 @@ LDFLAGS += -L/opt/mipslibs/usr/lib
 LDFLAGS += -lsctp
 
 CFLAGS = -Wall -Werror -g -O0 -I. 
-#CFLAGS += -I$(ACCAPI_DIR)
+CFLAGS += -I$(ACCAPI_PB_DIR)
 CFLAGS += -I/opt/mipslibs/usr/include
-CFLAGS += -I../../../accapi
+#CFLAGS += -I../../../accapi
 CFLAGS += -I/opt/mipslibs/usr/include/libxml2
 
 LIBS = -L/opt/mipslibs/usr/lib -L./  -lm -L/opt/mipslibs/usr/lib -lxml2 -lz
