@@ -37,6 +37,11 @@ MODULE_AUTHOR("Cavium Networks");
 MODULE_DESCRIPTION("Octeon Host PCI Nic Driver");
 MODULE_LICENSE("Cavium Networks");
 
+int oct_debug = 0;
+module_param(oct_debug, int, 0644);
+MODULE_PARM_DESC(oct_debug, "\n"
+       "\tdebug for recv packet.\n");
+
 extern void   octnet_napi_drv_callback(int oct_id, int oq_no, int event);
 
 struct  octdev_props_t  *octprops[MAX_OCTEON_DEVICES];

@@ -28,10 +28,15 @@
 #include "octeon_network.h"
 #include "octeon_macros.h"
 #include "octeon_nic.h"
+#include "octeon_rpa.h"
 #include <linux/autelan_product.h>
+
 
 extern struct  octdev_props_t  *octprops[MAX_OCTEON_DEVICES];
 extern product_info_t autelan_product_info;
+extern cvm_rpa_netdev_index_t cvm_rpa_dev_index[RPA_SLOT_NUM][RPA_NETDEV_NUM];
+extern uint32_t (*cvm_rpa_rx_hook)(struct net_device *dev, struct sk_buff *skb, unsigned int flag);
+extern int oct_debug;
 
 #define OCT_NIC_TX_OK     NETDEV_TX_OK
 #define OCT_NIC_TX_BUSY   NETDEV_TX_BUSY
@@ -61,6 +66,27 @@ oct_poll_fn_status_t octnet_check_txq_status(void *oct,unsigned long props_ptr);
 
 
 
+void printPacketBuffer(unsigned char *buffer,unsigned long buffLen)
+{
+	unsigned int i;
+
+	if(!buffer)
+		return;
+	cavium_error(":::::::::::::::::::::::1::::::::::::::::::::::::\n");
+	
+	for(i = 0;i < buffLen ; i++)
+	{
+		cavium_print_msg("%02x ",buffer[i]);
+		if(0==(i+1)%16) {
+			cavium_print_msg("\n");
+		}
+	}
+	if((buffLen%16)!=0)
+	{
+		cavium_print_msg("\n");
+	}
+	cavium_error("::::::::::::::::::::::::1:::::::::::::::::::::::\n");
+}
 
 
 
@@ -456,13 +482,6 @@ octnet_change_mtu(struct net_device *pndev, int new_mtu)
 
 
 
-
-
-
-
-
-
-
 /** Routine to push packets arriving on Octeon interface upto network layer.
   * @param oct_dev  - pointer to octeon device.
   * @param skbuff   - skbuff struct to be passed to network layer.
@@ -477,9 +496,57 @@ octnet_push_packet(int                  octeon_id,
 {
 	struct sk_buff     *skb   = (struct sk_buff *)skbuff;
 	octnet_os_devptr_t *pndev = (octnet_os_devptr_t *)octprops[octeon_id]->pndev[resp_hdr->dest_qport];
+    rpa_packet_flag rpa_pkt_flag = NOT_RPA_PKT;
+	unsigned int rpa_type_position;
+    unsigned int base_local_slot_num;
+	//int oct_debug = 0;
+	enum cvm_oct_callback_result callback_result;
+
+	if (oct_debug) {
+		cavium_error("Octeon NIC before remove rpa tag.\n");
+		printPacketBuffer(skb->data, skb->len);
+	}
+	
+	if (autelan_product_info.board_type == AUTELAN_BOARD_AX71_CRSMU)
+		rpa_type_position = 0x10;
+	else
+		rpa_type_position = 0xc;
+
+	base_local_slot_num = autelan_product_info.board_slot_id - 1;
 
 	if(pndev) {
 		octnet_priv_t  *priv  = GET_NETDEV_PRIV(pndev);
+
+		rpa_pkt_flag = NOT_RPA_PKT;
+		if (*((unsigned short*)(skb->data + rpa_type_position)) == RPA_COOKIE) {
+			rpa_eth_header *rpa_head = (rpa_eth_header *)(skb->data + (rpa_type_position - 0xc));
+			unsigned char slotNum = (rpa_head->d_s_slotNum >> 4) & 0x0f;
+			if ((unsigned int)slotNum == base_local_slot_num) {
+    			rpa_pkt_flag = NORMAL_RPA_PKT;
+
+    			/* need send to protocol stack? */
+    			if ((rpa_head->type & 0x0f) == 0x01){
+					int rpa_slotNum = (rpa_head->d_s_slotNum) & 0x0f;
+					int rpa_netdevNum = rpa_head->snetdevNum;
+					/* get right device which send the arp-reply to kernel */
+					if (cvm_rpa_dev_index[rpa_slotNum][rpa_netdevNum].netdev) {
+						skb->dev = cvm_rpa_dev_index[rpa_slotNum][rpa_netdevNum].netdev;
+						//cavium_error("huangjing##dev->name : %s\n", skb->dev->name);
+						skb_pull(skb, rpa_type_position + 0x6);
+						rpa_pkt_flag = TO_PS_RPA_PKT;
+					}else {
+            			free_recv_buffer(skb);
+            			priv->stats.rx_dropped++;
+            			return;
+					}
+				}
+	        }else{
+                free_recv_buffer(skb);
+				priv->stats.rx_dropped++;
+				return;
+			}
+		}
+
 	
 		/* Do not proceed if the interface is not in RUNNING state. */
 		if( !(cavium_atomic_read(&priv->ifstate) & OCT_NIC_IFSTATE_RUNNING)) {
@@ -488,22 +555,48 @@ octnet_push_packet(int                  octeon_id,
 			return;
 		}
 
-		skb->dev       = pndev;
-		skb->protocol  = eth_type_trans(skb, skb->dev);
-		skb->ip_summed = CHECKSUM_NONE;
+		/* if received skb by rpa(not a arp-reply), not parse the L2 head */
+    	if(rpa_pkt_flag == NOT_RPA_PKT) {
+        	skb->dev       = pndev;
+            skb->protocol  = eth_type_trans(skb, skb->dev);
+        	skb->ip_summed = CHECKSUM_NONE;
 
-		if(netif_rx(skb) != NET_RX_DROP) {
-			priv->stats.rx_bytes += len;
-			priv->stats.rx_packets++;
-			pndev->last_rx  = jiffies;
-		} else {
-			priv->stats.rx_dropped++;
+        	if(netif_rx(skb) != NET_RX_DROP) {
+        		priv->stats.rx_bytes += len;
+        		priv->stats.rx_packets++;
+        		pndev->last_rx  = jiffies;
+        	} else {
+        		priv->stats.rx_dropped++;
+        	}
+    	}else if (rpa_pkt_flag == TO_PS_RPA_PKT) {
+			skb->protocol = eth_type_trans(skb, skb->dev);
+			skb->protocol  = eth_type_trans(skb, skb->dev);
+        	skb->ip_summed = CHECKSUM_NONE;
+
+        	if(netif_rx(skb) != NET_RX_DROP) {
+        		priv->stats.rx_bytes += len;
+        		priv->stats.rx_packets++;
+        		pndev->last_rx  = jiffies;
+        	} else {
+        		priv->stats.rx_dropped++;
+        	}
+		}else if (rpa_pkt_flag == NORMAL_RPA_PKT) {
+        	if (cvm_rpa_rx_hook) {
+            	callback_result = cvm_rpa_rx_hook(skb->dev, skb, rpa_pkt_flag);
+            }
+			else {
+				callback_result = CVM_OCT_DROP;
+			}
+			if(callback_result != CVM_OCT_TAKE_OWNERSHIP_SKB)
+			{
+                free_recv_buffer(skb);
+			}
 		}
-
+		
 	} else  {
 
 		free_recv_buffer(skb);
-	}
+	    }
 
 }
 
