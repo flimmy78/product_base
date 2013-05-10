@@ -157,7 +157,7 @@ $(info =========================================================================
 #export IBUS_MOD="src/ibus"
 export ACCAPI_DIR=${TOPSRC_DIR}/dg/accapi
 export ACCAPI_PB_DIR=${TOPSRC_DIR}/accapi_pb
-export BASHTOOLS_DIR=src/bashtools
+export BASHTOOLS_DIR=src/dg/bashtools
 export NPDSUIT_MV_MOD=src/npdsuit_mv
 export SEM_MOD=src/sem
 #export XCAT_BM_MOD="src/xcatbm"
