@@ -69,6 +69,9 @@ inline int rpa_packet_handle(cvmx_wqe_t* work,cvm_common_ip_hdr_t **ip,uint32_t 
 	}
 
 	work->word2.s.ip_offset = ((uint8_t*)ip_head - pkt_ptr);
+
+	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+							"Get the packet IP header, start =0x%p, ip =0x%p, offset =%d\r\n",pkt_ptr,ip_head,work->word2.s.ip_offset);
 	return RETURN_OK;
 }
 

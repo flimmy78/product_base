@@ -652,10 +652,11 @@ static inline int send_packet_pip_out(cvmx_wqe_t *work, rule_item_t *prule, uint
 	            ip_offset += 4;
 	        if(0 != prule->rules.dsa_info)
 	            ip_offset += 8;
-			if(0 != prule->rules.pppoe_flag)   /*add by wangjian for support pppoe 2013-3-21*/
-				ip_offset += 8;
-
+			
             work->word2.s.ip_offset = ip_offset;
+			
+			if(0 != prule->rules.pppoe_flag)  
+				ip_offset += 8;
             
     		if (prule->rules.action_type == FLOW_ACTION_ETH_FORWARD) 
     		{
@@ -1338,6 +1339,7 @@ inline int8_t rx_l2hdr_decap( uint8_t* eth_head,cvm_common_ip_hdr_t **ip_head)
 			/*add by wangjian for support pppoe 2013-3-14*/
 			else
 			{
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_NONIP_PACKETS, 1);
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"rx_l2hdr_decap Not normal QinQ packets,eth type = %04x \r\n",protocol);
 				return RETURN_ERROR;
@@ -1367,6 +1369,7 @@ inline int8_t rx_l2hdr_decap( uint8_t* eth_head,cvm_common_ip_hdr_t **ip_head)
 		/*add by wangjian for support pppoe 2013-3-14*/
 		else
 		{
+			cvmx_fau_atomic_add64(CVM_FAU_ENET_NONIP_PACKETS, 1);
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"rx_l2hdr_parse Not normal 802.1 packets,eth type = %04x\r\n",protocol);
 			return RETURN_ERROR;
@@ -1392,6 +1395,7 @@ inline int8_t rx_l2hdr_decap( uint8_t* eth_head,cvm_common_ip_hdr_t **ip_head)
 	else
 	{ 
 		/* no  ip */
+		cvmx_fau_atomic_add64(CVM_FAU_ENET_NONIP_PACKETS, 1);
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"rx_l2hdr_parse NonIP packets,eth type = %04x\r\n",protocol);
 		return RETURN_ERROR;
@@ -3400,15 +3404,28 @@ static void application_main_loop(unsigned int coremask_data)
             action_type = FLOW_ACTION_TOLINUX;			
 			goto scheme_execute; 
 		}
-		/* add by wangjian for support pppoe 2013-3-14 */
-		else if (PPPOE_TYPE == tmp_proto)
+		else if((PPPOE_TYPE == tmp_proto) || 
+			     (work->word2.s.vlan_valid && (PPPOE_TYPE == ((vlan_eth_hdr_t*)tmp_eth_header)->h_eth_type)))
 		{
-			if (PPPOE_IP_TYPE == *(uint16_t *)((uint8_t *)tmp_eth_header + ETH_H_LEN + 6))
+			if (PPPOE_IP_TYPE == *(uint16_t *)((uint8_t *)tmp_eth_header + ETH_H_LEN + (work->word2.s.vlan_valid * VLAN_HLEN) + 6))
 			{
-				ip = (cvm_common_ip_hdr_t *)((uint8_t *)tmp_eth_header + ETH_H_LEN + PPPOE_H_LEN);
+				ip = (cvm_common_ip_hdr_t *)((uint8_t *)tmp_eth_header + ETH_H_LEN + (work->word2.s.vlan_valid * VLAN_HLEN) + PPPOE_H_LEN);
 				pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 				work->word2.s.ip_offset = ((uint8_t*)ip - pkt_ptr);
 				/*be careful work->word2.s.ip_offset can change?*/
+
+				if((ip->ip_off&0x3f) != 0)/*frag ip*/
+				{		
+					FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+							"Receive the frag IP packets\r\n");
+					
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_FRAGIP_PACKETS, 1);
+					action_type = FLOW_ACTION_TOLINUX;			
+					goto scheme_execute;
+				}
+
+				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+							"Get the packet IP header, start =0x%p, ip =0x%p, offset =%d\r\n",pkt_ptr,ip,work->word2.s.ip_offset);
 			}
 			else 
 			{
@@ -3417,7 +3434,6 @@ static void application_main_loop(unsigned int coremask_data)
 				goto scheme_execute; 
 			}
 		}
-		/* add by wangjian for support pppoe 2013-3-14 */
 		else
 		{
 		
