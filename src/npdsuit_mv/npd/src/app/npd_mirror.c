@@ -394,42 +394,58 @@ int npd_mirror_destination_node_member_check
 		return MIRROR_RETURN_CODE_DESTINATION_NODE_NOTEXIST;
 	}
 	else {
-		if(MIRROR_INGRESS_E == direct){
-		   for(i = 0; i < MIRROR_FUNC_MAX; i++) {
-			 if(destNode->func[i]!= NULL){
-                if(MIRROR_FUNC_PORT == i){
+
+		if(MIRROR_INGRESS_E == direct)
+		{
+		   for(i = 0; i < MIRROR_FUNC_MAX; i++) 
+		   {
+			 if(destNode->func[i]!= NULL)
+			 {
+                if(MIRROR_FUNC_PORT == i)
+				{
                    srcPortList = destNode->func[i];
-				   if((NULL != srcPortList)&&(srcPortList->count > 0)){
+				   if((NULL != srcPortList)&&(srcPortList->count > 0))
+				   {
 						list = &(srcPortList->list);
-						__list_for_each(pos,list) {
+						__list_for_each(pos,list) 
+						{
 							srcPortNode = list_entry(pos,struct mirror_src_port_node_s,list);
-							if(MIRROR_INGRESS_E == srcPortNode->direct){
+							if((MIRROR_INGRESS_E == srcPortNode->direct) || (MIRROR_BIDIRECTION_E == srcPortNode->direct))
+							{
 	                            return NPD_TRUE;
 							}
 						}
 				   	}
 				}
-				else{
+				else
+				{
 			         return NPD_TRUE;					
 				}				
 			 }  
 		   } 
 		}
-		else if(MIRROR_EGRESS_E == direct){
+		else if(MIRROR_EGRESS_E == direct)
+		{
              srcPortList = destNode->func[MIRROR_FUNC_PORT];
- 		     if((NULL != srcPortList)&&(srcPortList->count > 0)) {
+ 		     if((NULL != srcPortList)&&(srcPortList->count > 0)) 
+			 {
  				list = &(srcPortList->list);
- 				__list_for_each(pos,list) {
+ 				__list_for_each(pos,list) 
+				{
  					srcPortNode = list_entry(pos,struct mirror_src_port_node_s,list);
- 					if(MIRROR_EGRESS_E == srcPortNode->direct){
+ 					if((MIRROR_EGRESS_E == srcPortNode->direct) || (MIRROR_BIDIRECTION_E == srcPortNode->direct))
+					{
                          return NPD_TRUE;
  					}
  				}
  		   	}
 		}
-		else if(MIRROR_BIDIRECTION_E == direct){
-			for(i = 0; i < MIRROR_FUNC_MAX; i++) {
-				if(destNode->func[i]!= NULL){
+		else if(MIRROR_BIDIRECTION_E == direct)
+		{
+			for(i = 0; i < MIRROR_FUNC_MAX; i++) 
+			{
+				if(destNode->func[i]!= NULL)
+				{
 					return NPD_TRUE;
 				}
 		    } 
@@ -684,7 +700,13 @@ int npd_mirror_src_port_check
 		__list_for_each(pos,list) {
 			srcPortNode = list_entry(pos,struct mirror_src_port_node_s,list);
 			if(src_eth_g_index == srcPortNode->eth_g_index) {
+				#if 0
 				if((direct == srcPortNode->direct)||(MIRROR_BIDIRECTION_E == srcPortNode->direct)){
+				   return NPD_TRUE;
+				}
+				#endif
+				if(direct == srcPortNode->direct)
+				{
 				   return NPD_TRUE;
 				}
 			}
@@ -1879,16 +1901,24 @@ DBusMessage * npd_dbus_mirror_config(DBusConnection *conn, DBusMessage *msg, voi
 	unsigned int	    ret = 0;
 	unsigned int 	profile = DEFAULT_MIRROR_PROFILE;
 
-	if(!((productinfo.capbmp) & FUNCTION_MIRROR_VLAUE)){
+	if(!((productinfo.capbmp) & FUNCTION_MIRROR_VLAUE))
+	{
 		npd_syslog_dbg("do not support mirror!\n");
 		ret = COMMON_PRODUCT_NOT_SUPPORT_FUCTION;
 	}
 	else if(((productinfo.capbmp) & FUNCTION_MIRROR_VLAUE) \
-			&& !((productinfo.runbmp) & FUNCTION_MIRROR_VLAUE)){
+			&& !((productinfo.runbmp) & FUNCTION_MIRROR_VLAUE))
+	{
 		npd_syslog_dbg("do not support mirror!\n");
 		ret = COMMON_PRODUCT_NOT_SUPPORT_FUCTION;
 	}
-	else {
+	else if((BOARD_TYPE == BOARD_TYPE_AX71_CRSMU) || (BOARD_TYPE == BOARD_TYPE_AX81_SMU))
+	{
+		npd_syslog_dbg("do not support mirror!\n");
+		ret = COMMON_PRODUCT_NOT_SUPPORT_FUCTION;
+	}
+	else 
+	{
 		dbus_error_init(&err);
 
 		if (!(dbus_message_get_args ( msg, &err,
@@ -1896,22 +1926,27 @@ DBusMessage * npd_dbus_mirror_config(DBusConnection *conn, DBusMessage *msg, voi
 									 DBUS_TYPE_INVALID))) 
 		{
 			syslog_ax_mirror_err("Unable to get input args ");
-			if (dbus_error_is_set(&err)) {
+			if (dbus_error_is_set(&err)) 
+			{
 				syslog_ax_mirror_err("%s raised: %s",err.name,err.message);
 				dbus_error_free(&err);
 			}
 			return NULL;
 		}	
-		if(MIRROR_RETURN_CODE_SUCCESS != profile_check(profile)){
+		if(MIRROR_RETURN_CODE_SUCCESS != profile_check(profile))
+		{
 	       syslog_ax_mirror_err("profile check error not supported value %d!\n",profile);
 		   ret = MIRROR_RETURN_CODE_NOT_SUPPORT_PROFILE;
 		}
-		else{
+		else
+		{
 			ret = MIRROR_RETURN_CODE_BAD_PARAM;
-			if(NULL != npd_mirror_get_profile_node(profile)){/*if the node has already exist*/
+			if(NULL != npd_mirror_get_profile_node(profile))
+			{/*if the node has already exist*/
 		       ret = MIRROR_RETURN_CODE_SUCCESS;
 			}
-		    else {/*else if not exist ,create first!*/
+		    else 
+			{/*else if not exist ,create first!*/
 				ret = npd_mirror_profile_create(profile);
 			}
 		}
@@ -1949,7 +1984,8 @@ DBusMessage * npd_dbus_mirror_create_dest_port(DBusConnection *conn, DBusMessage
 	ETHERADDR macAddr;
 	unsigned char *mac = NULL;
 
-	if(!((productinfo.capbmp) & FUNCTION_MIRROR_VLAUE)){
+	if(!((productinfo.capbmp) & FUNCTION_MIRROR_VLAUE))
+	{
 		npd_syslog_dbg("do not support mirror!\n");
 		ret = COMMON_PRODUCT_NOT_SUPPORT_FUCTION;
 	}
@@ -2319,48 +2355,62 @@ DBusMessage * npd_dbus_mirror_del_dest_port(DBusConnection *conn, DBusMessage *m
 		}
 	}
 
-	if(MIRROR_RETURN_CODE_SUCCESS == ret) {
-		if(0 != npd_get_devport_by_global_index(eth_g_index,&devNum,&virPortId)){
+	if(MIRROR_RETURN_CODE_SUCCESS == ret) 
+	{
+		if(0 != npd_get_devport_by_global_index(eth_g_index,&devNum,&virPortId))
+		{
 			ret = MIRROR_RETURN_CODE_ERROR;
 		}
-		if(NULL ==(destNode = npd_mirror_get_profile_node(profile))){/*check if the node exist*/
+		if(NULL ==(destNode = npd_mirror_get_profile_node(profile)))
+		{/*check if the node exist*/
             ret = MIRROR_RETURN_CODE_PROFILE_NOT_CREATED;
 	    }
-		else if(NPD_TRUE == npd_mirror_destination_node_member_check(profile,direct)){/*check if has members*/
+		else if(NPD_TRUE == npd_mirror_destination_node_member_check(profile,direct))
+		{/*check if has members*/
             ret = MIRROR_RETURN_CODE_DESTINATION_NODE_MEMBER_EXIST;
 		}
-		else{/*set to default value*/
-           if(MIRROR_INGRESS_E == direct){
-			  if(destNode->in_eth_index == eth_g_index){
+		else
+		{/*set to default value*/
+           if(MIRROR_INGRESS_E == direct)
+		   {
+			  if(destNode->in_eth_index == eth_g_index)
+			  {
                   destNode->in_eth_index = MIRROR_DEST_INPORT_DEFAULT;
 				  /*cancel the mirror port in hw*/
 				  nam_mirror_analyzer_port_set(profile,0,0,MIRROR_INGRESS_E);
 				  npd_mirror_nam_analyer_port_del_for_bcm(profile,direct,destNode->eg_eth_index);
 			  }
-			  else {
+			  else 
+			  {
                    ret = MIRROR_RETURN_CODE_BAD_PARAM;
 			  }
 			}
-			else if(MIRROR_EGRESS_E == direct){
-				if(destNode->eg_eth_index == eth_g_index){
+			else if(MIRROR_EGRESS_E == direct)
+			{
+				if(destNode->eg_eth_index == eth_g_index)
+				{
 				    destNode->eg_eth_index =  MIRROR_DEST_INPORT_DEFAULT;
 					/*cancel the mirror port in hw*/
 				    nam_mirror_analyzer_port_set(profile,0,0,MIRROR_EGRESS_E);
 				    npd_mirror_nam_analyer_port_del_for_bcm(profile,direct,destNode->in_eth_index);
 				}
-				else {
+				else 
+				{
                    ret = MIRROR_RETURN_CODE_BAD_PARAM;
 			    }
 			}
-			else if(MIRROR_BIDIRECTION_E == direct){
-				if((destNode->eg_eth_index == eth_g_index)&&(destNode->in_eth_index == eth_g_index)){
+			else if(MIRROR_BIDIRECTION_E == direct)
+			{
+				if((destNode->eg_eth_index == eth_g_index)&&(destNode->in_eth_index == eth_g_index))
+				{
 				    destNode->in_eth_index = MIRROR_DEST_INPORT_DEFAULT;
 				    destNode->eg_eth_index =  MIRROR_DEST_INPORT_DEFAULT;
 					/*cancel the mirror port in hw*/
 				    nam_mirror_analyzer_port_set(profile,0,0,MIRROR_BIDIRECTION_E);
 				    npd_mirror_nam_analyer_port_del_for_bcm(profile,direct,0);
 				}
-				else {
+				else 
+				{
                    ret = MIRROR_RETURN_CODE_BAD_PARAM;
 			    }
 			}
@@ -2771,8 +2821,10 @@ DBusMessage * npd_dbus_mirror_del_source_port(DBusConnection *conn, DBusMessage 
 	}	
 
 	ret = NPD_DBUS_ERROR_NO_SUCH_PORT;
-	if (CHASSIS_SLOTNO_ISLEGAL(slot)) {
-		if (ETH_LOCAL_PORTNO_ISLEGAL(slot,port)) {
+	if (CHASSIS_SLOTNO_ISLEGAL(slot)) 
+	{
+		if (ETH_LOCAL_PORTNO_ISLEGAL(slot,port)) 
+		{
 			src_eth_g_index = ETH_GLOBAL_INDEX_FROM_SLOT_PORT_LOCAL_NO(slot,port);
 			npd_get_devport_by_global_index(src_eth_g_index, &devNum, &portNum);
 			/*printf("index for %d/%d is %#0x\n",slot,port,src_eth_g_index);*/
