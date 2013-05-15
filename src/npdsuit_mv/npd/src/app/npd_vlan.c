@@ -72,7 +72,6 @@ extern "C"
 #include "sysdef/returncode.h"
 #include "npd_mld_snp_com.h"
 #include "cvm/autelan_product.h"
-#include <syslog.h>
 
 #include "board/netlink.h"   /* for netlink msg */
 netlink_msg_t n_vlan_msg;

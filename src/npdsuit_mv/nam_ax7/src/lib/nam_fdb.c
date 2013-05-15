@@ -3223,20 +3223,8 @@ int nam_static_fdb_entry_indirect_set_for_igmp
 	macEntryPtr.key.key.ipMcast.vlanId = vlanId;
 	memcpy(macEntryPtr.key.key.ipMcast.sip, anySip, 4);
 
-	#if 0	
-	#ifdef DRV_LIB_CPSS_3_4
-	macEntryPtr.key.key.ipMcast.dip[0] = dmip[0];
-	macEntryPtr.key.key.ipMcast.dip[1] = dmip[1];
-	macEntryPtr.key.key.ipMcast.dip[2] = dmip[2];
-	macEntryPtr.key.key.ipMcast.dip[3] = dmip[3];
-	#else
-	macEntryPtr.key.key.ipMcast.dip[0] = dmip[3];
-	macEntryPtr.key.key.ipMcast.dip[1] = dmip[2];
-	macEntryPtr.key.key.ipMcast.dip[2] = dmip[1];
-	macEntryPtr.key.key.ipMcast.dip[3] = dmip[0];
-	#endif
-	#endif
 
+	/* use the old sequence for IGMP, houxx@autelan.com 2013-02-22 */
 	macEntryPtr.key.key.ipMcast.dip[0] = dmip[3];
 	macEntryPtr.key.key.ipMcast.dip[1] = dmip[2];
 	macEntryPtr.key.key.ipMcast.dip[2] = dmip[1];
@@ -3373,36 +3361,16 @@ int nam_static_fdb_entry_indirect_delete_for_igmp
 	macEntryKeyPtr.key.ipMcast.vlanId = vid;
 	memcpy(macEntryKeyPtr.key.ipMcast.sip,anySip,4);
 	/*memcpy(macEntryKeyPtr.key.ipMcast.dip,dmip,4);*/
-#if 0
-	#ifdef DRV_LIB_CPSS_3_4
-	macEntryKeyPtr.key.ipMcast.dip[0] = dmip[0];
-	macEntryKeyPtr.key.ipMcast.dip[1] = dmip[1];
-	macEntryKeyPtr.key.ipMcast.dip[2] = dmip[2];
-	macEntryKeyPtr.key.ipMcast.dip[3] = dmip[3];
-	tmp_dmip[0] = dmip[0];
-	tmp_dmip[1] = dmip[1];	
-	tmp_dmip[2] = dmip[2];
-	tmp_dmip[3] = dmip[3];
-	#else
-	macEntryKeyPtr.key.ipMcast.dip[0] = dmip[3];
-	macEntryKeyPtr.key.ipMcast.dip[1] = dmip[2];
-	macEntryKeyPtr.key.ipMcast.dip[2] = dmip[1];
-	macEntryKeyPtr.key.ipMcast.dip[3] = dmip[0];
-	tmp_dmip[0] = dmip[3];
-	tmp_dmip[1] = dmip[2];	
-	tmp_dmip[2] = dmip[1];
-	tmp_dmip[3] = dmip[0];
-	#endif
-#endif
-	macEntryKeyPtr.key.ipMcast.dip[0] = dmip[3];
-	macEntryKeyPtr.key.ipMcast.dip[1] = dmip[2];
-	macEntryKeyPtr.key.ipMcast.dip[2] = dmip[1];
-	macEntryKeyPtr.key.ipMcast.dip[3] = dmip[0];
-	tmp_dmip[0] = dmip[3];
-	tmp_dmip[1] = dmip[2];	
-	tmp_dmip[2] = dmip[1];
-	tmp_dmip[3] = dmip[0];
 
+	/* use the old sequence for IGMP, houxx@autelan.com 2013-02-22 */
+	macEntryKeyPtr.key.ipMcast.dip[0] = dmip[3];
+	macEntryKeyPtr.key.ipMcast.dip[1] = dmip[2];
+	macEntryKeyPtr.key.ipMcast.dip[2] = dmip[1];
+	macEntryKeyPtr.key.ipMcast.dip[3] = dmip[0];
+	tmp_dmip[0] = dmip[3];
+	tmp_dmip[1] = dmip[2];	
+	tmp_dmip[2] = dmip[1];
+	tmp_dmip[3] = dmip[0];
 
 #endif
 	ret = cpssDxChBrgFdbHashCalc(devNum,&macEntryKeyPtr,&hash);

@@ -2766,9 +2766,9 @@ unsigned int nam_asic_group_mbr_bmp_v1
 					/*port26 lead to NO match error,so can NOT return.Or untagBmpTmp>port[0]&0x3ffffff.*/
 				}
 				 nam_syslog_dbg("NAM>>find group portmember: dev %d port %d on %d/%d",devNum,i,slotNo,localPortNo);
-#if 0
+				#if 0
 				tmpBmp[i/32] |= 1<<((slotNo-1)*8+localPortNo%32);
-#endif
+				#endif
 				tmpBmp[localPortNo/32] |= 1<<(localPortNo%32);
 
 			}

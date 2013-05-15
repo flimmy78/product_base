@@ -2364,27 +2364,32 @@ DBusMessage * npd_dbus_ethports_interface_get_port_rate
 	}
 	else
 	{
+		if(asic_board == NULL)
+		{			
+			ret =  ETHPORT_RETURN_CODE_UNSUPPORT;			
+			syslog_ax_board_err("ret  is %x\n",ret);
+			goto DONE;
+		}
 		eth_g_index = port_index - (asic_board->asic_port_start_no -1);			
 		ret = npd_get_devport_by_global_index(eth_g_index,&devNum,&portNum);
 		if(ret != 0)
 		{
+			ret =  ETHPORT_RETURN_CODE_UNSUPPORT;
 			syslog_ax_board_err("npd_get_devport_by_global_index  FAIL. \n");
-			return NULL;
+			goto DONE;
 		}
 		
 	}
 	
-	reply = dbus_message_new_method_return(msg);	
-	dbus_message_iter_init_append (reply, &iter);
-
     /* read mac mib */
 	
 	for(i = 0;i<2; i++) /*times +1*/
 	{
 		ret = nam_asic_get_port_mac_mib(devNum,portNum,&portMacMib); 
 		if(0 != ret){
+			ret =  ETHPORT_RETURN_CODE_UNSUPPORT;
 			syslog_ax_board_err("get dev %d port %d mib error.\n", devNum, portNum);
-			return NULL;
+			goto DONE;
 		}
 		
 		if(i == 0)
@@ -2397,12 +2402,16 @@ DBusMessage * npd_dbus_ethports_interface_get_port_rate
 	bitsumsent = portMacMib.goodOctetsRcv[27]*power + portMacMib.goodOctetsRcv[26];
 	packetsumsent = portMacMib.goodOctetsRcv[29]*power + portMacMib.goodOctetsRcv[28] + portMacMib.goodOctetsRcv[65]*power +portMacMib.goodOctetsRcv[64] + portMacMib.goodOctetsRcv[35]*power + portMacMib.goodOctetsRcv[34]+ portMacMib.goodOctetsRcv[33]*power + portMacMib.goodOctetsRcv[32];
 
-
+DONE:
+	reply = dbus_message_new_method_return(msg);	
+	dbus_message_iter_init_append (reply, &iter);
+	
 	dbus_message_iter_append_basic (&iter,DBUS_TYPE_UINT64,&bitsumrecv);
 	dbus_message_iter_append_basic (&iter,DBUS_TYPE_UINT64,&packetsumrecv);
 
 	dbus_message_iter_append_basic (&iter,DBUS_TYPE_UINT64,&bitsumsent);
 	dbus_message_iter_append_basic (&iter,DBUS_TYPE_UINT64,&packetsumsent);
+	dbus_message_iter_append_basic (&iter,DBUS_TYPE_UINT32,&ret);
 
 
 	return reply;
