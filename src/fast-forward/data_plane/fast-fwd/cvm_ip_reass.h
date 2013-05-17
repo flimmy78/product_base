@@ -111,7 +111,7 @@ typedef struct
 
 
 void cvm_ip_reass_hash_additem(cvmx_wqe_t	*work, uint32_t action_type,
-		cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th,rule_item_t *prule,uint8_t is_qos, uint8_t is_pppoe);
+		cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th, cvm_common_ip_hdr_t *true_ip, rule_item_t *prule);
 //void zctt_dispatch_hash_aging();
 void cvm_ip_reass_hash_finditem(cvmx_wqe_t * work, dispatch_info * dispatch_infor);
 void cvm_ip_reass_hash_removeitem(cvm_common_ip_hdr_t *ip);

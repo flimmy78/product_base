@@ -24,6 +24,9 @@
 #include "cvmx-coremask.h"
 #include "cvmx-bootmem.h"
 #include "cvmx-helper.h"
+#include "cvmx-malloc.h"
+#include "cvmx-atomic.h"
+#include "cvmx-rwlock.h"
 #ifdef SDK_VERSION_2_2
 #include "fastfwd-common-defs.h"
 #include "fastfwd-common-rnd.h"
@@ -37,12 +40,10 @@
 #endif
 #include "autelan_product_info.h"
 #include "capwap.h"	
-#include "cvmx-malloc.h"
-#include "cvmx-atomic.h"
 
 #include "shell.h"
 
-#include "cvmx-rwlock.h"
+
 
 
 #define ACL_TBL_RULE_NAME "acl_tbl_rule"
@@ -827,6 +828,26 @@ static inline rule_item_t* cvm_ip_hash_lookup (uint32_t ip)
 	cvmx_scratch_write64(CVM_SCR_ACL_CACHE_PTR, (uint64_t) (CAST64(bucket)));
 	return (bucket);
 }
+
+static inline rule_item_t * cvm_two_tupe_hash_lookup(uint32_t dip, uint32_t sip)
+{
+	rule_item_t *bucket;
+	uint64_t  result = 0;
+
+	CVMX_MT_CRC_POLYNOMIAL(0x1edc6f41);
+	CVMX_MT_CRC_IV(0);
+	CVMX_MT_CRC_WORD(dip);
+	CVMX_MT_CRC_WORD(sip);
+	CVMX_MF_CRC_IV(result);
+
+	result &= (acl_static_tbl_size - 1);
+
+	/*Save bucket address in the scratch memory.*/
+	bucket = &acl_bucket_tbl[result];	
+	cvmx_scratch_write64(CVM_SCR_ACL_CACHE_PTR, (uint64_t) (CAST64(bucket)));
+	return (bucket);
+}
+
 
 static inline rule_item_t* cvm_three_tupe_hash_lookup (uint32_t dip, uint32_t sip, uint8_t proto)
 {
@@ -2001,8 +2022,14 @@ int32_t user_action_offline(uint32_t user_ip);
 int32_t user_stats_clear(uint32_t user_ip);
 void user_flow_statistics_process(cvmx_wqe_t *work, rule_item_t *rule,cvm_common_ip_hdr_t *true_ip);
 
-void flow_action_process(cvmx_wqe_t *work, uint32_t action_type, cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th, rule_item_t *prule,uint8_t is_qos, cvmx_spinlock_t *first_lock, uint8_t is_pppoe);
+void flow_action_process(cvmx_wqe_t *work, uint32_t action_type, cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th, cvm_common_ip_hdr_t *true_ip, rule_item_t *prule, cvmx_spinlock_t *first_lock);
 
 int fastfwd_show_fau64(fau64_info_t *fau64_info);
+extern inline int32_t acl_fill_rule(rule_param_t* dst_rule_para, rule_param_t* src_rule_para, capwap_cache_t* cw_cache);
+extern inline int32_t fwd_get_user_idx(rule_param_t *rule_param);
+
+extern inline rule_item_t * cvm_two_tupe_hash_lookup(uint32_t dip, uint32_t sip);
+
+
 #endif
 

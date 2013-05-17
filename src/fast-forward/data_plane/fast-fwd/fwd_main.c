@@ -52,6 +52,8 @@
 #include "cvm_ratelimit.h"
 
 #include "fwd_debug.h"
+#include "fwd_pure_ip.h"
+
 
 
 //#define PASSTHOUGH_L2_PERFORMANCE_TEST
@@ -102,6 +104,8 @@ CVMX_SHARED int32_t (*fwd_equipment_test_fun)(cvmx_wqe_t*) = NULL; /*for equipme
 
 CVMX_SHARED uint64_t linux_sec = 0;
 CVMX_SHARED uint64_t fwd_sec = 0;
+
+CVMX_SHARED int pure_ip_forward_enable = FUNC_DISABLE;
 
 void clear_fau_64();
 
@@ -562,24 +566,21 @@ static inline int32_t capwap_with_wifi_qos(cvmx_wqe_t *work)
  * free: enable or disable hardware free the packet memory 
  * port: PIP port 
  */
-static inline int send_packet_pip_out(cvmx_wqe_t *work, rule_item_t *prule, uint8_t free, int lock_type)
+static inline int send_packet_pip_out(cvmx_wqe_t *work, uint64_t port, uint16_t pko_ip_offset, uint8_t free, int lock_type)
 {
 	cvmx_pko_command_word0_t pko_command;
 	cvmx_buf_ptr_t packet_ptr;
 	int queue = 0;
 	int ret = 0;
 	int tag = 0;
-	uint64_t port = 0;
-	int ip_offset = 0;
 	
-	if((work == NULL) || (prule == NULL))
+	if(work == NULL)
 	{
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_WARNING,
 				"send_packet_pip_out param is NULL!\n");
 		return RETURN_ERROR;    		
 	}		
 
-	port = prule->rules.forward_port;
 	if (OCTEON_IS_MODEL(OCTEON_CN68XX))
 	    queue = cvmx_pko_get_base_queue(port);
 	else
@@ -641,46 +642,10 @@ static inline int send_packet_pip_out(cvmx_wqe_t *work, rule_item_t *prule, uint
 	//add by yin for fwd nat  need add prule 
 	/*wangjian_nat*/
 	
-	if (prule) 
+	if(pko_ip_offset)
 	{
-	    if(prule->rules.nat_flag == 1)
-	    {
-	        ip_offset = 14;
-	        if(0 != prule->rules.out_ether_type)
-	            ip_offset += 4;
-	        if(0 != prule->rules.in_ether_type)
-	            ip_offset += 4;
-	        if(0 != prule->rules.dsa_info)
-	            ip_offset += 8;
-			
-            work->word2.s.ip_offset = ip_offset;
-			
-			if(0 != prule->rules.pppoe_flag)  
-				ip_offset += 8;
-            
-    		if (prule->rules.action_type == FLOW_ACTION_ETH_FORWARD) 
-    		{
-    			pko_command.s.ipoffp1 = ip_offset + 1;
-    		}
-    		else if (prule->rules.action_type == FLOW_ACTION_CAPWAP_FORWARD)
-    		{
-    			int qos = capwap_with_wifi_qos(work);
-                if(qos == 1){
-    			    pko_command.s.ipoffp1 = IP_H_LEN + UDP_H_LEN + CW_H_LEN + 
-    						IEEE80211_QOS_H_LEN + LLC_H_LEN + ip_offset + 1;
-    			}
-    			else{
-    			    pko_command.s.ipoffp1 = IP_H_LEN + UDP_H_LEN + CW_H_LEN + 
-    						IEEE80211_H_LEN + LLC_H_LEN + ip_offset + 1;
-    			}
-    		}
-    		else if (prule->rules.action_type == FLOW_ACTION_CAP802_3_FORWARD) 
-    		{
-    			pko_command.s.ipoffp1 = IP_H_LEN + UDP_H_LEN + CW_H_LEN + ETH_H_LEN + ip_offset + 1;
-    		}
-		}
+		pko_command.s.ipoffp1 = pko_ip_offset;
 	}
-
 	
 	ret = 	cvmx_pko_send_packet_finish(port, queue, pko_command, packet_ptr, lock_type);
 	
@@ -763,22 +728,21 @@ static inline void encap_pppoe(cvmx_wqe_t *work, rule_item_t *rule, uint8_t **pk
  * Encapsulate Eth type packet by ipfwd rule.
  * offset: the offset of the ip address from the begining of the packet
  */
-static inline void encap_eth_packet(cvmx_wqe_t *work, rule_item_t *rule, uint32_t offset)
+static inline void encap_eth_packet(cvmx_wqe_t *work, rule_item_t *rule, cvm_common_ip_hdr_t *ip)
 {
 	uint8_t *pkt_ptr = NULL;
-	cvm_common_ip_hdr_t *ip = NULL;
 	uint8_t vlan_flag = 0;
+	uint32_t offset = 0;
 
-	if((work == NULL) || (rule == NULL))
+	if((work == NULL) || (rule == NULL) || (ip == NULL))
 	{
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_WARNING,
 				"encap_eth_packet: work or rule is Null!\r\n");
 		return ;
-	}
+	}	
 
 	pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
-	ip = (cvm_common_ip_hdr_t *)(pkt_ptr + offset); 	
-
+	offset = (uint8_t *)ip - (uint8_t *)pkt_ptr;
 	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) - offset);
 
 
@@ -810,6 +774,8 @@ static inline void encap_eth_packet(cvmx_wqe_t *work, rule_item_t *rule, uint32_
 		cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH_PPPOE, 1);
 	}
 	/*add by wangjian for support pppoe 2013-3-12*/
+	
+	cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH, 1);
 	
 	/* [DMAC-6][SMAC-6][DSA-8][TAG1-4][TAG4][TYPE-2]*/    /*倒序赋值*/
 	/*add by wangjian for support pppoe 2013-3-12*/
@@ -880,7 +846,7 @@ static inline void encap_eth_packet(cvmx_wqe_t *work, rule_item_t *rule, uint32_
  * Encapsulate 802.11 capwap type packet by ipfwd rule.
  * offset: the offset of the rule(internal) ip address from the begining of the packet
  */
-static inline void encap_802_11_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, uint32_t offset)
+static inline void encap_802_11_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, cvm_common_ip_hdr_t *ip)
 {
 	uint8_t *pkt_ptr = NULL;
 	uint8_t *pkt_ptr_tmp = NULL;
@@ -889,12 +855,12 @@ static inline void encap_802_11_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, u
 	union capwap_hd *cw_hdr = NULL;
 	cvm_common_udp_hdr_t *ext_uh = NULL;
 	cvm_common_ip_hdr_t *ext_ip = NULL;
-	cvm_common_ip_hdr_t *ip = NULL;
 	uint32_t in_ip_totlen = 0, ieee80211_len = 0;
 	uint8_t vlan_flag = 0;
 	uint8_t is_qos = 0;
+	uint32_t offset = 0;
 
-	if((work == NULL) || (rule == NULL))
+	if((work == NULL) || (rule == NULL) || (ip == NULL))
 	{
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_WARNING,
 				"encap_cw_packet: work or rule is Null!\r\n");
@@ -904,9 +870,9 @@ static inline void encap_802_11_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, u
 	if ( cvm_qos_enable || (rule->rules.acl_tunnel_wifi_header_fc[0] & IEEE80211_FC0_QOS_MASK))
 		is_qos = 1;
 
-	pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);	
+	pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+	offset = (uint8_t *)ip - (uint8_t *)pkt_ptr;
 	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) - offset);
-	ip = (cvm_common_ip_hdr_t *)(pkt_ptr + offset); 	
 
 	/* add by yin for fwd nat *//*wangjian_nat*/
 	if (rule->rules.nat_flag == 1) 
@@ -949,6 +915,7 @@ static inline void encap_802_11_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, u
 	}
 	/*add by wangjian for support pppoe 2013-3-12*/
 
+	cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 1);
 	/* Encap LLC */	
 
 	/*add by wangjian for support pppoe 2013-3-14*/
@@ -1111,26 +1078,26 @@ static inline void encap_802_11_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, u
  * Encapsulate 802.3 capwap type packet by ipfwd rule.
  * offset: the offset of the rule(internal) ip address from the begining of the packet
  */
-static inline void encap_802_3_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, uint32_t offset)
+static inline void encap_802_3_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, cvm_common_ip_hdr_t *ip)
 {
 	uint8_t *pkt_ptr = NULL;
 	union capwap_hd *cw_hdr = NULL;
 	cvm_common_udp_hdr_t *ext_uh = NULL;
 	cvm_common_ip_hdr_t *ext_ip = NULL;
-	cvm_common_ip_hdr_t *ip = NULL;
 	uint32_t in_ip_totlen = 0;
 	uint8_t vlan_flag = 0;
+	uint32_t offset = 0;
 
-	if((work == NULL) || (rule == NULL))
+	if((work == NULL) || (rule == NULL) || (ip == NULL))
 	{
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_WARNING,
 				"encap_cw_packet: work or rule is Null!\r\n");
 		return ;
 	}
 
-	pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);			
+	pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+	offset = (uint8_t *)ip - (uint8_t *)pkt_ptr;
 	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) - offset);
-	ip = (cvm_common_ip_hdr_t *)(pkt_ptr + offset); 	
 
 	/* add by yin for fwd nat *//*wangjian_nat*/
 	if (rule->rules.nat_flag == 1) 
@@ -1170,6 +1137,7 @@ static inline void encap_802_3_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, ui
 		cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP_PPPOE, 1);
 	}
 	/*add by wangjian for support pppoe 2013-3-12*/
+	cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 1);
 
 	/* Encap internal MAC head */	
 	/*add by wangjian for support pppoe 2013-3-12*/
@@ -1418,17 +1386,16 @@ inline int8_t rx_l2hdr_decap( uint8_t* eth_head,cvm_common_ip_hdr_t **ip_head)
  *  -1: Failed
  *
  */
-static inline int8_t cw_802_11_decap(cvm_common_udp_hdr_t *ex_uh, 
+inline int8_t cw_802_11_decap(cvm_common_udp_hdr_t *ex_uh, 
 		cvm_common_ip_hdr_t **in_ip, 
-		cvm_common_tcp_hdr_t **in_th, 
-		uint8_t *is_qos,
-		uint8_t *is_pppoe)
+		cvm_common_tcp_hdr_t **in_th)
 {
 	struct ieee80211_frame *ieee80211_hdr = NULL;
 	struct ieee80211_llc *llc_hdr = NULL;
 	uint16_t len = 0;
-
-	if((ex_uh == NULL) || (in_ip == NULL) || (in_th == NULL) || (is_qos == NULL) || (is_pppoe == NULL))
+	uint8_t is_pppoe = 0;
+	
+	if((ex_uh == NULL) || (in_ip == NULL) || (in_th == NULL))
 	{
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_WARNING,
 				"cw_skb_decap: input pointer NULL\n");
@@ -1452,12 +1419,10 @@ static inline int8_t cw_802_11_decap(cvm_common_udp_hdr_t *ex_uh,
 	if (ieee80211_hdr->i_fc[0] & IEEE80211_FC0_QOS_MASK) 
 	{ 
 		len = IEEE80211_QOS_H_LEN;
-		*is_qos = 1;
 	} 
 	else
 	{ 
 		len = IEEE80211_H_LEN;
-		*is_qos = 0;
 	}
 
 	llc_hdr = (struct ieee80211_llc*)((uint8_t*)ieee80211_hdr + len);
@@ -1474,7 +1439,7 @@ static inline int8_t cw_802_11_decap(cvm_common_udp_hdr_t *ex_uh,
 		if (PPPOE_IP_TYPE == *(uint16_t *)((uint8_t *)llc_hdr + LLC_H_LEN + 6))
 		{
 			*in_ip = (cvm_common_ip_hdr_t*)((uint8_t*)llc_hdr + LLC_H_LEN + PPPOE_H_LEN);
-			*is_pppoe = 1;
+			is_pppoe = 1;
 		}
 		else
 		{
@@ -1503,7 +1468,7 @@ static inline int8_t cw_802_11_decap(cvm_common_udp_hdr_t *ex_uh,
 	}
 
 
-	if (1 == *is_pppoe)
+	if (1 == is_pppoe)
 	{
 		*in_th = (cvm_common_tcp_hdr_t*)((uint8_t*)llc_hdr + LLC_H_LEN + IP_H_LEN + PPPOE_H_LEN);
 	}
@@ -1559,14 +1524,14 @@ static inline int8_t cw_802_11_decap(cvm_common_udp_hdr_t *ex_uh,
  *  -1: Failed
  *
  */
-static inline int8_t cw_802_3_decap(cvm_common_udp_hdr_t *ex_uh, 
+inline int8_t cw_802_3_decap(cvm_common_udp_hdr_t *ex_uh, 
 		cvm_common_ip_hdr_t **in_ip, 
-		cvm_common_tcp_hdr_t **in_th,
-		uint8_t *is_pppoe)
+		cvm_common_tcp_hdr_t **in_th)
 {
     eth_hdr* eth_header = NULL;
+	uint8_t is_pppoe = 0;
 
-	if((NULL == ex_uh) || (NULL == in_ip) || (NULL == in_th) || (NULL == is_pppoe))
+	if((NULL == ex_uh) || (NULL == in_ip) || (NULL == in_th))
 	{
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_WARNING,
 				"Warning:cw_802_3_decap input pointer NULL\n");
@@ -1587,7 +1552,7 @@ static inline int8_t cw_802_3_decap(cvm_common_udp_hdr_t *ex_uh,
 		if (PPPOE_IP_TYPE == *(uint16_t *)((uint8_t *)ex_uh + UDP_H_LEN + CW_H_LEN + ETH_H_LEN + 6))	
 		{
 			*in_ip = (cvm_common_ip_hdr_t*)((uint8_t*)ex_uh + UDP_H_LEN + CW_H_LEN + ETH_H_LEN + PPPOE_H_LEN);
-			*is_pppoe = 1;
+			is_pppoe = 1;
 		}
 		else 
 		{
@@ -1615,7 +1580,7 @@ static inline int8_t cw_802_3_decap(cvm_common_udp_hdr_t *ex_uh,
     }
 
 
-	if (1 == *is_pppoe)
+	if (1 == is_pppoe)
 	{
 		*in_th = (cvm_common_tcp_hdr_t*)((uint8_t*)*in_ip + IP_H_LEN + PPPOE_H_LEN);
 	}
@@ -1656,8 +1621,11 @@ static inline int8_t cw_802_3_decap(cvm_common_udp_hdr_t *ex_uh,
 }
 
 
-int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, uint8_t is_qos, uint8_t is_pppoe)
+int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_hdr_t *true_ip)
 {
+	uint16_t pko_ip_offset = 0;
+	uint8_t *pkt_ptr = NULL;
+	
 	if((prule == NULL) || (work == NULL))
 	{
 		return RETURN_ERROR;
@@ -1670,13 +1638,18 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, uint8_t is_qos
 		{
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"flow_action_process: ETH ICMP ==> ETH ICMP.\n");
-			encap_eth_packet(work, prule,work->word2.s.ip_offset);
+
+			encap_eth_packet(work, prule, true_ip);
 			if(prule->rules.action_type == FLOW_ACTION_RPA_ICMP)
 			{
 				add_rpa_head(work, prule);
 			}
-			
-			if(send_packet_pip_out(work,prule,MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
+			if (1 == prule->rules.nat_flag)
+			{
+				pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+				pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
+			}
+			if(send_packet_pip_out(work, prule->rules.forward_port, pko_ip_offset, MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
 			{
 				cvmx_fau_atomic_add64(CVM_FAU_PKO_ERRORS, 1);
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
@@ -1685,28 +1658,22 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, uint8_t is_qos
 			return RETURN_OK;
 		}
 		else if(CVM_WQE_GET_UNUSED(work) == PACKET_TYPE_CAPWAP_802_11)
-		{
-			uint32_t offset = 0;
-			offset =  IP_H_LEN + UDP_H_LEN + CW_H_LEN + 
-				IEEE80211_H_LEN + LLC_H_LEN + work->word2.s.ip_offset;
-			if (is_qos)
-				offset += IEEE80211_QOS_DIFF_LEN;
-
-			/*add by wangjian for support pppoe 2013-4-9 be careful with offset*/
-			if (is_pppoe)
-			{
-				offset += PPPOE_H_LEN;
-			}
-			/*add by wangjian for support pppoe 2013-4-9 be careful with offset*/
-			
+		{	
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"flow_action_process: CAPWAP 802.11 ICMP ==> ETH ICMP.\n");
-			encap_eth_packet(work, prule, offset);
+			
+			encap_eth_packet(work, prule, true_ip);
 			if(prule->rules.action_type == FLOW_ACTION_RPA_ICMP)
 			{
 				add_rpa_head(work, prule);
 			}
-			if(send_packet_pip_out(work,prule,MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
+			
+			if (1 == prule->rules.nat_flag)
+			{
+				pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+				pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
+			}
+			if(send_packet_pip_out(work, prule->rules.forward_port, pko_ip_offset, MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
 			{
 				cvmx_fau_atomic_add64(CVM_FAU_PKO_ERRORS, 1);
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
@@ -1716,24 +1683,21 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, uint8_t is_qos
 		}
 		else if(CVM_WQE_GET_UNUSED(work) == PACKET_TYPE_CAPWAP_802_3)
 		{
-			uint32_t offset = 0;
-			offset =  IP_H_LEN + UDP_H_LEN + CW_H_LEN + ETH_H_LEN - work->word2.s.ip_offset;
-
-			/*add by wangjian for support pppoe 2013-4-9 be careful with offset*/
-			if (is_pppoe)
-			{
-				offset += PPPOE_H_LEN;
-			}
-			/*add by wangjian for support pppoe 2013-4-9 be careful with offset*/
-
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"flow_action_process:CAPWAP 802.3 ICMP ==> ETH ICMP.\n");
-			encap_eth_packet(work, prule,offset);
+
+			encap_eth_packet(work, prule, true_ip);
 			if(prule->rules.action_type == FLOW_ACTION_RPA_ICMP)
 			{
 				add_rpa_head(work, prule);
 			}
-			if(send_packet_pip_out(work,prule,MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
+			
+			if (1 == prule->rules.nat_flag)
+			{
+				pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+				pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
+			}
+			if(send_packet_pip_out(work, prule->rules.forward_port, pko_ip_offset, MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
 			{
 				cvmx_fau_atomic_add64(CVM_FAU_PKO_ERRORS, 1);
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
@@ -1748,12 +1712,19 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, uint8_t is_qos
 		{
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"flow_action_process: ETH ICMP ==> CAPWAP 802.11 ICMP .\n");
-			encap_802_11_cw_packet(work, prule,work->word2.s.ip_offset);
+
+			encap_802_11_cw_packet(work, prule, true_ip);
 			if(prule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_802_11_ICMP)
 			{
 				add_rpa_head(work, prule);
 			}
-			if(send_packet_pip_out(work,prule,MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
+		
+			if (1 == prule->rules.nat_flag)
+			{
+				pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+				pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
+			}
+			if(send_packet_pip_out(work, prule->rules.forward_port, pko_ip_offset, MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
 			{
 				cvmx_fau_atomic_add64(CVM_FAU_PKO_ERRORS, 1);
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
@@ -1763,27 +1734,21 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, uint8_t is_qos
 		}
 		else if(CVM_WQE_GET_UNUSED(work) == PACKET_TYPE_CAPWAP_802_11)
 		{
-			uint32_t offset = 0;
-			offset =  IP_H_LEN + UDP_H_LEN + CW_H_LEN + 
-				IEEE80211_H_LEN + LLC_H_LEN + work->word2.s.ip_offset;
-			if (is_qos)
-				offset += IEEE80211_QOS_DIFF_LEN;
-
-			/*add by wangjian for support pppoe 2013-4-9 be careful with offset*/
-			if (is_pppoe)
-			{
-				offset += PPPOE_H_LEN;
-			}
-			/*add by wangjian for support pppoe 2013-4-9 be careful with offset*/
-
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"flow_action_process: CAPWAP 802.11 ICMP ==> CAPWAP 802.11 ICMP.\n");
-			encap_802_11_cw_packet(work, prule, offset);
+
+			encap_802_11_cw_packet(work, prule, true_ip);
 			if(prule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_802_11_ICMP)
 			{
 				add_rpa_head(work, prule);
 			}
-			if(send_packet_pip_out(work,prule,MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
+
+			if (1 == prule->rules.nat_flag)
+			{
+				pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+				pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
+			}
+			if(send_packet_pip_out(work, prule->rules.forward_port, pko_ip_offset, MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
 			{
 				cvmx_fau_atomic_add64(CVM_FAU_PKO_ERRORS, 1);
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
@@ -1798,12 +1763,19 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, uint8_t is_qos
 		{
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"flow_action_process: ETH ICMP ==> CAPWAP 802.3 ICMP .\n");
-			encap_802_3_cw_packet(work, prule,work->word2.s.ip_offset);
+
+			encap_802_3_cw_packet(work, prule, true_ip);
 			if(prule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_802_3_ICMP)
 			{
 				add_rpa_head(work, prule);
 			}
-			if(send_packet_pip_out(work,prule,MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
+			
+			if (1 == prule->rules.nat_flag)
+			{
+				pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+				pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
+			}
+			if(send_packet_pip_out(work, prule->rules.forward_port, pko_ip_offset, MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
 			{
 				cvmx_fau_atomic_add64(CVM_FAU_PKO_ERRORS, 1);
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
@@ -1813,24 +1785,21 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, uint8_t is_qos
 		}
 		else if(CVM_WQE_GET_UNUSED(work) == PACKET_TYPE_CAPWAP_802_3)
 		{
-			uint32_t offset = 0;
-			offset =  IP_H_LEN + UDP_H_LEN + CW_H_LEN + ETH_H_LEN - work->word2.s.ip_offset;
-
-			/*add by wangjian for support pppoe 2013-4-9 be careful with offset*/
-			if (is_pppoe)
-			{
-				offset += PPPOE_H_LEN;
-			}
-			/*add by wangjian for support pppoe 2013-4-9 be careful with offset*/
-
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"flow_action_process: CAPWAP 802.3 ICMP ==> CAPWAP 802.3 ICMP.\n");
-			encap_802_3_cw_packet(work, prule,offset);
+
+			encap_802_3_cw_packet(work, prule, true_ip);
 			if(prule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_802_3_ICMP)
 			{
 				add_rpa_head(work, prule);
 			}
-			if(send_packet_pip_out(work,prule,MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
+			
+			if (1 == prule->rules.nat_flag)
+			{
+				pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+				pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
+			}
+			if(send_packet_pip_out(work, prule->rules.forward_port, pko_ip_offset, MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
 			{
 				cvmx_fau_atomic_add64(CVM_FAU_PKO_ERRORS, 1);
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
@@ -1942,19 +1911,10 @@ int32_t fwd_register_virtual_port(uint32_t vp_type)
 
 
 /* add by sunjianchao */ 
-static inline void send_wait_packet_link(extend_link_t *wait_link, rule_item_t *prule, int cnt_type)
+static inline void send_wait_packet_link(extend_link_t *wait_link, uint64_t port, uint16_t pko_ip_offset, int cnt_type)
 {	
 	work_node_t *cur = NULL, *per = NULL;
-
 	int  lock_type;
-
-
-	if(prule == NULL)
-	{
-		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_WARNING,
-				"send_wait_packet_link param is NULL!\n");
-		return;    		
-	}	
 
 	for(cur = wait_link->head_link; cur; per = cur, cur = cur->next)
 	{
@@ -1968,7 +1928,7 @@ static inline void send_wait_packet_link(extend_link_t *wait_link, rule_item_t *
 			lock_type = CVMX_PKO_LOCK_NONE;
 		}
 
-		if(send_packet_pip_out(cur->work, prule,MEM_AUTO_FREE, lock_type) == RETURN_ERROR)
+		if(send_packet_pip_out(cur->work, port, pko_ip_offset, MEM_AUTO_FREE, lock_type) == RETURN_ERROR)
 		{		
 
 			cvmx_fau_atomic_add64(CVM_FAU_PKO_ERRORS, 1);
@@ -2004,7 +1964,7 @@ static inline void send_wait_packet_link(extend_link_t *wait_link, rule_item_t *
    发送报文，包括处理缓存链表里的延迟发送的报文
  */
 static inline void foward_action_process(cvmx_wqe_t *work, uint32_t action_type,
-		cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th,rule_item_t *prule)
+		cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th, uint16_t port, uint16_t pko_ip_offset, rule_item_t *prule)
 {
 	extend_link_t *wait_link = NULL;
 	cvmx_spinlock_t   *wait_lock = NULL;
@@ -2013,7 +1973,7 @@ static inline void foward_action_process(cvmx_wqe_t *work, uint32_t action_type,
 	if(flow_sequence_enable == FUNC_DISABLE)
 	{
 		/*发送当前work 的报文*/
-		if(send_packet_pip_out(work,prule,MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
+		if(send_packet_pip_out(work, port, pko_ip_offset, MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
 		{
 			cvmx_fau_atomic_add64(CVM_FAU_PKO_ERRORS, 1);
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
@@ -2103,7 +2063,7 @@ static inline void foward_action_process(cvmx_wqe_t *work, uint32_t action_type,
 			/*当等待报文到达一定值，把链表报文发送*/
 			if(wait_linux_buffer_count == wait_link->link_node_num)
 			{                               
-				send_wait_packet_link(wait_link, prule, action_type);
+				send_wait_packet_link(wait_link, port, pko_ip_offset, action_type);
 
 				if(prule->rules.extend_index)
 				{
@@ -2129,7 +2089,7 @@ static inline void foward_action_process(cvmx_wqe_t *work, uint32_t action_type,
 		if(prule->rules.extend_index)
 		{                   
 			wait_link = prule->rules.extend_index;                   
-			send_wait_packet_link(wait_link, prule, action_type);
+			send_wait_packet_link(wait_link, port, pko_ip_offset, action_type);
 
 			if(prule->rules.extend_index)
 			{
@@ -2140,7 +2100,7 @@ static inline void foward_action_process(cvmx_wqe_t *work, uint32_t action_type,
 			cvmx_spinlock_unlock(wait_lock);
 
 			/*发送当前work 的报文*/
-			if(send_packet_pip_out(work,prule,MEM_AUTO_FREE, CVMX_PKO_LOCK_NONE) == RETURN_ERROR)
+			if(send_packet_pip_out(work, port, pko_ip_offset, MEM_AUTO_FREE, CVMX_PKO_LOCK_NONE) == RETURN_ERROR)
 			{
 				cvmx_fau_atomic_add64(CVM_FAU_PKO_ERRORS, 1);
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
@@ -2163,7 +2123,7 @@ static inline void foward_action_process(cvmx_wqe_t *work, uint32_t action_type,
 		{
 			cvmx_spinlock_unlock(wait_lock);
 			/*发送当前work 报文*/
-			if(send_packet_pip_out(work,prule,MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
+			if(send_packet_pip_out(work, port, pko_ip_offset, MEM_AUTO_FREE, CVMX_PKO_LOCK_ATOMIC_TAG) == RETURN_ERROR)
 			{
 				cvmx_fau_atomic_add64(CVM_FAU_PKO_ERRORS, 1);
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
@@ -2192,7 +2152,7 @@ failed_handle_packet:
 
 	if(prule->rules.extend_index)
 	{
-		send_wait_packet_link(wait_link, prule, action_type);
+		send_wait_packet_link(wait_link, port, pko_ip_offset, action_type);
 		lock_type = CVMX_PKO_LOCK_NONE;
 	}
 
@@ -2205,7 +2165,7 @@ failed_handle_packet:
 	cvmx_spinlock_unlock(wait_lock);
 
 	/*发送当前work 的报文*/
-	if(send_packet_pip_out(work,prule,MEM_AUTO_FREE, lock_type) == RETURN_ERROR)
+	if(send_packet_pip_out(work, port, pko_ip_offset, MEM_AUTO_FREE, lock_type) == RETURN_ERROR)
 	{
 		cvmx_fau_atomic_add64(CVM_FAU_PKO_ERRORS, 1);
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
@@ -2213,7 +2173,6 @@ failed_handle_packet:
 	}
 
 	return;
-
 }
 
 
@@ -2222,14 +2181,17 @@ failed_handle_packet:
  *  lutao add
  */
 void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
-            cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th,rule_item_t *prule,uint8_t is_qos, cvmx_spinlock_t *first_lock, uint8_t is_pppoe)
+            cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th, cvm_common_ip_hdr_t *true_ip, rule_item_t *prule, cvmx_spinlock_t *first_lock)
 {
 	cvm_common_udp_hdr_t *uh = NULL;
+	uint16_t pko_ip_offset = 0;
+	uint8_t *pkt_ptr = NULL;
+	
 	if(work == NULL)
 	{
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_WARNING,
 				"flow_action_process: work has Null pointer!\r\n");
-		return ;
+		return;
 	}
 
 	if(prule == NULL) /*Get action info from action_type*/
@@ -2269,7 +2231,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 			//printf("flow_action_process: Saving fragment packet .....\r\n");
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"flow_action_process: Saving fragment packet .....\r\n"); 
-			cvm_ip_reass_hash_additem(work, action_type, ip, th, prule, is_qos, is_pppoe);
+			cvm_ip_reass_hash_additem(work, action_type, ip, th, true_ip, prule);
 			return ;
 		} // add by yin	
 #endif		
@@ -2335,8 +2297,8 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 			/*add by sunjc@autelan.com*/
 			prule->rules.packet_wait++;
 			CVMX_SYNC;
-
-			if(CVM_COMMON_IPPROTO_UDP == ip->ip_p )
+		
+			if(CVM_COMMON_IPPROTO_UDP == ip->ip_p)
 			{
 				uh = (cvm_common_udp_hdr_t *)th;
 				if((uh->uh_dport == PORTAL_PORT) || (uh->uh_sport == PORTAL_PORT) ||\
@@ -2346,6 +2308,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 					CVM_WQE_SET_QOS(work,0);
 				}
 			}
+			
 			cvmx_fau_atomic_add64(CVM_FAU_ENET_TO_LINUX_PACKETS, 1);    
 			cvmx_fau_atomic_add64(CVM_FAU_ENET_TO_LINUX_BYTES, CVM_WQE_GET_LEN(work)); 
 			fwd_virtual_port.ops.vp_pkt_to_control(work);
@@ -2362,41 +2325,37 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 						"flow_action_process: Eth ==> Eth.\n");
 
-				encap_eth_packet(work, prule,work->word2.s.ip_offset);
+				encap_eth_packet(work, prule, true_ip);
+				
 				if(prule->rules.action_type == FLOW_ACTION_RPA_ETH_FORWARD)
 				{
 					add_rpa_head(work,prule);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_RPA, 1);
 				}
-
-				foward_action_process(work, prule->rules.action_type,ip, th, prule);
+				
+				if (1 == prule->rules.nat_flag)
+				{
+					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
+				}
+				foward_action_process(work, prule->rules.action_type, ip, th, prule->rules.forward_port, pko_ip_offset, prule);
 				return;
 			}
 			else if (CVM_WQE_GET_UNUSED(work) == PACKET_TYPE_CAPWAP_802_11) /* CAPWAP 802.11 ==> ETH */
 			{           
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 						"flow_action_process: now in CAPWAP 802.11 ==> ETH.\n");
-
-				uint32_t offset = 0;
-
-				offset =  IP_H_LEN + UDP_H_LEN + CW_H_LEN + 
-					IEEE80211_H_LEN + LLC_H_LEN + work->word2.s.ip_offset;
-				if (is_qos)
-					offset += IEEE80211_QOS_DIFF_LEN;
-
-				/*add by wangjian for support pppoe 2013-3-14 be careful with offset*/
-				if (is_pppoe)
-				{
-					offset += PPPOE_H_LEN;
-				}
-				/*add by wangjian for support pppoe 2013-3-14 be careful with offset*/
-
-				encap_eth_packet(work, prule, offset);
+				encap_eth_packet(work, prule, true_ip);
 				if(prule->rules.action_type == FLOW_ACTION_RPA_ETH_FORWARD)
 				{
 					add_rpa_head(work,prule);
 				}
-
-				foward_action_process(work, prule->rules.action_type,ip, th, prule);
+				if (1 == prule->rules.nat_flag)
+				{
+					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
+				}
+				foward_action_process(work, prule->rules.action_type, ip, th, prule->rules.forward_port, pko_ip_offset, prule);
 				return;          
 
 			}
@@ -2404,23 +2363,17 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 						"flow_action_process: now in CAPWAP 802.3 ==> ETH.\n");
-				uint32_t offset = 0;
-				offset =  IP_H_LEN + UDP_H_LEN + CW_H_LEN + ETH_H_LEN + work->word2.s.ip_offset;
-
-				/*add by wangjian for support pppoe 2013-3-14 be careful with offset*/
-				if (is_pppoe)
-				{
-					offset += PPPOE_H_LEN;
-				}
-				/*add by wangjian for support pppoe 2013-3-14 be careful with offset*/
-
-				encap_eth_packet(work, prule,offset);
+				encap_eth_packet(work, prule,true_ip);
 				if(prule->rules.action_type == FLOW_ACTION_RPA_ETH_FORWARD)
 				{
 					add_rpa_head(work,prule);
 				}
-
-				foward_action_process(work, prule->rules.action_type,ip, th, prule);
+				if (1 == prule->rules.nat_flag)
+				{
+					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
+				}
+				foward_action_process(work, prule->rules.action_type, ip, th, prule->rules.forward_port, pko_ip_offset, prule);
 				return;     
 			}       
 			else
@@ -2445,43 +2398,35 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 						"flow_action_process: Eth ==> CAPWAP 802.11.\n");
-
-				encap_802_11_cw_packet(work, prule,work->word2.s.ip_offset);               
+				
+				encap_802_11_cw_packet(work, prule, true_ip);           
 				if(prule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_FORWARD)
 				{	
 					add_rpa_head(work,prule);
 				}
-
-				foward_action_process(work, prule->rules.action_type,ip, th, prule);
+				if (1 == prule->rules.nat_flag)
+				{
+					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
+				}
+				foward_action_process(work, prule->rules.action_type, ip, th, prule->rules.forward_port, pko_ip_offset, prule);
 				return;  
 			}
 			else if (CVM_WQE_GET_UNUSED(work) == PACKET_TYPE_CAPWAP_802_11) /* CAPWAP 802.11 ==> CAPWAP 802.11*/
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 						"flow_action_process: CAPWAP 802.11 ==> CAPWAP 802.11.\n");
-
-				uint32_t offset = 0;
-
-				offset =  IP_H_LEN + UDP_H_LEN + CW_H_LEN + 
-					IEEE80211_H_LEN + LLC_H_LEN + work->word2.s.ip_offset;
-
-				if (is_qos)
-					offset += IEEE80211_QOS_DIFF_LEN;
-
-				/*add by wangjian for support pppoe 2013-3-14 be careful with offset*/
-				if (is_pppoe)
-				{
-					offset += PPPOE_H_LEN;
-				}
-				/*add by wangjian for support pppoe 2013-3-14 be careful with offset*/
-				
-				encap_802_11_cw_packet(work, prule, offset);
+				encap_802_11_cw_packet(work, prule, true_ip);
 				if(prule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_FORWARD)
 				{	
 					add_rpa_head(work,prule);
 				}
-
-				foward_action_process(work, prule->rules.action_type,ip, th, prule);
+				if (1 == prule->rules.nat_flag)
+				{
+					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
+				}
+				foward_action_process(work, prule->rules.action_type, ip, th, prule->rules.forward_port, pko_ip_offset, prule);
 				return;  
 			}
 		}
@@ -2496,38 +2441,35 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 						"flow_action_process: eth 802.3 ==> CAPWAP 802.3.\n");
 
-				encap_802_3_cw_packet(work, prule,work->word2.s.ip_offset);
+				encap_802_3_cw_packet(work, prule, true_ip);
 
 				if(prule->rules.action_type == FLOW_ACTION_RPA_CAP802_3_FORWARD)
 				{
 					add_rpa_head(work,prule);
 				}
-				foward_action_process(work, prule->rules.action_type,ip, th, prule);
+				if (1 == prule->rules.nat_flag)
+				{
+					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
+				}
+				foward_action_process(work, prule->rules.action_type, ip, th, prule->rules.forward_port, pko_ip_offset, prule);
 				return;  
 			}
 			else if(CVM_WQE_GET_UNUSED(work) ==  PACKET_TYPE_CAPWAP_802_3) /* CAPWAP 802.3 ==> CAPWAP 802.3*/
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 						"flow_action_process: capwap 802.3 ==> CAPWAP 802.3.\n");
-
-				uint32_t offset = 0;
-
-				offset =  work->word2.s.ip_offset + IP_H_LEN + UDP_H_LEN + CW_H_LEN + ETH_H_LEN;
-
-				/*add by wangjian for support pppoe 2013-3-14 be careful with offset*/
-				if (is_pppoe)
-				{
-					offset += PPPOE_H_LEN;
-				}
-				/*add by wangjian for support pppoe 2013-3-14 be careful with offset*/
-
-				encap_802_3_cw_packet(work, prule, offset);
+				encap_802_3_cw_packet(work, prule, true_ip);
 				if(prule->rules.action_type == FLOW_ACTION_RPA_CAP802_3_FORWARD)
 				{
 					add_rpa_head(work,prule);
 				}
-
-				foward_action_process(work, prule->rules.action_type,ip, th, prule);
+				if (1 == prule->rules.nat_flag)
+				{
+					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
+				}
+				foward_action_process(work, prule->rules.action_type, ip, th, prule->rules.forward_port, pko_ip_offset, prule);
 				return;  
 			}
 		}       
@@ -2538,7 +2480,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 				(prule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_802_11_ICMP) ||
 				(prule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_802_3_ICMP))
 		{
-			flow_icmp_fast_path(prule, work, is_qos, is_pppoe);
+			flow_icmp_fast_path(prule, work, true_ip);
 			return;
 		}
 		else
@@ -2638,7 +2580,19 @@ static inline int acl_cache_flow(cvmx_wqe_t* work, control_cmd_t * fccp_cmd)
 		/* self learning */
 		if(rule_para->rule_state == RULE_IS_LEARNED)
 		{
-			if(acl_self_learn_rule(rule_para, cw_cache) != RETURN_OK)
+			/* add by wangjian for pure ip forward 2013-5-7  */
+			if (FUNC_ENABLE == pure_ip_forward_enable)
+			{
+				/*hash ,compare need change,fwd_pure_ip.c add*/
+				if(acl_self_learn_pure_ip_rule(rule_para, cw_cache) != RETURN_OK)
+				{
+					/* self-learn not send fccp back */
+					cvmx_helper_free_packet_data(work); /*free data*/				 
+					cvmx_fpa_free(work, CVMX_FPA_WQE_POOL, 0); /*free wqe*/
+					return RETURN_ERROR;
+				}
+			}
+			else if(acl_self_learn_rule(rule_para, cw_cache) != RETURN_OK)
 			{
 				/* self-learn not send fccp back */
 				cvmx_helper_free_packet_data(work); /*free data*/                
@@ -2999,6 +2953,29 @@ static inline int acl_cache_flow(cvmx_wqe_t* work, control_cmd_t * fccp_cmd)
     	}
     	return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
 	}
+	/* pure ip forward enable/disable */
+	/* add by wangjian for pure ip forward 2013-5-7  */
+	else if(fccp_cmd->cmd_opcode == FCCP_CMD_ENABLE_PURE_IP)
+	{
+		if((fccp_cmd->fccp_data.module_enable != FUNC_ENABLE) && 
+				(fccp_cmd->fccp_data.module_enable != FUNC_DISABLE))
+		{
+			printf("acl_cache_flow : set pure ip enable/disable error, module = %d\n", fccp_cmd->fccp_data.module_enable);
+			return_fccp(work, FCCP_RETURN_ERROR, fccp_cmd, product_info.to_linux_fccp_group);
+			return RETURN_ERROR;
+		}
+		disable_fastfwd();
+		pure_ip_forward_enable = fccp_cmd->fccp_data.module_enable;
+		acl_clear_rule();
+		enable_fastfwd();
+		return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
+	}
+	/* show pure ip state */
+	else if(fccp_cmd->cmd_opcode == FCCP_CMD_GET_PURE_IP_STATE)
+	{
+		fccp_cmd->fccp_data.module_enable = pure_ip_forward_enable;
+		return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
+	}
 	else
 	{
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
@@ -3256,9 +3233,6 @@ static void application_main_loop(unsigned int coremask_data)
 
 	while (1)
 	{
-		uint8_t is_qos = 0;
-		uint8_t is_pppoe = 0;
-
 		if(cvmx_coremask_first_core(coremask_data)) 
 		{
 			if((loop_tag != 1) && (set_tag_flag != 1))
@@ -3472,7 +3446,7 @@ static void application_main_loop(unsigned int coremask_data)
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"Get the packet IP header, start =0x%p, ip =0x%p, offset =%d\r\n",pkt_ptr,ip,work->word2.s.ip_offset);
 		}
-		
+
 		if(cvmx_unlikely(CVM_WQE_GET_LEN(work) < (int)(sizeof( cvm_common_ip_hdr_t)))) {
 			cvmx_fau_atomic_add64(CVM_FAU_IP_SHORT_PACKETS, 1);
 			action_type = FLOW_ACTION_DROP;			
@@ -3522,6 +3496,23 @@ static void application_main_loop(unsigned int coremask_data)
 
         /* set true_ip = ip first. when capwap pkt,change it */
         true_ip = ip;
+		
+		/* add by wangjian for pure ip forward 2013-5-7 */
+		th = (cvm_common_tcp_hdr_t *)((uint32_t *)ip + ip->ip_hl);
+		if (FUNC_ENABLE == pure_ip_forward_enable)
+		{
+			/* get true_ip consider capwap  CVM_WQE_SET_UNUSED to work  ,fwd_pure_ip.c add */
+			if ((action_type = pure_ip_get(&true_ip, &true_th, work)) <= FLOW_ACTION_TOLINUX)
+			{
+				goto scheme_execute;
+			}
+			else
+			{
+				action_type = 0;
+				goto table_lookup;
+			}
+		}
+		
 
 		/**************************************************
 		 * Parse the icmp packets. zhaohan add
@@ -3615,7 +3606,7 @@ static void application_main_loop(unsigned int coremask_data)
 		 ***********************************************************************/
 		if(CVM_WQE_GET_UNUSED(work) == PACKET_TYPE_CAPWAP_802_11)
 		{
-			if (cw_802_11_decap(uh, &in_ip, &in_th, &is_qos, &is_pppoe) != 0) 
+			if (cw_802_11_decap(uh, &in_ip, &in_th) != 0) 
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
 						"Warning]: recv capwap packet, decap capwap failed\n");
@@ -3627,7 +3618,7 @@ static void application_main_loop(unsigned int coremask_data)
 		}
 		else if(CVM_WQE_GET_UNUSED(work) == PACKET_TYPE_CAPWAP_802_3)
 		{
-			if (cw_802_3_decap(uh, &in_ip, &in_th,&is_pppoe) != 0) 
+			if (cw_802_3_decap(uh, &in_ip, &in_th) != 0) 
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
 						"Warning]: recv capwap 802.3 packet, decap capwap failed\n");
@@ -3637,11 +3628,26 @@ static void application_main_loop(unsigned int coremask_data)
 			true_ip = in_ip;	
 			true_th = in_th;
 		}
+		
 
+table_lookup:
 		/***********************************************************************
 		 * packet parse end, based on the result, handle the flow lookup, etc. lutao add
 		 ***********************************************************************/
-		if(true_ip->ip_p == CVM_COMMON_IPPROTO_ICMP)
+		if (FUNC_ENABLE == pure_ip_forward_enable)  /* add by wangjian for pure ip forward 2013-5-7 */
+		{
+			/*fwd_pure_ip.c add */
+			rule = acl_table_pure_ip_lookup(true_ip, &first_lock);
+			if(rule == NULL)
+			{
+				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
+						"Flow table lookup failed.\r\n");
+				cvmx_fau_atomic_add64(CVM_FAU_FLOW_LOOKUP_ERROR, 1);
+				action_type = FLOW_ACTION_TOLINUX;			
+				goto scheme_execute; 					
+			}
+		}
+		else if(true_ip->ip_p == CVM_COMMON_IPPROTO_ICMP)
 		{
 			rule = acl_table_icmp_lookup(true_ip);
 			if(rule == NULL)
@@ -3687,7 +3693,7 @@ scheme_execute:
         /* filter large pkts.(maybe over mtu) */
 		fwd_filter_large_pkts(rule, work);
 
-		flow_action_process(work,action_type,ip,th,rule,is_qos,first_lock,is_pppoe);
+		flow_action_process(work,action_type,ip,th,true_ip,rule,first_lock);
 		action_type = 0;
 		ip = NULL;
 		th = NULL;

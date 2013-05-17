@@ -191,7 +191,7 @@ void cvm_ip_reass_hash_removeitem(cvm_common_ip_hdr_t *ip)
  * param		dispatch_infor 需添加的数据包的分流模式
 */
 void cvm_ip_reass_hash_additem(cvmx_wqe_t	*work, uint32_t action_type,
-		cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th,rule_item_t *prule,uint8_t is_qos,uint8_t is_pppoe)
+		cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th, cvm_common_ip_hdr_t *true_ip, rule_item_t *prule)
 {
     uint8_t timestamp = 0, uTimeDistance = 0, uMaxTimeDistance = 0;
 	int i = 0, maxStampIndex = 0;
@@ -263,7 +263,7 @@ void cvm_ip_reass_hash_additem(cvmx_wqe_t	*work, uint32_t action_type,
 				}
 				
 				//printf("cvm_ip_reass_hash_additem: STORE at inode[%d] rule %x\n", i, rule->rules.rule_state);
-				flow_action_process(inode[i].work, action_type, ip, th, rule, is_qos, first_lock, is_pppoe);
+				flow_action_process(inode[i].work, action_type, ip, th,true_ip, rule, first_lock);
 			//}
 			break;
 		}
@@ -297,7 +297,7 @@ void cvm_ip_reass_hash_additem(cvmx_wqe_t	*work, uint32_t action_type,
 			}
 			
 			//printf( "cvm_ip_reass_hash_additem: No inode out-of-time! Index %d stay longest!\n", i);
-			flow_action_process(inode[maxStampIndex].work, action_type, ip, th, rule, is_qos, first_lock, is_pppoe);
+			flow_action_process(inode[maxStampIndex].work, action_type, ip, th, true_ip, rule, first_lock);
 		//}
 	}   
 	

@@ -342,7 +342,7 @@ static inline int32_t acl_find_or_insert_cw(uint16_t* p_idx, capwap_cache_t* cw_
 }
 
 
-static inline int32_t acl_fill_rule(rule_param_t* dst_rule_para, rule_param_t* src_rule_para, capwap_cache_t* cw_cache)
+inline int32_t acl_fill_rule(rule_param_t* dst_rule_para, rule_param_t* src_rule_para, capwap_cache_t* cw_cache)
 {
 	int32_t ret = 0;
 
@@ -818,7 +818,7 @@ static inline int32_t fwd_find_user_idx(uint32_t ip, uint32_t *p_usr_idx, uint16
  * Return:
  *        
  *************************************************************/
-static inline int32_t fwd_get_user_idx(rule_param_t *rule_param)
+inline int32_t fwd_get_user_idx(rule_param_t *rule_param)
 {
 	uint32_t sip_usr_idx = 0xffffffff;
 	uint16_t sip_usr_link_idx = 0;

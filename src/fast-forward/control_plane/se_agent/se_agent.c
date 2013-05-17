@@ -1348,6 +1348,9 @@ void se_agent_show_fau_dump_64(char *buf,struct sockaddr_tipc *client_addr,unsig
 	fau64_info.fau_enet_output_packets_qinq=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_QINQ, 0);
 	fau64_info.fau_enet_output_packets_eth_pppoe=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH_PPPOE, 0); 			/* add by wangjian 2013-3-18*/
 	fau64_info.fau_enet_output_packets_capwap_pppoe=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP_PPPOE, 0); 	/* add by wangjian 2013-3-18*/
+	fau64_info.fau_enet_output_packets_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH, 0); 	/* add by wangjian 2013-3-18*/
+	fau64_info.fau_enet_output_packets_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 0); 	/* add by wangjian 2013-3-18*/
+	fau64_info.fau_enet_output_packets_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_RPA, 0); 	/* add by wangjian 2013-3-18*/
 	fau64_info.fau_flow_lookup_error=cvmx_fau_fetch_and_add64(CVM_FAU_FLOW_LOOKUP_ERROR, 0);
 	fau64_info.fau_recv_fccp=cvmx_fau_fetch_and_add64(CVM_FAU_RECV_FCCP_PACKETS,0);
 	fau64_info.fau_recv_works=cvmx_fau_fetch_and_add64(CVM_FAU_RECV_TOTAL_WORKS,0);
@@ -1711,6 +1714,101 @@ func_end:
 	}
 	return ;
 }
+
+void se_agent_pure_ip_enable(char *buf, struct sockaddr_tipc *client_addr, unsigned int len)
+{
+	uint32_t enable;
+	se_interative_t *se_buf=NULL;
+	int ret,rval,status;
+	char str[100]={0};
+	
+	if(NULL==buf || NULL==client_addr ||0==len)
+	{
+		se_agent_syslog_err("se_agent_pure_ip_enable  param error\n");
+		return ;
+	}
+	if(NULL == ipfwd_learn_name)
+	{
+		se_agent_syslog_err("se_agent_pure_ip_enable not find ipfwd_learn module\n");
+		return ;
+	}
+	
+	se_buf=(se_interative_t *)buf;
+	if(FASTFWD_NOT_LOADED == (fast_forward_module_load_check()))
+	{
+		strncpy((se_buf->err_info),FASTFWD_NOT_LOADED_STR,strlen(FASTFWD_NOT_LOADED_STR));
+		se_buf->cmd_result = AGENT_RETURN_FAIL;
+		goto func_end;
+	}
+	enable=se_buf->fccp_cmd.fccp_data.module_enable;
+	sprintf(str,"echo %d > /sys/module/%s/parameters/pure_ip_enable",enable, ipfwd_learn_name);
+	rval=system(str);
+	status=WEXITSTATUS(rval);
+	if(status)
+	{
+		se_agent_syslog_err("set fast_forward pure ip learned error\n");
+		goto learned_pure_ip_err;
+	}
+	
+	se_buf->fccp_cmd.dest_module=FCCP_MODULE_ACL;
+	se_buf->fccp_cmd.src_module=FCCP_MODULE_AGENT_ACL;
+	se_buf->fccp_cmd.cmd_opcode=FCCP_CMD_ENABLE_PURE_IP;
+
+	ret = se_agent_fccp_process(buf, len, 1);
+	if(ret ==SE_AGENT_RETURN_OK)
+	{
+		se_buf->cmd_result=AGENT_RETURN_OK;
+		goto func_end;
+	}
+	else
+	{
+		goto se_pure_ip_err;
+	}
+	
+learned_pure_ip_err:
+	se_buf->cmd_result=AGENT_RETURN_FAIL;
+	strncpy((char*)(se_buf->err_info),"set ipfwd_learned pure ip failed\n",ERR_INFO_SIZE);
+	goto func_end;
+se_pure_ip_err:
+	se_buf->cmd_result=AGENT_RETURN_FAIL;
+	strncpy(se_buf->err_info,"set fastfwd pure ip failed\n",ERR_INFO_SIZE);
+	goto func_end;
+func_end:
+	ret=sendto(se_socket,(char*)buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
+	if(ret<0)
+	{
+		se_agent_syslog_err("se_agent_pure_ip_enable send to dcli failed:%s\n",strerror(errno));
+		return ;
+	}
+	return ;
+}
+
+void se_agent_show_pure_ip_enable(char *buf, struct sockaddr_tipc *client_addr, unsigned int len)
+{
+	se_interative_t *se_buf = NULL;
+
+	if(NULL == buf || NULL == client_addr || 0 ==len)
+	{
+		se_agent_syslog_err("se_agent_show_pure_ip_enable param error\n");
+		return; 
+	}  
+
+	se_buf = (se_interative_t *)buf;
+	se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
+	se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
+	se_buf->fccp_cmd.cmd_opcode = FCCP_CMD_GET_PURE_IP_STATE;
+
+    se_agent_fccp_process(buf, len, 1);
+
+    if(sendto(se_socket, buf, sizeof(se_interative_t), 0, (struct sockaddr*)client_addr,len) < 0)
+	{
+		se_agent_syslog_err("se_agent_show_pure_ip_enable send to dcli failed\n");
+		return; 
+	}
+
+	return; 
+}
+
 
 int32_t get_fastfwd_stats()
 {
@@ -2309,6 +2407,8 @@ int se_agent_cmd_func_table_init()
 	se_agent_cmd_func_register(SE_AGENT_SHOW_BUCKET_ENTRY,(cmd_handle_func)se_agent_get_bucket_entry);
 	se_agent_cmd_func_register(SE_AGENT_CLEAR_FAU64,(cmd_handle_func)se_agent_clear_fau64);
 	se_agent_cmd_func_register(SE_AGENT_ICMP_ENABLE,(cmd_handle_func)se_agent_icmp_enable);
+	se_agent_cmd_func_register(SE_AGENT_PURE_IP_ENABLE,(cmd_handle_func)se_agent_pure_ip_enable);
+	se_agent_cmd_func_register(SE_AGENT_SHOW_PURE_IP_ENABLE,(cmd_handle_func)se_agent_show_pure_ip_enable);
 	se_agent_cmd_func_register(SE_AGENT_FASTFWD_ENABLE,(cmd_handle_func)se_agent_fastfwd_enable);
 	se_agent_cmd_func_register(SE_AGENT_SHOW_ACL_STATS,(cmd_handle_func)se_agent_show_rule_sum);
 	se_agent_cmd_func_register(SE_AGENT_SHOW_CAPWAP,(cmd_handle_func)se_agent_show_capwap_rule);

@@ -141,6 +141,7 @@ inline void add_rpa_head(cvmx_wqe_t *work, rule_item_t *rule)
 	}
 #endif
 
+	cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_RPA, 1);
 	return;
 }
 

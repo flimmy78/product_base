@@ -273,6 +273,15 @@
 	fau CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP_PPPOE
     		size = 8
     		description = "64-bit counter used for total ethernet output capwap pppoe packets";
+	fau CVM_FAU_ENET_OUTPUT_PACKETS_ETH
+    		size = 8
+    		description = "64-bit counter used for total ethernet output eth packets";
+	fau CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP
+    		size = 8
+    		description = "64-bit counter used for total ethernet output capwap packets";
+	fau CVM_FAU_ENET_OUTPUT_PACKETS_RPA
+    		size = 8
+    		description = "64-bit counter used for total ethernet output rpa packets";
 
     
 

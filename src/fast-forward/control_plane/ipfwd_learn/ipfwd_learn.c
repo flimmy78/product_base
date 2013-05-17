@@ -72,6 +72,8 @@ int log_level = INFO_LVL;  /* printk log level */
 int icmp_enable = FUNC_DISABLE;
 int learn_enable = FUNC_ENABLE;
 
+int pure_ip_enable = FUNC_DISABLE;
+
 /* work mode */
 #define IPFWD_LEARN_MODE_NONE                  0
 #define IPFWD_LEARN_MODE_COEXIST_ENABLE       1
@@ -106,6 +108,14 @@ MODULE_PARM_DESC(learn_enable,"\n"
 		"\t\t 0 disable learn function\n"
 		"\t\t 1 enable  learn function\n"
 	    );
+
+module_param(pure_ip_enable,int,0644);
+MODULE_PARM_DESC(pure_ip_enable,"\n"
+		"\t\t enable|disable pure_ip function\n"
+		"\t\t 0 disable pure_ip function\n"
+		"\t\t 1 enable  pure_ip function\n"
+	    );
+
 
 #ifdef IPFWD_LEARN_MODE_STANDALONE   
 extern int octnet_get_nic_ifcount(void);
@@ -1925,9 +1935,17 @@ int ipfwd_learn (struct sk_buff *skb,uint8_t dev_type)
 	//	}
 
 	true_ip = ip;
+	th = (struct tcphdr *)((uint32_t*)ip + ip->ihl);
 	if(ip->protocol == IP_PROTOCOL_ICMP)
 	{
-		skb_type = ETH_ICMP;
+		if (FUNC_DISABLE == pure_ip_enable)
+		{
+			skb_type = ETH_ICMP;
+		}
+		else
+		{
+			skb_type = ETH_TYPE;
+		}
 	}
 	else if (ip->protocol == IP_PROTOCOL_TCP)
 	{
@@ -1947,6 +1965,15 @@ int ipfwd_learn (struct sk_buff *skb,uint8_t dev_type)
 		if(ETH_TYPE == skb_type)
 		{
             true_ip = ip;
+		}
+		/* add by wangjian for pure ip forward 2013-5-9 */
+		else if ((CW_802_11_ICMP == skb_type) && (FUNC_ENABLE == pure_ip_enable))
+		{
+			skb_type = CW_802_11_STREAM;
+		}
+		else if ((CW_802_3_ICMP == skb_type) && (FUNC_ENABLE == pure_ip_enable))
+		{
+			skb_type = CW_802_3_STREAM;
 		}
 	}
 	else
@@ -2119,6 +2146,12 @@ int ipfwd_learn (struct sk_buff *skb,uint8_t dev_type)
 	        log(DEBUG_LVL, "dip=%d.%d.%d.%d is local ip, skip\n", IP_FMT(dip));
 	        goto free_buf;
 	    }
+	}
+	/* add by wangjian for pure ip forward 2013-5-7 nat & pure_ip need free dont fccp to forward */
+	else if (FUNC_ENABLE == pure_ip_enable)
+	{
+		log(DEBUG_LVL, "nat & pure_ip, skip\n");
+		goto free_buf;
 	}
 	
 

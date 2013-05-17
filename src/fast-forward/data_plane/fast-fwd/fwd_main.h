@@ -109,5 +109,11 @@ typedef struct fwd_virtual_port_s
 
 int32_t disable_fastfwd();
 int32_t enable_fastfwd();
+
+extern inline int8_t cw_802_3_decap(cvm_common_udp_hdr_t *ex_uh, cvm_common_ip_hdr_t **in_ip, cvm_common_tcp_hdr_t **in_th);
+
+extern inline int8_t cw_802_11_decap(cvm_common_udp_hdr_t *ex_uh, cvm_common_ip_hdr_t **in_ip, cvm_common_tcp_hdr_t **in_th);
+
+
 #endif
 
