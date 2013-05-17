@@ -574,6 +574,14 @@ static void notify_rule_change(int event, struct fib_rule *rule,
 	struct net *net;
 	struct sk_buff *skb;
 	int err = -ENOBUFS;
+#if 1
+		/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
+		if((memcmp(rule->ifname[0],"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
+		{
+			/*printk(KERN_DEBUG"%s:****[Rule core],dev(%s)****\n",__func__,rule->ifname);*/
+			return;
+			}
+#endif
 
 	net = ops->fro_net;
 	skb = nlmsg_new(fib_rule_nlmsg_size(ops, rule), GFP_KERNEL);

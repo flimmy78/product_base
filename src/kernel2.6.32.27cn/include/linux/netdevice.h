@@ -1922,6 +1922,13 @@ extern const struct net_device_stats *dev_get_stats(struct net_device *dev);
 
 extern int		netdev_max_backlog;
 extern int		weight_p;
+
+/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
+extern int		radio_interface_level;
+#define RADIO_INTERFACE_NETLINK_INFO_ENABLE  			0 /*all enable*/
+#define RADIO_INTERFACE_NETLINK_INFO_SOME_ENABLE  		1 /*ifconfig or ip link can see radio interface.*/
+#define RADIO_INTERFACE_NETLINK_INFO_DISABLE			2 /*all disable*/
+
 extern int		netdev_set_master(struct net_device *dev, struct net_device *master);
 extern int skb_checksum_help(struct sk_buff *skb);
 extern struct sk_buff *skb_gso_segment(struct sk_buff *skb, int features);

@@ -106,6 +106,16 @@ static struct ctl_table net_core_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec
 	},
+	/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
+	/*The file is : /proc/sys/net/core/radio_level */
+	{
+		.ctl_name	= NET_CORE_RADIO_LEVEL,
+		.procname	= "radio_level",
+		.data		= &radio_interface_level,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
 	{ .ctl_name = 0 }
 };
 

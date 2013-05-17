@@ -1070,6 +1070,15 @@ static void ndisc_ra_useropt(struct sk_buff *ra, struct nd_opt_hdr *opt)
 	int base_size = NLMSG_ALIGN(sizeof(struct nduseroptmsg)
 				    + (opt->nd_opt_len << 3));
 	size_t msg_size = base_size + nla_total_size(sizeof(struct in6_addr));
+	
+#if 1
+	/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
+	if((memcmp(ra->dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
+	{
+		/*printk(KERN_DEBUG"%s:****[V6 Nd],dev(%s)****\n",__func__,ra->dev->name);*/
+		return;
+		}
+#endif
 
 	skb = nlmsg_new(msg_size, GFP_ATOMIC);
 	if (skb == NULL) {

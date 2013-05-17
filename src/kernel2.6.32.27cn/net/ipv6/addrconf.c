@@ -123,6 +123,8 @@ static int desync_factor = MAX_DESYNC_FACTOR * HZ;
 static int ipv6_generate_eui64(u8 *eui, struct net_device *dev);
 static int ipv6_count_addresses(struct inet6_dev *idev);
 
+extern int radio_interface_level;
+
 /*
  *	Configured unicast address hash table
  */
@@ -3513,6 +3515,15 @@ static int inet6_dump_addr(struct sk_buff *skb, struct netlink_callback *cb,
 		ip_idx = 0;
 		if ((idev = in6_dev_get(dev)) == NULL)
 			goto cont;
+#if 1
+		/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
+		if((memcmp(idev->dev->name,"r",1)==0)
+			&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
+		{
+			/*printk(KERN_DEBUG"%s: line %d,****ifa_dev(%s)****\n",__func__,__LINE__,idev->dev->name);*/
+			goto cont;
+			}
+#endif
 		read_lock_bh(&idev->lock);
 		switch (type) {
 		case UNICAST_ADDR:
@@ -3622,6 +3633,16 @@ static int inet6_rtm_getaddr(struct sk_buff *in_skb, struct nlmsghdr* nlh,
 		err = -EADDRNOTAVAIL;
 		goto errout;
 	}
+#if 1
+		/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
+		if(((dev&&(memcmp(dev->name,"r",1)==0))||(ifa&&(memcmp(ifa->idev->dev->name,"r",1)==0)))
+			&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
+		{
+			/*printk(KERN_DEBUG"%s: line %d,****dev(%s)****\n",__func__,__LINE__,dev->name);
+			printk(KERN_DEBUG"%s: line %d,****ifa_dev(%s)****\n",__func__,__LINE__,ifa->idev->dev->name);*/
+			goto errout;
+			}
+#endif
 
 	if ((skb = nlmsg_new(inet6_ifaddr_msgsize(), GFP_KERNEL)) == NULL) {
 		err = -ENOBUFS;
@@ -3648,6 +3669,15 @@ static void inet6_ifa_notify(int event, struct inet6_ifaddr *ifa)
 	struct sk_buff *skb;
 	struct net *net = dev_net(ifa->idev->dev);
 	int err = -ENOBUFS;
+
+#if 1
+	/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
+	if((memcmp(ifa->idev->dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
+	{
+		/*printk(KERN_DEBUG"%s:****[V6 addr],dev(%s)****\n",__func__,ifa->idev->dev->name);*/
+		return;
+		}
+#endif
 
 	skb = nlmsg_new(inet6_ifaddr_msgsize(), GFP_ATOMIC);
 	if (skb == NULL)
@@ -3860,6 +3890,15 @@ void inet6_ifinfo_notify(int event, struct inet6_dev *idev)
 	struct sk_buff *skb;
 	struct net *net = dev_net(idev->dev);
 	int err = -ENOBUFS;
+	
+#if 1
+		/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
+		if((memcmp(idev->dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
+		{
+			/*printk(KERN_DEBUG"%s:****[V6 ifinfo],dev(%s)****\n",__func__,idev->dev->name);*/
+			return;
+			}
+#endif
 
 	skb = nlmsg_new(inet6_if_nlmsg_size(), GFP_ATOMIC);
 	if (skb == NULL)
@@ -3931,6 +3970,14 @@ static void inet6_prefix_notify(int event, struct inet6_dev *idev,
 	struct sk_buff *skb;
 	struct net *net = dev_net(idev->dev);
 	int err = -ENOBUFS;
+#if 1
+		/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
+		if((memcmp(idev->dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
+		{
+			/*printk(KERN_DEBUG"%s:****[V6 prefix],dev(%s)****\n",__func__,idev->dev->name);*/
+			return;
+			}
+#endif
 
 	skb = nlmsg_new(inet6_prefix_nlmsg_size(), GFP_ATOMIC);
 	if (skb == NULL)

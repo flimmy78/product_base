@@ -2407,6 +2407,14 @@ void inet6_rt_notify(int event, struct rt6_info *rt, struct nl_info *info)
 	struct net *net = info->nl_net;
 	u32 seq;
 	int err;
+#if 1
+		/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
+		if((memcmp(rt->rt6i_dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
+		{
+			/*printk(KERN_DEBUG"%s:****[V6 route],dev(%s)****\n",__func__,rt->rt6i_dev->name);*/
+			return;
+			}
+#endif
 
 	err = -ENOBUFS;
 	seq = info->nlh != NULL ? info->nlh->nlmsg_seq : 0;

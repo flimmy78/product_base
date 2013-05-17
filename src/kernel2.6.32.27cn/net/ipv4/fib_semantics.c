@@ -308,6 +308,14 @@ void rtmsg_fib(int event, __be32 key, struct fib_alias *fa,
 	struct sk_buff *skb;
 	u32 seq = info->nlh ? info->nlh->nlmsg_seq : 0;
 	int err = -ENOBUFS;
+#if 1
+		/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
+		if((memcmp(fa->fa_info->fib_dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
+		{
+			/*printk(KERN_DEBUG"%s:****[V4 route],dev(%s)****\n",__func__,fa->fa_info->fib_dev->name);*/
+			return;
+			}
+#endif
 
 	skb = nlmsg_new(fib_nlmsg_size(fa->fa_info), GFP_KERNEL);
 	if (skb == NULL)

@@ -2026,6 +2026,10 @@ int netdev_max_backlog __read_mostly = 1000;
 int netdev_budget __read_mostly = 300;
 int weight_p __read_mostly = 64;            /* old backlog weight */
 
+/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
+int radio_interface_level __read_mostly = 2;
+EXPORT_SYMBOL(radio_interface_level);
+
 DEFINE_PER_CPU(struct netif_rx_stats, netdev_rx_stat) = { 0, };
 
 
@@ -3130,6 +3134,14 @@ static int dev_ifconf(struct net *net, char __user *arg)
 
 	total = 0;
 	for_each_netdev(net, dev) {
+		
+		/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
+		if((memcmp(dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_SOME_ENABLE))
+		{
+			/*printk(KERN_DEBUG"%s:****[Dev ioctl],dev(%s)****\n",__func__,dev->name);*/
+			continue;
+		}
+		
 		for (i = 0; i < NPROTO; i++) {
 			if (gifconf_list[i]) {
 				int done;

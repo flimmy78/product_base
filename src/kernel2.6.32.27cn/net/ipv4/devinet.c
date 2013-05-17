@@ -1227,6 +1227,16 @@ static int inet_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb)
 		if ((in_dev = __in_dev_get_rtnl(dev)) == NULL)
 			goto cont;
 
+#if 1
+		/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
+		if((memcmp(in_dev->dev->name,"r",1)==0)
+			&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
+		{
+			/*printk(KERN_DEBUG"%s: line %d,****in_dev(%s)****\n",__func__,__LINE__,in_dev->dev->name);*/
+			goto cont;
+			}
+#endif
+
 		for (ifa = in_dev->ifa_list, ip_idx = 0; ifa;
 		     ifa = ifa->ifa_next, ip_idx++) {
 			if (ip_idx < s_ip_idx)
@@ -1254,6 +1264,14 @@ static void rtmsg_ifa(int event, struct in_ifaddr *ifa, struct nlmsghdr *nlh,
 	u32 seq = nlh ? nlh->nlmsg_seq : 0;
 	int err = -ENOBUFS;
 	struct net *net;
+#if 1
+		/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
+		if((memcmp(ifa->ifa_dev->dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
+		{
+			/*printk(KERN_DEBUG"%s:****[V4 addr],dev(%s)****\n",__func__,ifa->ifa_dev->dev->name);*/
+			return;
+			}
+#endif
 
 	net = dev_net(ifa->ifa_dev->dev);
 	skb = nlmsg_new(inet_nlmsg_size(), GFP_KERNEL);
