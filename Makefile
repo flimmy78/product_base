@@ -1181,7 +1181,7 @@ prepare_config:
 	@echo "/* Automatically generated  header file.*/" > ${ACCAPI_PB_DIR}/config/auteware_config.h
 	@echo "/* Automatically generated  header file for NPD.*/" > ${ACCAPI_PB_DIR}/config/npd_config.h
 ifeq (${WEB},1)
-	@echo "#define __WITH_AUTEWARE_WEB 1" >> ${ACCAPI_PB_DIR}/config/auteware_config.h
+	@echo "#define __WITH_AUTEWARE_WEB 1" >> ${ACCAPI_DIR}/config/auteware_config.h
 endif
 
 ifeq (${CSCD},1)
