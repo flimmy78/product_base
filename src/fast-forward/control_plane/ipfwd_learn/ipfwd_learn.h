@@ -385,7 +385,37 @@ typedef struct
 	int64_t fau_large_cw8023_rpa_fwd_packets;
 	int64_t fau_spe_tcp_hdr;
 	int64_t fau_cw_spe_tcp_hdr;
+	int64_t fau_enet_eth_pppoe_nonip_packets; 			/*64-bit counter used for total ethernet input eth pppoe noneip packets*/
+	int64_t fau_enet_capwap_pppoe_nonip_packets;	/*64-bit counter used for total ethernet input capwap pppoe noneip packets*/
+	int64_t fau_enet_output_packets_eth_pppoe;			/*64-bit counter used for total ethernet output eth pppoe packets*/
+	int64_t fau_enet_output_packets_capwap_pppoe;   /*64-bit counter used for total ethernet output capwap pppoe packets*/
+	int64_t fau_enet_output_packets_eth;   /*64-bit counter used for total ethernet output eth packets*/
+	int64_t fau_enet_output_packets_capwap;   /*64-bit counter used for total ethernet output capwap packets*/
+	int64_t fau_enet_output_packets_rpa;   /*64-bit counter used for total ethernet output rpa packets*/
 }fau64_info_t;
+
+typedef struct 
+{
+	int64_t fau_enet_output_packets_eth;   /*64-bit counter used for total ethernet output eth packets*/
+	int64_t fau_enet_output_packets_capwap;   /*64-bit counter used for total ethernet output capwap packets*/
+	int64_t fau_enet_output_packets_rpa;   /*64-bit counter used for total ethernet output rpa packets*/
+}fau64_part_info_t;
+
+typedef struct 
+{
+	int64_t fau_enet_output_packets_eth;   /*64-bit counter used for total ethernet output eth packets*/
+}fau64_out_eth_info_t;
+
+typedef struct 
+{
+	int64_t fau_enet_output_packets_capwap;   /*64-bit counter used for total ethernet output capwap packets*/
+}fau64_out_capwap_info_t;
+
+typedef struct 
+{
+	int64_t fau_enet_output_packets_rpa;   /*64-bit counter used for total ethernet output rpa packets*/
+}fau64_out_rpa_info_t;
+
 
 
 typedef union{
@@ -396,6 +426,10 @@ typedef union{
     }rule_info;
 	traffic_stats_t traffic_stats;
 	fau64_info_t fau64_info;
+	fau64_part_info_t fau64_part_info;
+	fau64_out_eth_info_t fau64_out_eth_info;
+	fau64_out_capwap_info_t fau64_out_capwap_info;
+	fau64_out_rpa_info_t fau64_out_rpa_info;
 }fccp_data_t;
 
 

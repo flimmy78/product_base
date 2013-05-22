@@ -2094,7 +2094,53 @@ int fastfwd_show_fau64(fau64_info_t *fau64_info)
     fau64_info->fau_large_cw8023_rpa_fwd_packets = cvmx_fau_fetch_and_add64(CVM_FAU_LARGE_CW8023_RPA_FWD_PACKET,0);
     fau64_info->fau_spe_tcp_hdr = cvmx_fau_fetch_and_add64(CVM_FAU_SPE_TCP_HDR,0);
     fau64_info->fau_cw_spe_tcp_hdr = cvmx_fau_fetch_and_add64(CVM_FAU_CW_SPE_TCP_HDR,0);
+	fau64_info->fau_enet_output_packets_eth = cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH,0);
+	fau64_info->fau_enet_output_packets_capwap = cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP,0);
+	fau64_info->fau_enet_output_packets_rpa = cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_RPA,0);
 
     return RETURN_OK;
 }
+
+int fastfwd_show_part_fau64(fau64_part_info_t *fau64_part_info)
+{
+    if(NULL == fau64_part_info)
+        return RETURN_ERROR;
+
+	fau64_part_info->fau_enet_output_packets_eth = cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH,0);
+	fau64_part_info->fau_enet_output_packets_capwap = cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP,0);
+	fau64_part_info->fau_enet_output_packets_rpa = cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_RPA,0);
+
+    return RETURN_OK;
+}
+
+int fastfwd_show_out_eth_fau64(fau64_out_eth_info_t *fau64_out_eth_info)
+{
+    if(NULL == fau64_out_eth_info)
+        return RETURN_ERROR;
+
+	fau64_out_eth_info->fau_enet_output_packets_eth = cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH,0);
+
+    return RETURN_OK;
+}
+
+int fastfwd_show_out_capwap_fau64(fau64_out_capwap_info_t *fau64_out_capwap_info)
+{
+    if(NULL == fau64_out_capwap_info)
+        return RETURN_ERROR;
+
+	fau64_out_capwap_info->fau_enet_output_packets_capwap = cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP,0);
+
+    return RETURN_OK;
+}
+
+int fastfwd_show_out_rpa_fau64(fau64_out_rpa_info_t *fau64_out_rpa_info)
+{
+    if(NULL == fau64_out_rpa_info)
+        return RETURN_ERROR;
+	
+	fau64_out_rpa_info->fau_enet_output_packets_rpa = cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_RPA,0);
+
+    return RETURN_OK;
+}
+
 #endif

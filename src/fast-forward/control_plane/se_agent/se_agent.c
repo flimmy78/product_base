@@ -1072,15 +1072,15 @@ void se_agent_save_cfg(unsigned char *buf,unsigned int bufLen)
 		switch (tag_type)
 		{
 			case CVMX_POW_TAG_TYPE_ORDERED :
-				length += sprintf(current, " config tag type %s\n","ordered");
+				length += sprintf(current, " config fast-forward tag type %s\n","ordered");
 				current = showStr + length;
 				break;
 			case CVMX_POW_TAG_TYPE_ATOMIC :
-				length += sprintf(current, " config tag type %s\n","atomic");
+				length += sprintf(current, " config fast-forward tag type %s\n","atomic");
 				current = showStr + length;
 				break;
 			case CVMX_POW_TAG_TYPE_NULL :
-				length += sprintf(current, " config tag type %s\n","null");
+				length += sprintf(current, " config fast-forward tag type %s\n","null");
 				current = showStr + length;
 				break;
 			default:
@@ -1385,6 +1385,177 @@ SEND_DCLI:
 			return ;
 	}	
 }
+
+/**********************************************************************************
+ *  se_agent_show_part_fau_dump_64
+ *
+ *	DESCRIPTION:
+ * 		se_agent_show_part_fau_dump_64
+ *
+ *	INPUT:
+ *		client_addr   ->dcli client address
+ *		len ->client address length
+ *	
+ *	OUTPUT:
+ *		NULL
+ *
+ * 	RETURN:
+ *		NULL
+ *				
+ **********************************************************************************/
+void se_agent_show_part_fau_dump_64(char *buf,struct sockaddr_tipc *client_addr,unsigned int len)
+{
+	int ret = -1,i = 0;
+	fau64_part_info_t  fau64_part_info;
+	se_interative_t *se_buf = NULL;
+	memset(&fau64_part_info,0,sizeof(fau64_part_info));
+
+	if(NULL==buf || NULL==client_addr || 0==len)
+	{
+		se_agent_syslog_err("se_agent_show_part_fau_dump_64 param error\n");
+		return ;
+	}  
+
+	se_buf=(se_interative_t *)buf;
+	
+    if(se_buf->cpu_tag == 1)
+    {
+        se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
+    	se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
+    	se_buf->fccp_cmd.cmd_opcode = FCCP_CMD_SHOW_PART_FAU64;
+        se_agent_fccp_process_pcie(buf, len, 1);
+        goto SEND_DCLI;
+    }
+   
+	fau64_part_info.fau_enet_output_packets_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH, 0); 	/* add by wangjian 2013-3-18*/
+	fau64_part_info.fau_enet_output_packets_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 0); 	/* add by wangjian 2013-3-18*/
+	fau64_part_info.fau_enet_output_packets_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_RPA, 0); 	/* add by wangjian 2013-3-18*/
+
+
+	memcpy(&se_buf->fccp_cmd.fccp_data.fau64_part_info, &fau64_part_info, sizeof(fau64_part_info_t));
+	se_buf->cmd_result = AGENT_RETURN_OK;
+SEND_DCLI:
+	ret=sendto(se_socket,buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
+	if(ret<0)
+	{
+			se_agent_syslog_err("se_agent_show_part_fau_dump_64 send to dcli failed:%s\n",strerror(errno));
+			return ;
+	}	
+}
+
+void se_agent_show_out_eth_fau_dump_64(char *buf,struct sockaddr_tipc *client_addr,unsigned int len)
+{
+	int ret = -1,i = 0;
+	fau64_out_eth_info_t  fau64_out_eth_info;
+	se_interative_t *se_buf = NULL;
+	memset(&fau64_out_eth_info,0,sizeof(fau64_out_eth_info));
+
+	if(NULL==buf || NULL==client_addr || 0==len)
+	{
+		se_agent_syslog_err("se_agent_show_out_eth_fau_dump_64 param error\n");
+		return ;
+	}  
+
+	se_buf=(se_interative_t *)buf;
+	
+    if(se_buf->cpu_tag == 1)
+    {
+        se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
+    	se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
+    	se_buf->fccp_cmd.cmd_opcode = FCCP_CMD_SHOW_OUT_ETH_FAU64;
+        se_agent_fccp_process_pcie(buf, len, 1);
+        goto SEND_DCLI;
+    }
+   
+	fau64_out_eth_info.fau_enet_output_packets_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH, 0); 	
+
+	memcpy(&se_buf->fccp_cmd.fccp_data.fau64_out_eth_info, &fau64_out_eth_info, sizeof(fau64_out_eth_info_t));
+	se_buf->cmd_result = AGENT_RETURN_OK;
+SEND_DCLI:
+	ret=sendto(se_socket,buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
+	if(ret<0)
+	{
+			se_agent_syslog_err("se_agent_show_out_eth_fau_dump_64 send to dcli failed:%s\n",strerror(errno));
+			return ;
+	}	
+}
+
+void se_agent_show_out_capwap_fau_dump_64(char *buf,struct sockaddr_tipc *client_addr,unsigned int len)
+{
+	int ret = -1,i = 0;
+	fau64_out_capwap_info_t  fau64_out_capwap_info;
+	se_interative_t *se_buf = NULL;
+	memset(&fau64_out_capwap_info,0,sizeof(fau64_out_capwap_info));
+
+	if(NULL==buf || NULL==client_addr || 0==len)
+	{
+		se_agent_syslog_err("se_agent_show_out_capwap_fau_dump_64 param error\n");
+		return ;
+	}  
+
+	se_buf=(se_interative_t *)buf;
+	
+    if(se_buf->cpu_tag == 1)
+    {
+        se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
+    	se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
+    	se_buf->fccp_cmd.cmd_opcode = FCCP_CMD_SHOW_OUT_CAPWAP_FAU64;
+        se_agent_fccp_process_pcie(buf, len, 1);
+        goto SEND_DCLI;
+    }
+   
+	fau64_out_capwap_info.fau_enet_output_packets_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 0); 	
+
+	memcpy(&se_buf->fccp_cmd.fccp_data.fau64_out_capwap_info, &fau64_out_capwap_info, sizeof(fau64_out_capwap_info_t));
+	se_buf->cmd_result = AGENT_RETURN_OK;
+SEND_DCLI:
+	ret=sendto(se_socket,buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
+	if(ret<0)
+	{
+			se_agent_syslog_err("se_agent_show_out_capwap_fau_dump_64 send to dcli failed:%s\n",strerror(errno));
+			return ;
+	}	
+}
+
+void se_agent_show_out_rpa_fau_dump_64(char *buf,struct sockaddr_tipc *client_addr,unsigned int len)
+{
+	int ret = -1,i = 0;
+	fau64_out_rpa_info_t  fau64_out_rpa_info;
+	se_interative_t *se_buf = NULL;
+	memset(&fau64_out_rpa_info,0,sizeof(fau64_out_rpa_info));
+
+	if(NULL==buf || NULL==client_addr || 0==len)
+	{
+		se_agent_syslog_err("se_agent_show_out_rpa_fau_dump_64 param error\n");
+		return ;
+	}  
+
+	se_buf=(se_interative_t *)buf;
+	
+    if(se_buf->cpu_tag == 1)
+    {
+        se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
+    	se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
+    	se_buf->fccp_cmd.cmd_opcode = FCCP_CMD_SHOW_OUT_RPA_FAU64;
+        se_agent_fccp_process_pcie(buf, len, 1);
+        goto SEND_DCLI;
+    }
+   
+	fau64_out_rpa_info.fau_enet_output_packets_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_RPA, 0); 	
+
+	memcpy(&se_buf->fccp_cmd.fccp_data.fau64_out_rpa_info, &fau64_out_rpa_info, sizeof(fau64_out_rpa_info_t));
+	se_buf->cmd_result = AGENT_RETURN_OK;
+SEND_DCLI:
+	ret=sendto(se_socket,buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
+	if(ret<0)
+	{
+			se_agent_syslog_err("se_agent_show_out_rpa_fau_dump_64 send to dcli failed:%s\n",strerror(errno));
+			return ;
+	}	
+}
+
+
+
 void se_agent_clear_fau64(char *buf,struct sockaddr_tipc *client_addr,unsigned int len)
 {
 		se_interative_t *se_buf=NULL;
@@ -2425,6 +2596,10 @@ int se_agent_cmd_func_table_init()
 	se_agent_cmd_func_register(SE_AGENT_SHOW_RUNNING_CFG,(cmd_handle_func)se_agent_show_running_config);
 	se_agent_cmd_func_register(SE_AGENT_SHOW_AVAILIABLE_BUFF_COUNT,(cmd_handle_func)se_agent_show_fpa_buff_count);
 	se_agent_cmd_func_register(SE_AGENT_SHOW_FAU64,(cmd_handle_func)se_agent_show_fau_dump_64);
+	se_agent_cmd_func_register(SE_AGENT_SHOW_PART_FAU64,(cmd_handle_func)se_agent_show_part_fau_dump_64);
+	se_agent_cmd_func_register(SE_AGENT_SHOW_OUT_ETH_FAU64,(cmd_handle_func)se_agent_show_out_eth_fau_dump_64);
+	se_agent_cmd_func_register(SE_AGENT_SHOW_OUT_CAPWAP_FAU64,(cmd_handle_func)se_agent_show_out_capwap_fau_dump_64);
+	se_agent_cmd_func_register(SE_AGENT_SHOW_OUT_RPA_FAU64,(cmd_handle_func)se_agent_show_out_rpa_fau_dump_64);
 	se_agent_cmd_func_register(SE_AGENT_CONFIG_AGENT_DEBUG_LEVEL,(cmd_handle_func)se_agent_log_config_debug_level);
 	se_agent_cmd_func_register(SE_AGENT_USER_ONLINE,(cmd_handle_func)se_agent_user_online);
 	se_agent_cmd_func_register(SE_AGENT_USER_OFFLINE,(cmd_handle_func)se_agent_user_offline);

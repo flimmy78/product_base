@@ -404,6 +404,19 @@ inline uint32_t pure_ip_get(cvm_common_ip_hdr_t **true_ip, cvm_common_tcp_hdr_t 
 				return FLOW_ACTION_TOLINUX;			
 			}
 		}	
+
+		ip = *true_ip;
+		
+		if (CVM_COMMON_IPPROTO_UDP == ip->ip_p) 
+		{
+			uh = ( cvm_common_udp_hdr_t*)((uint32_t *)ip + ip->ip_hl);
+		
+			if (uh->uh_dport == 0)
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_UDP_BAD_DPORT, 1);
+				return FLOW_ACTION_DROP;
+			}
+		}
 	}
 	else
 	{
