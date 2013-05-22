@@ -1377,6 +1377,12 @@ EXPORT_SYMBOL(unregister_netdevice_notifier);
 
 int call_netdevice_notifiers(unsigned long val, struct net_device *dev)
 {
+    /* Add to remove the notifier of radio interface, bugfix AXSSZFI-1529,1538,1551. zhangdi@autelan.com 2013-05-14 */
+	if(dev->name[0]=='r')
+	{
+ 		return NOTIFY_DONE;
+	}
+	/* Add end */
 	return raw_notifier_call_chain(&netdev_chain, val, dev);
 }
 
