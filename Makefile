@@ -135,6 +135,13 @@ export BUILDNOFILE=./buildno_v2.0
 export AWNAME=$(shell echo "AW`cat ${VERFILE}`.`cat ${BUILDNOFILE}`.`cat ${PRODUCTFILE}`")
 export IMGDIR=imgdir
 
+version=$(shell echo "`cat ${VERFILE}`")
+ifeq ($(version), 2.0.18sp7)
+export AWVERSION=VERSION_18SP7
+else ifeq ($(version), 2.0.18sp8)
+export AWVERSION=VERSION_18SP8
+endif
+
 $(shell git log | head -n 1 | awk '{ print $$2 }' > ${GITHASH})
 
 $(shell \
@@ -152,6 +159,7 @@ $(info ROOTFS_DIR = ${ROOTFS_DIR})
 $(info PATH is ${PATH} )
 $(info CFLAGS=${CFLAGS} )
 $(info DESTDIR is ${DESTDIR})
+$(info VERSION is $(AWVERSION))
 $(info =========================================================================)
 
 #export IBUS_MOD="src/ibus"
