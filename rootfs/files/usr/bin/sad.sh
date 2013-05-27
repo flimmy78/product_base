@@ -142,7 +142,7 @@ ap_lsimgs()
 		cmp $tmpfile_ap /etc/ap_imgmagic
 		ret_temp_ap=$?
 		if [ $ret_temp_ap -eq 0 ] ; then
-                imgname_ap=`basename $f_ap`
+                  imgname_ap=`basename $f_ap`
 		  case "$imgname_ap" in
 		    *.img) echo $imgname_ap >> $output_ap ;;
 		    *.IMG) echo $imgname_ap >> $output_ap ;;
@@ -215,11 +215,11 @@ echo "[`date +%Y%m%d%H%M%S`]" > $SADSTARTTIME
              logger -p daemon.info -t $LOGTAG "No Enough Space. File $OPFILENAME size [$filesize] >= freespace [$freespace]."
              ret=2
           else
-            if [ $filesize -gt 1000000 ] ; then
+#            if [ $filesize -gt 1000000 ] ; then
               cp -rf /mnt/$opfilename $destdir
-            else
-              cp --backup=simple -rf /mnt/$opfilename $destdir
-            fi
+#            else
+#              cp --backup=simple -rf /mnt/$opfilename $destdir
+#            fi
 	    chmod a+rw /blk/$opfilename
           fi
           ;;
