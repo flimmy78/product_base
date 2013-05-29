@@ -5092,7 +5092,6 @@ out_rtnl:
 
 static int __init bonding_init(void)
 {
-	int i;
 	int res;
 
 	pr_info("%s", version);

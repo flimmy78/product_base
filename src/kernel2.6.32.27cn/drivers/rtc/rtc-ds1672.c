@@ -192,9 +192,9 @@ static int ds1672_detect(struct i2c_client *client, int kind,
 			  struct i2c_board_info *info)
 {
 	struct i2c_adapter *adapter = client->adapter;
-	int i;
+	/*int i;*/
 	const char *type_name = "";
-	int conv_rate, status, config;
+	/*int conv_rate, status, config;*/
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_I2C)) {
 		pr_debug("ds1672: detect failed, "

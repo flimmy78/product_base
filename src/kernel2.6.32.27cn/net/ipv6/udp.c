@@ -392,7 +392,7 @@ int udpv6_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 
 		/* FALLTHROUGH -- it's a UDP Packet */
 
-		int ret;		
+		/*	int ret;*/		
 		switch(up->encap_type){
 			case UDP_ENCAP_CAPWAP:
 				if(wifi_ko_rx_hook6){
