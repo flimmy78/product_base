@@ -3317,7 +3317,7 @@ void npd_save_dst_trunk_cfg(char *buf,int bufLen)
 					#endif
 				}
 				if((length + 4) < 2048) { /* exit port config(add,masterport,enDis,) */
-					length += sprintf(tmpPtr,"exit\n");
+					length += sprintf(tmpPtr," exit\n");
 					 syslog_ax_trunk_dbg("%s\n\n",tmpPtr);
 					tmpPtr = tmpBuf + length;
 				}					

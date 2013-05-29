@@ -707,6 +707,14 @@ int nam_fdb_table_delete_entry_with_vlan_for_debug(unsigned short vlanid)
 	       goto isflag;
 		}
 
+		ret= cpssDxChBrgFdbMacTriggerModeSet( devNum,CPSS_ACT_TRIG_E);
+		if(0 != ret)
+		{
+			nam_syslog_err("npd_fdb:cpssDxChBrgFdbMacTriggerModeSet:FAIL.\n");
+			nam_syslog_err("err vlaue is: %d\n",ret);
+			goto isflag;
+		}
+
 		ret= cpssDxChBrgFdbStaticDelEnable( devNum,NAM_FALSE);
 		if(0 != ret){
 			nam_syslog_err("npd_fdb:cpssDxChBrgFdbStaticDelEnable:FAIL.\n");
@@ -933,7 +941,8 @@ int nam_fdb_table_delete_entry_with_vlan(unsigned short vlanid)
 	{
 		devNum = asic_num;
 	    ret = cpssDxChBrgFdbAAandTAToCpuGet(devNum,&Atenable);
-		if(0 != ret){
+		if(0 != ret)
+		{
 	         nam_syslog_err("nam_fdb:cpssDxChBrgFdbAAandTATOCpuGet error: %d\n",ret);
 	         return FDB_CONFIG_FAIL;
 		}
@@ -947,31 +956,36 @@ int nam_fdb_table_delete_entry_with_vlan(unsigned short vlanid)
 			}
 		}
 		ret = cpssDxChBrgFdbActionActiveInterfaceGet(devNum,& actIsTrunk,& actIsTrunkMask,&actTrunkPort,& actTrunkPortMask);
-		if(0 != ret){
+		if(0 != ret)
+		{
 			 nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveInterfaceGet:FAIL.\n");
 			 nam_syslog_err("err vlaue is: %d\n",ret);
 			 return FDB_CONFIG_FAIL;
 		}
 		ret = cpssDxChBrgFdbActionActiveVlanGet(devNum,&actVlanorg,&actVlanMaskorg);
-		if(0 != ret){
+		if(0 != ret)
+		{
 			 nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveVlanGet:FAIL.\n");
 			 nam_syslog_err("err vlaue is: %d\n",ret);
 			 return FDB_CONFIG_FAIL;
 		}
 
 		ret = cpssDxChBrgFdbActionModeGet(devNum,&actmode);
-		if( 0 != ret){
+		if( 0 != ret)
+		{
 	           nam_syslog_err("nam_fdb:cpssDxChBrgFdbActionModeGet error %d \n",ret);
 	           return FDB_CONFIG_FAIL;
 		}
 
 		ret = cpssDxChBrgFdbMacTriggerModeGet(devNum,&macmode);
-		if( 0 != ret){
+		if( 0 != ret)
+		{
 	           nam_syslog_err("nam_fdb:  cpssDxChBrgFdbMacTriggerModeGet: error %d\n",ret);
 	           return FDB_CONFIG_FAIL;
 		}
 		ret=cpssDxChBrgFdbActionsEnableSet( devNum, NAM_FALSE);
-		if(0 != ret){
+		if(0 != ret)
+		{
 			nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionsEnableSet:FAIL.\n");
 			nam_syslog_err("err vlaue is: %ld\n",ret);
 			re_flag++;
@@ -980,7 +994,8 @@ int nam_fdb_table_delete_entry_with_vlan(unsigned short vlanid)
 
 
 		ret=cpssDxChBrgFdbAAandTAToCpuSet(devNum,NAM_FALSE);
-		if(0 != ret){
+		if(0 != ret)
+		{
 			nam_syslog_err("npd_fdb:cpssDxChBrgFdbAAandTAToCpuSet:FAIL.\n");
 			nam_syslog_err("err vlaue is: %d\n",ret);
 			re_flag++;
@@ -988,7 +1003,8 @@ int nam_fdb_table_delete_entry_with_vlan(unsigned short vlanid)
 		}
 
 		ret= cpssDxChBrgFdbStaticDelEnable( devNum,NAM_FALSE);
-		if(0 != ret){
+		if(0 != ret)
+		{
 			nam_syslog_err("npd_fdb:cpssDxChBrgFdbStaticDelEnable:FAIL.\n");
 			nam_syslog_err("err vlaue is: %d\n",ret);
 			re_flag++;
@@ -996,8 +1012,17 @@ int nam_fdb_table_delete_entry_with_vlan(unsigned short vlanid)
 
 		}
 
+		ret= cpssDxChBrgFdbMacTriggerModeSet( devNum,CPSS_ACT_TRIG_E);
+		if(0 != ret)
+		{
+			nam_syslog_err("npd_fdb:cpssDxChBrgFdbMacTriggerModeSet:FAIL.\n");
+			nam_syslog_err("err vlaue is: %d\n",ret);
+			goto isflag;
+		}
+
 		ret= cpssDxChBrgFdbActionActiveInterfaceSet( devNum, 0, 0,0,0);
-		if(0 != ret){
+		if(0 != ret)
+		{
 			nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveInterfaceSet:FAIL.\n");
 			nam_syslog_err("err vlaue is: %d\n",ret);
 			re_flag++;
@@ -1006,7 +1031,8 @@ int nam_fdb_table_delete_entry_with_vlan(unsigned short vlanid)
 		}	
 		
 		ret= cpssDxChBrgFdbActionActiveDevSet( devNum,0, 0);
-		if(0 != ret){
+		if(0 != ret)
+		{
 			nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveInterfaceSet:FAIL.\n");
 			nam_syslog_err("err vlaue is: %d\n",ret);
 			re_flag++;
@@ -1015,7 +1041,8 @@ int nam_fdb_table_delete_entry_with_vlan(unsigned short vlanid)
 		}	
 	  
 		ret= cpssDxChBrgFdbActionActiveVlanSet( devNum,vlanid,vlanMask);
-		if(0 != ret){
+		if(0 != ret)
+		{
 			nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveVlanSet:FAIL.\n");
 			nam_syslog_err("err vlaue is: %d\n",ret);
 			re_flag++;
@@ -1026,7 +1053,8 @@ int nam_fdb_table_delete_entry_with_vlan(unsigned short vlanid)
 		pthread_mutex_lock(&FdbActMutex);		 
 		ret=cpssDxChBrgFdbTrigActionStart( devNum, CPSS_FDB_ACTION_DELETING_E);
 		pthread_mutex_unlock(&FdbActMutex);	
-		if(0 != ret){
+		if(0 != ret)
+		{
 			nam_syslog_err("npd_fdb:cpssDxChBrgFdbTrigActionStart:FAIL.\n");
 			nam_syslog_err("err vlaue is: %d\n",ret); 
 			re_flag++;
@@ -1064,62 +1092,62 @@ int nam_fdb_table_delete_entry_with_vlan(unsigned short vlanid)
 		isflag:
 		ret=cpssDxChBrgFdbActionsEnableSet( devNum, NAM_TRUE);
 		if(0 != ret)
-				{
-					nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionsEnableSet:FAIL.\n");
-					nam_syslog_err("err vlaue is: %ld\n",ret);
-					re_flag++;
-				}
+		{
+			nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionsEnableSet:FAIL.\n");
+			nam_syslog_err("err vlaue is: %ld\n",ret);
+			re_flag++;
+		}
 
 		
 		ret=cpssDxChBrgFdbActionModeSet( devNum, actmode);
 		if(0 != ret)
-				{
-					nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionModeSet:FAIL.\n");
-					nam_syslog_err("err vlaue is: %d\n",ret); 
-					re_flag++;
-			    }
+		{
+			nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionModeSet:FAIL.\n");
+			nam_syslog_err("err vlaue is: %d\n",ret); 
+			re_flag++;
+	    }
 
 
 		ret= cpssDxChBrgFdbMacTriggerModeSet( devNum,macmode);
 		if(0 != ret)
-				{
-					nam_syslog_err("npd_fdb:cpssDxChBrgFdbMacTriggerModeSet:FAIL.\n");
-					nam_syslog_err("err vlaue is: %d\n",ret);
-					re_flag++;
-				}
+		{
+			nam_syslog_err("npd_fdb:cpssDxChBrgFdbMacTriggerModeSet:FAIL.\n");
+			nam_syslog_err("err vlaue is: %d\n",ret);
+			re_flag++;
+		}
 
 		ret = cpssDxChBrgFdbActionActiveVlanSet(devNum,actVlanorg,actVlanMaskorg);
 		if(0 != ret)
-				{
-					nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveVlanSet:FAIL.\n");
-					nam_syslog_err("err vlaue is: %d\n",ret);
-					re_flag++;
-				}
+		{
+			nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveVlanSet:FAIL.\n");
+			nam_syslog_err("err vlaue is: %d\n",ret);
+			re_flag++;
+		}
 
 	   
 		ret= cpssDxChBrgFdbActionActiveInterfaceSet( devNum, actIsTrunk,  actIsTrunkMask,actTrunkPort,actTrunkPortMask);
 		if(0 != ret)
-				{
-					nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveInterfaceSet:FAIL.\n");
-					nam_syslog_err("err vlaue is: %d\n",ret);
-					re_flag++;
-				}	
+		{
+			nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveInterfaceSet:FAIL.\n");
+			nam_syslog_err("err vlaue is: %d\n",ret);
+			re_flag++;
+		}	
 		
 		ret= cpssDxChBrgFdbActionActiveDevSet( devNum, actDev, actDevMask);
 		if(0 != ret)
-				{
-					nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveInterfaceSet:FAIL.\n");
-					nam_syslog_err("err vlaue is: %d\n",ret);
-					re_flag++;
-				}
+		{
+			nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveInterfaceSet:FAIL.\n");
+			nam_syslog_err("err vlaue is: %d\n",ret);
+			re_flag++;
+		}
 		
 		ret=cpssDxChBrgFdbAAandTAToCpuSet(devNum,Atenable);
 		if(0 != ret)
-			{
-				nam_syslog_err("npd_fdb:cpssDxChBrgFdbAAandTAToCpuSet:FAIL.\n");
-				nam_syslog_err("err vlaue is: %d\n",ret);
-				re_flag++;
-			}
+		{
+			nam_syslog_err("npd_fdb:cpssDxChBrgFdbAAandTAToCpuSet:FAIL.\n");
+			nam_syslog_err("err vlaue is: %d\n",ret);
+			re_flag++;
+		}
 		if(re_flag)
 		{
 			nam_syslog_err("delete fdb for dev %d vlan %d err !!!\n",asic_num,vlanid);
@@ -1336,6 +1364,13 @@ int nam_fdb_table_delete_entry_with_port(unsigned int index)
 		re_flag++;
 		 goto isenable;
 	}
+	ret= cpssDxChBrgFdbMacTriggerModeSet( devNum,CPSS_ACT_TRIG_E);
+	if(0 != ret)
+	{
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbMacTriggerModeSet:FAIL.\n");
+		nam_syslog_err("err vlaue is: %d\n",ret);
+		goto isenable;
+	}
 #if 0
     ret= cpssDxChBrgFdbPortLearnStatusSet(devNum,portNum,0,CPSS_LOCK_DROP_E);
 	if(0 != ret){
@@ -1476,6 +1511,352 @@ int nam_fdb_table_delete_entry_with_port(unsigned int index)
 	}
 	
 	ret=cpssDxChBrgFdbAAandTAToCpuSet(devNum,Atenable);/*enable the AA*/
+	if(0 != ret){
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbAAandTAToCpuSet:FAIL.\n");
+		nam_syslog_err("err vlaue is: %d\n",ret);
+		re_flag++;
+	}
+#if 0
+	ret=cpssDxChBrgFdbPortLearnStatusSet(devNum,portNum,learn,learncmd);
+	if(0 != ret){
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbPortLearnStatusSet:FAIL.\n");
+		nam_syslog_err("err vlaue is: %d\n",ret);
+		re_flag++;
+	}
+#endif
+    pthread_mutex_unlock(&FdbActMutex);
+
+    if(re_flag){
+        return FDB_CONFIG_FAIL;
+	}
+	else{
+	    return FDB_CONFIG_SUCCESS;
+	}
+#endif
+
+#ifdef DRV_LIB_BCM
+    ret = npd_get_devport_by_global_index(index,&unit,&port);
+    if(NAM_OK != ret){
+		syslog_ax_nam_fdb_err("eth_index %#x get asic port failed for ret %d\n",index,ret);
+        return FDB_CONFIG_FAIL;
+	}
+	ret = bcm_stk_modid_get(unit,&mod);	/*the mod get according to the unit*/
+	if(NAM_OK != ret){
+       syslog_ax_nam_fdb_err("get mod-id %d in device %d error, ret %d\n", mod, unit, ret);
+	   return FDB_CONFIG_FAIL;
+	}
+    num_of_asic = nam_asic_get_instance_num();
+	for(i = 0;i < num_of_asic;i++){
+		ret = bcm_l2_addr_delete_by_port(i,mod,port,0);
+		if(NAM_OK != ret){
+	       syslog_ax_nam_fdb_err("delete fdb eth-port %#x asic port(%d,%d) failed in hw for ret %d!\n",index,i,port,ret);
+		}
+		NAM_RV_REPLACE_OK(ret, rv, NAM_E_UNAVAIL);
+	}
+	return rv;
+#endif
+}
+
+
+int nam_fdb_table_delete_entry_with_dev_port(unsigned char devnum,unsigned char portnum)
+{
+#ifdef DRV_LIB_BCM
+    int rv = 0,ret = 0,mod = 0,i = 0,num_of_asic = 0;
+	unsigned char unit = 0,port = 0;
+#endif
+
+#ifdef DRV_LIB_CPSS
+	unsigned int isEnable = 0;
+	unsigned int ret=FDB_INIT;
+	NAM_BOOL  ok = NAM_FALSE;
+	NAM_BOOL  Atenable = NAM_FALSE,learn = NAM_FALSE;
+	unsigned int  actIsTrunk=0;
+    unsigned int  actIsTrunkMask=1;
+	unsigned int  actIsTrunkorg=0;
+    unsigned int  actIsTrunkMaskorg=1;
+    unsigned int  actTrunkPort=0;
+    unsigned int  actTrunkPortMask=0x7f;
+	unsigned int  actTrunkPortorg=0;
+    unsigned int  actTrunkPortMaskorg=0x7f;
+	unsigned int  actDev=0;
+    unsigned int  actDevMask=0x1f;
+	unsigned int  actDevorg=0;
+    unsigned int  actDevMaskorg=0x1f;
+	unsigned short  actVlan = 0;
+	unsigned short  actVlanMask = 0;
+	unsigned int  re_flag = 0;
+	enum product_id_e productId = npd_query_product_id();
+	unsigned int isBoard = 0,linkState = 0;
+	unsigned char asic_num = 0,ammount_asic_nums = 0;
+	unsigned int fdb_state_count = 0;
+
+	CPSS_MAC_ACTION_MODE_ENT  macmode = CPSS_ACT_AUTO_E;
+	CPSS_FDB_ACTION_MODE_ENT  actmode = CPSS_FDB_ACTION_AGE_WITH_REMOVAL_E;
+	CPSS_PORT_LOCK_CMD_ENT    learncmd = CPSS_LOCK_FRWRD_E;
+#endif
+
+#ifdef DRV_LIB_CPSS
+
+	actDev = devnum;
+	actTrunkPort=portnum;
+	if(IS_DISTRIBUTED == SYSTEM_TYPE)   /*slove bug  AXSSZFI-170	*/
+	{
+		ret = nam_get_distributed_devnum(asic_num,&actDev);
+		if(ret != FDB_CONFIG_SUCCESS)
+		{
+			nam_syslog_dbg("get distributed dev num failure !!! \n");
+		}
+	}
+   /*
+         save the pre-configuration before action
+      */
+      
+   pthread_mutex_lock(&FdbActMutex);
+   
+   ret = cpssDxChBrgFdbAAandTAToCpuGet(devnum,&Atenable);
+   if( 0 != ret ){
+         nam_syslog_err("nam_fdb:cpssDxChBrgFdbAAandTAToCpuGet error: %d\n",ret);
+         pthread_mutex_unlock(&FdbActMutex);
+		 return FDB_CONFIG_FAIL;
+   }
+#if 0
+   ret = cpssDxChBrgFdbPortLearnStatusGet(devNum,portNum,&learn,&learncmd);
+   if( 0 != ret ){
+         nam_syslog_err("nam_fdb: cpssDxChBrgFdbPortLearnStatusGet error: %d\n",ret);
+		 return FDB_CONFIG_FAIL;
+   }
+#endif
+   ret = cpssDxChBrgFdbActionModeGet(devnum,&actmode);
+   if( 0 != ret){
+         nam_syslog_err("nam_fdb: cpssDxChBrgFdbActionModeGet error: %d\n",ret);
+         nam_syslog_err("Now the CPSS_FDB_ACTION_MODE_ENT value is %d\n",actmode);
+         pthread_mutex_unlock(&FdbActMutex);
+		 return FDB_CONFIG_FAIL;
+   }
+   ret = cpssDxChBrgFdbMacTriggerModeGet(devnum,&macmode);
+   if(0 != ret){
+         nam_syslog_err("nam_fdb: cpssDxChBrgFdbMacTriggerModeGet error :%d\n",ret);
+         nam_syslog_err("Now the CPSS_MAC_ACTION_MODE_ENT value is %d\n",macmode);
+         pthread_mutex_unlock(&FdbActMutex);
+		 return FDB_CONFIG_FAIL;
+   }
+   ret = cpssDxChBrgFdbActionActiveDevGet( devnum,&actDevorg,&actDevMaskorg);
+   	if(0 != ret)
+			{
+				nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveDevGet:FAIL.\n");
+				nam_syslog_err("err vlaue is: %d\n",ret);
+                pthread_mutex_unlock(&FdbActMutex);
+				return FDB_CONFIG_FAIL;
+			}
+	if(IS_DISTRIBUTED == SYSTEM_TYPE)
+	{
+		ret = nam_get_distributed_devnum(asic_num,&actDev);
+		if(ret != FDB_CONFIG_SUCCESS)
+		{
+			nam_syslog_dbg("get distributed dev num failure !!! \n");
+		}
+	}
+    ret = cpssDxChBrgFdbActionActiveInterfaceGet(devnum,&actIsTrunkorg,&actIsTrunkMaskorg,&actTrunkPortorg,&actTrunkPortMaskorg);
+    if(0 != ret)
+			{
+				nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveInterfaceGet:FAIL.\n");
+				nam_syslog_err("err vlaue is: %d\n",ret);
+                pthread_mutex_unlock(&FdbActMutex);
+				return FDB_CONFIG_FAIL;
+			}
+
+    ret = cpssDxChBrgFdbActionActiveVlanGet(devnum,&actVlan,& actVlanMask);
+    if(0 != ret)
+			{
+				nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveVlanGet:FAIL.\n");
+				nam_syslog_err("err vlaue is: %d\n",ret);                
+                pthread_mutex_unlock(&FdbActMutex);
+				return FDB_CONFIG_FAIL;
+			}
+	ret = cpssDxChPortEnableGet(devnum,portnum,&linkState);
+	if(0 != ret){
+          nam_syslog_err("nam_fdb:get link state error!ret %d\n",ret);          
+          pthread_mutex_unlock(&FdbActMutex);
+		  return FDB_CONFIG_FAIL;
+	}
+
+
+   /*
+       ACTION SET
+    */
+   /*first set port admin disable*/
+   if(((PRODUCT_ID_AX7K == productId)||(PRODUCT_ID_AX7K_I == productId))
+   		&& (index < 4)) {
+	  isBoard = NPD_TRUE;
+   }
+   if(NPD_FALSE == isBoard){
+	   isEnable = 0;
+	   ret = cpssDxChPortEnableSet(devnum,portnum,isEnable);
+	   osTimerWkAfter(1);/*gave time to stop the packet stream*/
+   }
+
+   
+    /*
+          disable action first to avoid auto aging
+       */
+     ret=cpssDxChBrgFdbActionsEnableSet( devnum, NAM_FALSE);
+	if(0 != ret){
+		 nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionsEnableSet:FAIL.\n");
+		 nam_syslog_err("err vlaue is: %ld\n",ret);
+		 re_flag++;
+		 goto isenable;
+	}
+
+	
+    ret=cpssDxChBrgFdbAAandTAToCpuSet(devnum,NAM_FALSE);
+	if(0 != ret){
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbAAandTAToCpuSet:FAIL.\n");
+		nam_syslog_err("err vlaue is: %d\n",ret);
+		re_flag++;
+		 goto isenable;
+	}
+	ret= cpssDxChBrgFdbMacTriggerModeSet( devnum,CPSS_ACT_TRIG_E);
+	if(0 != ret)
+	{
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbMacTriggerModeSet:FAIL.\n");
+		nam_syslog_err("err vlaue is: %d\n",ret);
+		goto isenable;
+	}
+#if 0
+    ret= cpssDxChBrgFdbPortLearnStatusSet(devNum,portNum,0,CPSS_LOCK_DROP_E);
+	if(0 != ret){
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbPortLearnStatusSet:FAIL.\n");
+		nam_syslog_err("err vlaue is: %d\n",ret);
+		re_flag++;
+		 goto isenable;
+	}
+#endif
+	ret= cpssDxChBrgFdbActionActiveVlanSet( devnum,0,0);
+	if(0 != ret){
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveVlanSet:FAIL.\n");
+		nam_syslog_err("err vlaue is: %d\n",ret);
+		re_flag++;
+		 goto isenable;
+	}
+
+	/* disable FDB static del*/
+	ret= cpssDxChBrgFdbStaticDelEnable( devnum,NAM_FALSE);
+	if(0 != ret){
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbStaticDelEnable:FAIL.\n");
+		nam_syslog_err("err vlaue is: %d\n",ret);
+		re_flag++;/*set reflag value to identifier that the return value is fail*/
+		goto isenable;
+	}
+
+	ret= cpssDxChBrgFdbActionActiveInterfaceSet( devnum, actIsTrunk,  actIsTrunkMask,actTrunkPort,actTrunkPortMask);
+	if(0 != ret){
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveInterfaceSet:FAIL.\n");
+		nam_syslog_err("err vlaue is: %d\n",ret);
+		re_flag++;
+		 goto isenable;
+	}	
+	ret= cpssDxChBrgFdbActionActiveDevSet( devnum, actDev, actDevMask);
+	if(0 != ret){
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveInterfaceSet:FAIL.\n");
+		nam_syslog_err("err vlaue is: %d\n",ret);
+		re_flag++;
+		 goto isenable;
+	}	
+	
+	ret=cpssDxChBrgFdbTrigActionStart( devnum, CPSS_FDB_ACTION_DELETING_E);
+	
+	if(0 != ret){
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbTrigActionStart1:FAIL.\n");
+		nam_syslog_err("err vlaue is: %d\n",ret); 
+		re_flag++;
+		 goto isenable;
+		/*if call failed ,do not return*/
+    }
+	while(fdb_state_count <= 6)
+	{
+		ret = cpssDxChBrgFdbTrigActionStatusGet(devnum,&ok);
+		if(ret != 0)
+		{
+			nam_syslog_err("npd_fdb:cpssDxChBrgFdbTrigActionStatusGet:FAIL!\n");
+			fdb_state_count++;
+			continue;
+		}
+		else if(0 == ok)
+		{
+			nam_syslog_err("delete fdb action did not finished !\n");
+			osTimerWkAfter(100);
+			fdb_state_count++;
+			continue;
+		}
+		else if(1 == ok)
+		{
+			nam_syslog_dbg("delete fdb action finished !\n");
+			break;
+		}
+		fdb_state_count++;
+	}
+	if(ok == 0)
+	{
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbTrigActionStatusGet:delete failed!ok value %d\n",ok);
+		re_flag++;
+		goto isenable;
+	}
+         /*enable the port */
+  isenable:
+  
+	if(((PRODUCT_ID_AX7K == productId)||(PRODUCT_ID_AX7K_I == productId))
+		&& (index < 4)) {
+	   isBoard = NPD_TRUE;
+	}
+	if(NPD_FALSE == isBoard){
+		ret = cpssDxChPortEnableSet(devnum,portnum,linkState);
+	}
+	
+	ret=cpssDxChBrgFdbActionsEnableSet( devnum, NAM_TRUE);
+	if(0 != ret){
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionsEnableSet:FAIL.\n");
+		nam_syslog_err("err vlaue is: %ld\n",ret);
+		re_flag++;
+	}
+		
+	ret=cpssDxChBrgFdbActionModeSet( devnum, actmode);
+	if(0 != ret){
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionModeSet:FAIL.\n");
+		nam_syslog_err("err vlaue is: %d\n",ret); 
+		re_flag++;
+	}
+
+	ret= cpssDxChBrgFdbMacTriggerModeSet( devnum,macmode);
+	if(0 != ret){
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbMacTriggerModeSet:FAIL.\n");
+		nam_syslog_err("err vlaue is: %d\n",ret);
+		re_flag++;
+	}
+
+
+	ret = cpssDxChBrgFdbActionActiveVlanSet(devnum,actVlan,actVlanMask);
+	if(0 != ret){
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveVlanSet:FAIL.\n");
+		nam_syslog_err("err vlaue is: %d\n",ret);
+		re_flag++;
+	}
+
+
+	ret= cpssDxChBrgFdbActionActiveInterfaceSet( devnum, actIsTrunkorg,  actIsTrunkMaskorg,actTrunkPortorg,actTrunkPortMaskorg);
+	if(0 != ret){
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveInterfaceSet:FAIL.\n");
+		nam_syslog_err("err vlaue is: %d\n",ret);
+		re_flag++;
+	}	
+
+	ret= cpssDxChBrgFdbActionActiveDevSet( devnum, actDevorg, actDevMaskorg);
+	if(0 != ret){
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbActionActiveInterfaceSet:FAIL.\n");
+		nam_syslog_err("err vlaue is: %d\n",ret);
+		re_flag++;
+	}
+	
+	ret=cpssDxChBrgFdbAAandTAToCpuSet(devnum,Atenable);/*enable the AA*/
 	if(0 != ret){
 		nam_syslog_err("npd_fdb:cpssDxChBrgFdbAAandTAToCpuSet:FAIL.\n");
 		nam_syslog_err("err vlaue is: %d\n",ret);
@@ -2129,6 +2510,13 @@ int nam_fdb_table_delete_entry_with_vlan_port
 		nam_syslog_err("err vlaue is: %d\n",ret);
 		re_flag++;
 		 goto isenable;
+	}
+	ret= cpssDxChBrgFdbMacTriggerModeSet( devNum,CPSS_ACT_TRIG_E);
+	if(0 != ret)
+	{
+		nam_syslog_err("npd_fdb:cpssDxChBrgFdbMacTriggerModeSet:FAIL.\n");
+		nam_syslog_err("err vlaue is: %d\n",ret);
+		goto isenable;
 	}
 
 	/* disable FDB static del*/
