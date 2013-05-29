@@ -83,8 +83,9 @@ VPATH = $(OCTEON_INC)/components/common \
 OBJS = $(OBJ_DIR)/builddate.o $(OBJ_DIR)/fwd_main.o $(OBJ_DIR)/fastfwd-common.o $(OBJ_DIR)/fastfwd-common-utils.o \
 			$(OBJ_DIR)/readcmd.o $(OBJ_DIR)/shell.o $(OBJ_DIR)/shell_common.o $(OBJ_DIR)/uart.o $(OBJ_DIR)/autelan_product_info.o \
             $(OBJ_DIR)/acl.o $(OBJ_DIR)/car.o $(OBJ_DIR)/traffic_monitor.o $(OBJ_DIR)/fwd_rpa.o \
-	    $(OBJ_DIR)/cvmcs-nic-api.o $(OBJ_DIR)/cvmcs-nic-init.o $(OBJ_DIR)/cvmcs-nic.o $(OBJ_DIR)/cvm_ip_reass.o $(OBJ_DIR)/cvm_ratelimit.o $(OBJ_DIR)/equipment_test.o \
+	    $(OBJ_DIR)/cvmcs-nic-api.o $(OBJ_DIR)/cvmcs-nic-init.o $(OBJ_DIR)/cvmcs-nic.o  $(OBJ_DIR)/cvm_ratelimit.o $(OBJ_DIR)/equipment_test.o \
 	    $(OBJ_DIR)/fwd_debug.o $(OBJ_DIR)/fwd_pure_ip.o
+#$(OBJ_DIR)/cvm_ip_reass.o
 
 
 CFLAGS_LOCAL =  -I$(OCTEON_INC)/components/common \

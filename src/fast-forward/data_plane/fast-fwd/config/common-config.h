@@ -282,6 +282,35 @@
 	fau CVM_FAU_ENET_OUTPUT_PACKETS_RPA
     		size = 8
     		description = "64-bit counter used for total ethernet output rpa packets";
+	fau CVM_FAU_ENET_INPUT_PACKETS_ETH
+    		size = 8
+    		description = "64-bit counter used for total ethernet input eth packets";
+	fau CVM_FAU_ENET_INPUT_PACKETS_CAPWAP
+    		size = 8
+    		description = "64-bit counter used for total ethernet input capwap packets";
+	fau CVM_FAU_ENET_INPUT_PACKETS_RPA
+    		size = 8
+    		description = "64-bit counter used for total ethernet input rpa packets";
+	fau CVM_FAU_ENET_OUTPUT_BYTES_ETH
+    		size = 8
+    		description = "64-bit counter used for total ethernet output eth bytes";
+	fau CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP
+    		size = 8
+    		description = "64-bit counter used for total ethernet output capwap bytes";
+	fau CVM_FAU_ENET_OUTPUT_BYTES_RPA
+    		size = 8
+    		description = "64-bit counter used for total ethernet output rpa bytes";
+	fau CVM_FAU_ENET_INPUT_BYTES_ETH
+    		size = 8
+    		description = "64-bit counter used for total ethernet input eth bytes";
+	fau CVM_FAU_ENET_INPUT_BYTES_CAPWAP
+    		size = 8
+    		description = "64-bit counter used for total ethernet input capwap bytes";
+	fau CVM_FAU_ENET_INPUT_BYTES_RPA
+    		size = 8
+    		description = "64-bit counter used for total ethernet input rpa bytes";
+
+
 
     
 

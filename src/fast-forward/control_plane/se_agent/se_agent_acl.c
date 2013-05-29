@@ -521,6 +521,9 @@ SEND_DCLI:
 	}
 	return;
 }
+
+
+
 void se_agent_show_learned_acl(char *buf,struct sockaddr_tipc *client_addr,unsigned int len)
 {
 	se_interative_t *se_buf=NULL;
@@ -532,13 +535,13 @@ void se_agent_show_learned_acl(char *buf,struct sockaddr_tipc *client_addr,unsig
 	rule_item_t * d_tbl_rule = NULL;
 	int32_t total_count = 0;
 	int32_t static_count=0;
-	//uint32_t acl_static_index = 0xFFFFFFFF;
-	uint32_t first_static = 1;
 	uint32_t static_loop = 0;
 	uint32_t static_index = 0;
 	uint32_t dynamic_index = 0;
+	uint32_t dynamic_loop = 0;
+	uint32_t dynamic_tmp_loop = 0;
+	uint32_t first_rule = 1;
 	
-	capwap_cache_t * capwap=NULL;
 	if(NULL==buf || NULL==client_addr || 0==len)
 	{
 		se_agent_syslog_err("se_agent_show_learned_acl param error\n");
@@ -553,10 +556,11 @@ void se_agent_show_learned_acl(char *buf,struct sockaddr_tipc *client_addr,unsig
 		goto SEND_DCLI;
 	}
 	static_index=se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index;
+	dynamic_index = se_buf->fccp_cmd.fccp_data.acl_info.acl_dynamic_index;
 
 	if(0xFFFFFFFF == static_index)
 	{
-		for(static_loop = 0; static_loop < acl_static_tbl_size; static_loop++)
+		for(static_loop = 0; static_loop < acl_static_tbl_size; dynamic_loop = 0, static_loop++)
 		{ 
 			s_tbl_rule = (rule_item_t *)acl_bucket_tbl+static_loop;
 			if(s_tbl_rule->rules.rule_state == RULE_IS_EMPTY)
@@ -569,9 +573,9 @@ void se_agent_show_learned_acl(char *buf,struct sockaddr_tipc *client_addr,unsig
 				switch(s_tbl_rule->rules.rule_state)
 				{
 					case RULE_IS_LEARNED:
-						if(first_static==1)
+						if(1 == first_rule)
 						{
-							first_static=0;
+							first_rule = 0;
 							static_index=static_loop;
 						}
 						total_count++;
@@ -590,6 +594,12 @@ void se_agent_show_learned_acl(char *buf,struct sockaddr_tipc *client_addr,unsig
 				switch(d_tbl_rule->rules.rule_state)
 				{
 					case RULE_IS_LEARNED:
+					    if(1 == first_rule)
+                        {
+                            first_rule = 0;
+                            static_index = static_loop;
+							dynamic_index = dynamic_loop;
+                        }
 						total_count++;
 						break;
 					default:
@@ -597,36 +607,92 @@ void se_agent_show_learned_acl(char *buf,struct sockaddr_tipc *client_addr,unsig
 				}
 
 				d_tbl_rule = d_tbl_rule->next;
+				dynamic_loop++;
 			}		
 		}
 		se_buf->cmd_result=AGENT_RETURN_OK;
 		se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index = static_index;
+		se_buf->fccp_cmd.fccp_data.acl_info.acl_dynamic_index = dynamic_index;
 		se_buf->fccp_cmd.fccp_data.acl_info.acl_static_cnt=static_count;
 		se_buf->fccp_cmd.fccp_data.acl_info.acl_cnt=total_count;
 		goto SEND_DCLI;
 	}
 	else
 	{
-		for(static_loop=static_index; static_loop < acl_static_tbl_size; static_loop++)
+		for(dynamic_loop = dynamic_index, static_loop=static_index; static_loop < acl_static_tbl_size; dynamic_loop = 0, static_loop++)
 		{ 
 			s_tbl_rule = (rule_item_t *)acl_bucket_tbl+static_loop;
 			if(s_tbl_rule->rules.rule_state == RULE_IS_EMPTY)
-			{
-				continue;             
+			{        
+				if (NULL == s_tbl_rule->next) 
+				{
+                    continue;
+            	} 
 			}
-			else
+			else if (0 == dynamic_loop)  /*this is a static acl*/
 			{
 				switch(s_tbl_rule->rules.rule_state)
 				{
 					case RULE_IS_LEARNED:
 						read_specified_rule(&(se_buf->fccp_cmd.fccp_data.rule_info.rule_param),s_tbl_rule);
 						se_buf->cmd_result=AGENT_RETURN_OK;
-						se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index=static_loop+1;
+						if (NULL == s_tbl_rule->next) 
+					  	{
+					      	se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index = static_loop + 1;
+						  	se_buf->fccp_cmd.fccp_data.acl_info.acl_dynamic_index = 0;
+				      	} 
+					  	else
+					  	{
+					      	se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index = static_loop;
+						  	se_buf->fccp_cmd.fccp_data.acl_info.acl_dynamic_index = 1;
+						}
 						goto SEND_DCLI;
 						break;
 					default:
 						break;
 				}
+			}
+
+			d_tbl_rule = s_tbl_rule->next;
+			dynamic_tmp_loop = dynamic_loop;
+			while ((d_tbl_rule != NULL) && (dynamic_tmp_loop > 1)) 
+			{
+				d_tbl_rule = cvmx_phys_to_ptr((uint64_t)d_tbl_rule);
+				d_tbl_rule = d_tbl_rule->next;
+				dynamic_tmp_loop--;
+			}
+			if (NULL == d_tbl_rule)
+			{
+				continue;
+			}
+
+			while(d_tbl_rule != NULL)
+			{
+				d_tbl_rule = cvmx_phys_to_ptr((uint64_t)d_tbl_rule);
+                
+                switch(d_tbl_rule->rules.rule_state)
+                {
+                    case RULE_IS_LEARNED:
+						read_specified_rule(&(se_buf->fccp_cmd.fccp_data.acl_info.acl_param),d_tbl_rule);
+						se_buf->cmd_result=AGENT_RETURN_OK;
+						if (NULL == d_tbl_rule->next) 
+						{
+				        	se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index = static_loop + 1;
+							se_buf->fccp_cmd.fccp_data.acl_info.acl_dynamic_index = 0;
+					    } 
+						else
+						{
+					    	se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index = static_loop;
+							se_buf->fccp_cmd.fccp_data.acl_info.acl_dynamic_index = dynamic_loop + 1;
+						}
+						goto SEND_DCLI;
+
+                  default:
+                      break;
+                }
+                
+				d_tbl_rule = d_tbl_rule->next;
+				dynamic_loop++;
 			}
 		}
 				
@@ -641,9 +707,9 @@ SEND_DCLI:
 		se_agent_syslog_err("se_agent_show_learned_acl send to dcli failed:%s\n",strerror(errno));
 		return ;
 	}
+	
 	return;
 }
-
 
 void se_agent_show_learning_acl(char *buf,struct sockaddr_tipc *client_addr,unsigned int len)
 {
@@ -656,10 +722,13 @@ void se_agent_show_learning_acl(char *buf,struct sockaddr_tipc *client_addr,unsi
 	rule_item_t * d_tbl_rule = NULL;
 	int32_t total_count = 0;
 	int32_t static_count = 0;
-	//uint32_t acl_static_index= -1;
-	uint32_t first_static = 1;
 	uint32_t static_loop = 0;
 	uint32_t static_index = 0;
+	uint32_t dynamic_index = 0;
+	uint32_t dynamic_loop = 0;
+	uint32_t dynamic_tmp_loop = 0;
+	uint32_t first_rule = 1;
+	int32_t dynamic_count = 0;
 	
 	if(NULL==buf || NULL==client_addr || 0==len)
 	{
@@ -667,16 +736,18 @@ void se_agent_show_learning_acl(char *buf,struct sockaddr_tipc *client_addr,unsi
 		return ;
 	}
 	se_buf=(se_interative_t *)buf;
-	if(acl_bucket_tbl == NULL || (FASTFWD_NOT_LOADED == fast_forward_module_load_check()))
+	if((acl_bucket_tbl == NULL) || (FASTFWD_NOT_LOADED == fast_forward_module_load_check()))
 	{
 		strncpy(se_buf->err_info,FASTFWD_NO_RESPOND_STR,sizeof(FASTFWD_NO_RESPOND_STR));
 		se_buf->cmd_result = AGENT_RETURN_FAIL;
 		goto SEND_DCLI;
 	}
 	static_index=se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index;
+	dynamic_index = se_buf->fccp_cmd.fccp_data.acl_info.acl_dynamic_index;
+
 	if(0xFFFFFFFF == static_index)
 	{
-		for(static_loop = 0; static_loop < acl_static_tbl_size; static_loop++)
+		for(static_loop = 0; static_loop < acl_static_tbl_size; dynamic_loop = 0, static_loop++)
 		{ 
 			s_tbl_rule = (rule_item_t *)acl_bucket_tbl+static_loop;
 			if(s_tbl_rule->rules.rule_state == RULE_IS_EMPTY)
@@ -689,9 +760,9 @@ void se_agent_show_learning_acl(char *buf,struct sockaddr_tipc *client_addr,unsi
 				switch(s_tbl_rule->rules.rule_state)
 				{
 					case RULE_IS_LEARNING:
-						if(first_static==1)
+						if(first_rule==1)
 						{
-							first_static=0;
+							first_rule=0;
 							static_index=static_loop;
 						}
 						total_count++;
@@ -710,6 +781,13 @@ void se_agent_show_learning_acl(char *buf,struct sockaddr_tipc *client_addr,unsi
 				switch(d_tbl_rule->rules.rule_state)
 				{
 					case RULE_IS_LEARNING:
+					    if(1 == first_rule)
+                        {
+                            first_rule = 0;
+                            static_index = static_loop;
+							dynamic_index = dynamic_loop;
+                        }
+                        dynamic_count++;
 						total_count++;
 						break;
 					default:
@@ -717,38 +795,94 @@ void se_agent_show_learning_acl(char *buf,struct sockaddr_tipc *client_addr,unsi
 				}
 
 				d_tbl_rule = d_tbl_rule->next;
+				dynamic_loop++;
 			}		
 		}
 		se_buf->cmd_result=AGENT_RETURN_OK;
 		se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index = static_index;
+		se_buf->fccp_cmd.fccp_data.acl_info.acl_dynamic_index = dynamic_index;
 		se_buf->fccp_cmd.fccp_data.acl_info.acl_static_cnt=static_count;
 		se_buf->fccp_cmd.fccp_data.acl_info.acl_cnt=total_count;
+		
 		goto SEND_DCLI;
 	}
 	else
 	{
-		for(static_loop=static_index; static_loop < acl_static_tbl_size; static_loop++)
+		for(dynamic_loop = dynamic_index, static_loop=static_index; static_loop < acl_static_tbl_size; dynamic_loop = 0, static_loop++)
 		{ 
 			s_tbl_rule = (rule_item_t *)acl_bucket_tbl+static_loop;
 			
 			
 			if(s_tbl_rule->rules.rule_state == RULE_IS_EMPTY)
-			{
-				continue;             
+			{      
+				if (NULL == s_tbl_rule->next) 
+				{
+                    continue;
+            	} 
 			}
-			else
+			else if (0 == dynamic_loop)  /*this is a static acl*/
 			{
 				switch(s_tbl_rule->rules.rule_state)
 				{
 					case RULE_IS_LEARNING:
 						read_specified_rule(&(se_buf->fccp_cmd.fccp_data.rule_info.rule_param),s_tbl_rule);
 						se_buf->cmd_result=AGENT_RETURN_OK;
-						se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index=static_loop+1;
+						if (NULL == s_tbl_rule->next) 
+					  	{
+					      	se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index = static_loop + 1;
+						  	se_buf->fccp_cmd.fccp_data.acl_info.acl_dynamic_index = 0;
+				      	} 
+					  	else
+					  	{
+					      	se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index = static_loop;
+						  	se_buf->fccp_cmd.fccp_data.acl_info.acl_dynamic_index = 1;
+						}
 						goto SEND_DCLI;
 						break;
 					default:
 						break;
 				}
+			}
+			d_tbl_rule = s_tbl_rule->next;
+			dynamic_tmp_loop = dynamic_loop;
+			while ((d_tbl_rule != NULL) && (dynamic_tmp_loop > 1)) 
+			{
+				d_tbl_rule = cvmx_phys_to_ptr((uint64_t)d_tbl_rule);
+				d_tbl_rule = d_tbl_rule->next;
+				dynamic_tmp_loop--;
+			}
+			if (NULL == d_tbl_rule)
+			{
+				continue;
+			}
+
+			while(d_tbl_rule != NULL)
+			{
+				d_tbl_rule = cvmx_phys_to_ptr((uint64_t)d_tbl_rule);
+                
+                switch(d_tbl_rule->rules.rule_state)
+                {
+                    case RULE_IS_LEARNING:
+						read_specified_rule(&(se_buf->fccp_cmd.fccp_data.acl_info.acl_param),d_tbl_rule);
+						se_buf->cmd_result=AGENT_RETURN_OK;
+						if (NULL == d_tbl_rule->next) 
+						{
+				        	se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index = static_loop + 1;
+							se_buf->fccp_cmd.fccp_data.acl_info.acl_dynamic_index = 0;
+					    } 
+						else
+						{
+					    	se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index = static_loop;
+							se_buf->fccp_cmd.fccp_data.acl_info.acl_dynamic_index = dynamic_loop + 1;
+						}
+						goto SEND_DCLI;
+
+                  default:
+                      break;
+                }
+                
+				d_tbl_rule = d_tbl_rule->next;
+				dynamic_loop++;
 			}
 		}
 				

@@ -389,9 +389,6 @@ typedef struct
 	int64_t fau_enet_capwap_pppoe_nonip_packets;	/*64-bit counter used for total ethernet input capwap pppoe noneip packets*/
 	int64_t fau_enet_output_packets_eth_pppoe;			/*64-bit counter used for total ethernet output eth pppoe packets*/
 	int64_t fau_enet_output_packets_capwap_pppoe;   /*64-bit counter used for total ethernet output capwap pppoe packets*/
-	int64_t fau_enet_output_packets_eth;   /*64-bit counter used for total ethernet output eth packets*/
-	int64_t fau_enet_output_packets_capwap;   /*64-bit counter used for total ethernet output capwap packets*/
-	int64_t fau_enet_output_packets_rpa;   /*64-bit counter used for total ethernet output rpa packets*/
 }fau64_info_t;
 
 typedef struct 
@@ -399,23 +396,41 @@ typedef struct
 	int64_t fau_enet_output_packets_eth;   /*64-bit counter used for total ethernet output eth packets*/
 	int64_t fau_enet_output_packets_capwap;   /*64-bit counter used for total ethernet output capwap packets*/
 	int64_t fau_enet_output_packets_rpa;   /*64-bit counter used for total ethernet output rpa packets*/
+	int64_t fau_enet_input_packets_eth;   /*64-bit counter used for total ethernet input eth packets*/
+	int64_t fau_enet_input_packets_capwap;   /*64-bit counter used for total ethernet input capwap packets*/
+	int64_t fau_enet_input_packets_rpa;   /*64-bit counter used for total ethernet input rpa packets*/
+	int64_t fau_enet_output_bytes_eth;   /*64-bit counter used for total ethernet output eth bytes*/
+	int64_t fau_enet_output_bytes_capwap;   /*64-bit counter used for total ethernet output capwap bytes*/
+	int64_t fau_enet_output_bytes_rpa;   /*64-bit counter used for total ethernet output rpa bytes*/
+	int64_t fau_enet_input_bytes_eth;   /*64-bit counter used for total ethernet input eth bytes*/
+	int64_t fau_enet_input_bytes_capwap;   /*64-bit counter used for total ethernet input capwap bytes*/
+	int64_t fau_enet_input_bytes_rpa;   /*64-bit counter used for total ethernet input rpa bytes*/
+
 }fau64_part_info_t;
 
 typedef struct 
 {
 	int64_t fau_enet_output_packets_eth;   /*64-bit counter used for total ethernet output eth packets*/
-}fau64_out_eth_info_t;
+	int64_t fau_enet_input_packets_eth;   /*64-bit counter used for total ethernet input eth packets*/
+	int64_t fau_enet_output_bytes_eth;   /*64-bit counter used for total ethernet output eth bytes*/
+	int64_t fau_enet_input_bytes_eth;   /*64-bit counter used for total ethernet input eth bytes*/
+}fau64_eth_info_t;
 
 typedef struct 
 {
 	int64_t fau_enet_output_packets_capwap;   /*64-bit counter used for total ethernet output capwap packets*/
-}fau64_out_capwap_info_t;
+	int64_t fau_enet_input_packets_capwap;   /*64-bit counter used for total ethernet input capwap packets*/
+	int64_t fau_enet_output_bytes_capwap;   /*64-bit counter used for total ethernet output capwap bytes*/
+	int64_t fau_enet_input_bytes_capwap;   /*64-bit counter used for total ethernet input capwap bytes*/
+}fau64_capwap_info_t;
 
 typedef struct 
 {
 	int64_t fau_enet_output_packets_rpa;   /*64-bit counter used for total ethernet output rpa packets*/
-}fau64_out_rpa_info_t;
-
+	int64_t fau_enet_input_packets_rpa;   /*64-bit counter used for total ethernet input rpa packets*/
+	int64_t fau_enet_output_bytes_rpa;   /*64-bit counter used for total ethernet output rpa packets*/
+	int64_t fau_enet_input_bytes_rpa;   /*64-bit counter used for total ethernet input rpa packets*/
+}fau64_rpa_info_t;
 
 
 typedef union{
@@ -427,9 +442,9 @@ typedef union{
 	traffic_stats_t traffic_stats;
 	fau64_info_t fau64_info;
 	fau64_part_info_t fau64_part_info;
-	fau64_out_eth_info_t fau64_out_eth_info;
-	fau64_out_capwap_info_t fau64_out_capwap_info;
-	fau64_out_rpa_info_t fau64_out_rpa_info;
+	fau64_eth_info_t fau64_eth_info;
+	fau64_capwap_info_t fau64_capwap_info;
+	fau64_rpa_info_t fau64_rpa_info;
 }fccp_data_t;
 
 

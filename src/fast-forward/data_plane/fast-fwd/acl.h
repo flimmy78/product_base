@@ -339,9 +339,6 @@ typedef struct
 	int64_t fau_enet_capwap_pppoe_nonip_packets;	/*64-bit counter used for total ethernet input capwap pppoe noneip packets*/
 	int64_t fau_enet_output_packets_eth_pppoe;			/*64-bit counter used for total ethernet output eth pppoe packets*/
 	int64_t fau_enet_output_packets_capwap_pppoe;   /*64-bit counter used for total ethernet output capwap pppoe packets*/
-	int64_t fau_enet_output_packets_eth;   /*64-bit counter used for total ethernet output eth packets*/
-	int64_t fau_enet_output_packets_capwap;   /*64-bit counter used for total ethernet output capwap packets*/
-	int64_t fau_enet_output_packets_rpa;   /*64-bit counter used for total ethernet output rpa packets*/
 }fau64_info_t;
 
 typedef struct 
@@ -349,22 +346,43 @@ typedef struct
 	int64_t fau_enet_output_packets_eth;   /*64-bit counter used for total ethernet output eth packets*/
 	int64_t fau_enet_output_packets_capwap;   /*64-bit counter used for total ethernet output capwap packets*/
 	int64_t fau_enet_output_packets_rpa;   /*64-bit counter used for total ethernet output rpa packets*/
+	int64_t fau_enet_input_packets_eth;   /*64-bit counter used for total ethernet input eth packets*/
+	int64_t fau_enet_input_packets_capwap;   /*64-bit counter used for total ethernet input capwap packets*/
+	int64_t fau_enet_input_packets_rpa;   /*64-bit counter used for total ethernet input rpa packets*/
+	int64_t fau_enet_output_bytes_eth;   /*64-bit counter used for total ethernet output eth bytes*/
+	int64_t fau_enet_output_bytes_capwap;   /*64-bit counter used for total ethernet output capwap bytes*/
+	int64_t fau_enet_output_bytes_rpa;   /*64-bit counter used for total ethernet output rpa bytes*/
+	int64_t fau_enet_input_bytes_eth;   /*64-bit counter used for total ethernet input eth bytes*/
+	int64_t fau_enet_input_bytes_capwap;   /*64-bit counter used for total ethernet input capwap bytes*/
+	int64_t fau_enet_input_bytes_rpa;   /*64-bit counter used for total ethernet input rpa bytes*/
+
 }fau64_part_info_t;
 
 typedef struct 
 {
 	int64_t fau_enet_output_packets_eth;   /*64-bit counter used for total ethernet output eth packets*/
-}fau64_out_eth_info_t;
+	int64_t fau_enet_input_packets_eth;   /*64-bit counter used for total ethernet input eth packets*/
+	int64_t fau_enet_output_bytes_eth;   /*64-bit counter used for total ethernet output eth bytes*/
+	int64_t fau_enet_input_bytes_eth;   /*64-bit counter used for total ethernet input eth bytes*/
+}fau64_eth_info_t;
 
 typedef struct 
 {
 	int64_t fau_enet_output_packets_capwap;   /*64-bit counter used for total ethernet output capwap packets*/
-}fau64_out_capwap_info_t;
+	int64_t fau_enet_input_packets_capwap;   /*64-bit counter used for total ethernet input capwap packets*/
+	int64_t fau_enet_output_bytes_capwap;   /*64-bit counter used for total ethernet output capwap bytes*/
+	int64_t fau_enet_input_bytes_capwap;   /*64-bit counter used for total ethernet input capwap bytes*/
+}fau64_capwap_info_t;
 
 typedef struct 
 {
 	int64_t fau_enet_output_packets_rpa;   /*64-bit counter used for total ethernet output rpa packets*/
-}fau64_out_rpa_info_t;
+	int64_t fau_enet_input_packets_rpa;   /*64-bit counter used for total ethernet input rpa packets*/
+	int64_t fau_enet_output_bytes_rpa;   /*64-bit counter used for total ethernet output rpa packets*/
+	int64_t fau_enet_input_bytes_rpa;   /*64-bit counter used for total ethernet input rpa packets*/
+}fau64_rpa_info_t;
+
+
 
 
 typedef struct rule_cnt_info_s{
@@ -2052,12 +2070,12 @@ int32_t user_action_offline(uint32_t user_ip);
 int32_t user_stats_clear(uint32_t user_ip);
 void user_flow_statistics_process(cvmx_wqe_t *work, rule_item_t *rule,cvm_common_ip_hdr_t *true_ip);
 
-void flow_action_process(cvmx_wqe_t *work, uint32_t action_type, cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th, cvm_common_ip_hdr_t *true_ip, rule_item_t *prule, cvmx_spinlock_t *first_lock);
+void flow_action_process(cvmx_wqe_t *work, uint32_t action_type, cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th, cvm_common_ip_hdr_t *true_ip, rule_item_t *prule, cvmx_spinlock_t *first_lock, uint8_t in_is_rpa);
 int fastfwd_show_fau64(fau64_info_t *fau64_info);
 int fastfwd_show_part_fau64(fau64_part_info_t *fau64_part_info);
-int fastfwd_show_out_eth_fau64(fau64_out_eth_info_t *fau64_out_eth_info);
-int fastfwd_show_out_capwap_fau64(fau64_out_capwap_info_t *fau64_out_capwap_info);
-int fastfwd_show_out_rpa_fau64(fau64_out_rpa_info_t *fau64_out_rpa_info);
+int fastfwd_show_eth_fau64(fau64_eth_info_t *fau64_eth_info);
+int fastfwd_show_capwap_fau64(fau64_capwap_info_t *fau64_capwap_info);
+int fastfwd_show_rpa_fau64(fau64_rpa_info_t *fau64_rpa_info);
 extern inline int32_t acl_fill_rule(rule_param_t* dst_rule_para, rule_param_t* src_rule_para, capwap_cache_t* cw_cache);
 extern inline int32_t fwd_get_user_idx(rule_param_t *rule_param);
 

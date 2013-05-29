@@ -214,7 +214,7 @@ out:
 
 void display_banner(void)
 {
-	printf("\n\nCopyright 2010-2012  BEIJING AUTELAN TELECOM CO., LTD.\r\n");
+	printf("\n\nCopyright 2010-2013  BEIJING AUTELAN TELECOM CO., LTD.\r\n");
 	printf ("%s\n\n", version_string);
 }
 

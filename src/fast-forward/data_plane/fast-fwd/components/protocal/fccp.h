@@ -68,9 +68,11 @@
 #define FCCP_CMD_ENABLE_PURE_IP             42
 #define FCCP_CMD_GET_PURE_IP_STATE      	43
 #define FCCP_CMD_SHOW_PART_FAU64 			44
-#define FCCP_CMD_SHOW_OUT_ETH_FAU64 		45
-#define FCCP_CMD_SHOW_OUT_CAPWAP_FAU64 		46
-#define FCCP_CMD_SHOW_OUT_RPA_FAU64 		47
+#define FCCP_CMD_SHOW_ETH_FAU64 			45
+#define FCCP_CMD_SHOW_CAPWAP_FAU64 			46
+#define FCCP_CMD_SHOW_RPA_FAU64 			47
+#define FCCP_CMD_CLEAR_PART_FAU64 			48
+
 
 
 typedef struct
@@ -208,9 +210,9 @@ typedef union{
     equipment_test_cntl_t equipment_test;
     fau64_info_t fau64_info;
 	fau64_part_info_t fau64_part_info;
-	fau64_out_eth_info_t fau64_out_eth_info;
-	fau64_out_capwap_info_t fau64_out_capwap_info;
-	fau64_out_rpa_info_t fau64_out_rpa_info;
+	fau64_eth_info_t fau64_eth_info;
+	fau64_capwap_info_t fau64_capwap_info;
+	fau64_rpa_info_t fau64_rpa_info;
     uint32_t pool_buff_count[8];
 }fccp_data_t;
 

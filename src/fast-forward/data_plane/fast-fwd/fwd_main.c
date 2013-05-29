@@ -107,6 +107,9 @@ CVMX_SHARED uint64_t fwd_sec = 0;
 
 CVMX_SHARED int pure_ip_forward_enable = FUNC_DISABLE;
 
+CVMX_SHARED int standalone_fwd_enable = FUNC_ENABLE;
+
+
 void clear_fau_64();
 
 /**
@@ -194,6 +197,13 @@ int32_t disable_fastfwd()
 {
 	int port_index;
 
+	if (product_info.se_mode == SE_MODE_STANDALONE)
+	{
+		standalone_fwd_enable = FUNC_DISABLE;
+
+		return RETURN_OK;
+	}
+	
 	/* Change the group for only the port we're interested in */
 	for (port_index=0; port_index < CVMX_PIP_NUM_INPUT_PORTS; port_index++)
 	{
@@ -213,6 +223,13 @@ int32_t disable_fastfwd()
 int32_t enable_fastfwd()
 {
 	int port_index;
+
+	if (product_info.se_mode == SE_MODE_STANDALONE)
+	{
+		standalone_fwd_enable = FUNC_ENABLE;
+
+		return RETURN_OK;
+	}
 
 	/* Change the group for only the port we're interested in */
 	for (port_index=0; port_index < CVMX_PIP_NUM_INPUT_PORTS; port_index++)
@@ -1595,7 +1612,7 @@ inline int8_t cw_802_3_decap(cvm_common_udp_hdr_t *ex_uh,
 }
 
 
-int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_hdr_t *true_ip)
+int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_hdr_t *true_ip, uint8_t input_rpa)
 {
 	uint16_t pko_ip_offset = 0;
 	uint8_t *pkt_ptr = NULL;
@@ -1613,7 +1630,19 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"flow_action_process: ETH ICMP ==> ETH ICMP.\n");
 
+			if (1 == input_rpa)
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, CVM_WQE_GET_LEN(work));
+			}
+			else
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_ETH, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
+			}
+
 			encap_eth_packet(work, prule, true_ip);
+			
 			if(prule->rules.action_type == FLOW_ACTION_RPA_ICMP)
 			{
 				add_rpa_head(work, prule);
@@ -1621,6 +1650,7 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 			else
 			{
 				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
 			}
 			
 			if (1 == prule->rules.nat_flag)
@@ -1640,15 +1670,28 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 		{	
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"flow_action_process: CAPWAP 802.11 ICMP ==> ETH ICMP.\n");
+
+			if (1 == input_rpa)
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, CVM_WQE_GET_LEN(work));
+			}
+			else
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_CAPWAP, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
+			}
 			
 			encap_eth_packet(work, prule, true_ip);
+			
 			if(prule->rules.action_type == FLOW_ACTION_RPA_ICMP)
 			{
 				add_rpa_head(work, prule);
 			}
 			else
 			{
-				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
 			}
 						
 			if (1 == prule->rules.nat_flag)
@@ -1669,14 +1712,27 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"flow_action_process:CAPWAP 802.3 ICMP ==> ETH ICMP.\n");
 
+			if (1 == input_rpa)
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, CVM_WQE_GET_LEN(work));
+			}
+			else
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_CAPWAP, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
+			}
+			
 			encap_eth_packet(work, prule, true_ip);
+
 			if(prule->rules.action_type == FLOW_ACTION_RPA_ICMP)
 			{
 				add_rpa_head(work, prule);
 			}
 			else
 			{
-				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
 			}			
 			
 			if (1 == prule->rules.nat_flag)
@@ -1700,7 +1756,19 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"flow_action_process: ETH ICMP ==> CAPWAP 802.11 ICMP .\n");
 
+			if (1 == input_rpa)
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, CVM_WQE_GET_LEN(work));
+			}
+			else
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_ETH, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
+			}
+
 			encap_802_11_cw_packet(work, prule, true_ip);
+			
 			if(prule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_802_11_ICMP)
 			{
 				add_rpa_head(work, prule);
@@ -1708,6 +1776,7 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 			else
 			{
 				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 			}
 						
 			if (1 == prule->rules.nat_flag)
@@ -1728,7 +1797,19 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"flow_action_process: CAPWAP 802.11 ICMP ==> CAPWAP 802.11 ICMP.\n");
 
+			if (1 == input_rpa)
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, CVM_WQE_GET_LEN(work));
+			}
+			else
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_CAPWAP, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
+			}
+
 			encap_802_11_cw_packet(work, prule, true_ip);
+			
 			if(prule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_802_11_ICMP)
 			{
 				add_rpa_head(work, prule);
@@ -1736,8 +1817,9 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 			else
 			{
 				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 			}
-
+			
 			if (1 == prule->rules.nat_flag)
 			{
 				pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
@@ -1759,7 +1841,19 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"flow_action_process: ETH ICMP ==> CAPWAP 802.3 ICMP .\n");
 
+			if (1 == input_rpa)
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, CVM_WQE_GET_LEN(work));
+			}
+			else
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_ETH, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
+			}
+
 			encap_802_3_cw_packet(work, prule, true_ip);
+			
 			if(prule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_802_3_ICMP)
 			{
 				add_rpa_head(work, prule);
@@ -1767,6 +1861,7 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 			else
 			{
 				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 			}
 			
 			if (1 == prule->rules.nat_flag)
@@ -1787,7 +1882,19 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"flow_action_process: CAPWAP 802.3 ICMP ==> CAPWAP 802.3 ICMP.\n");
 
+			if (1 == input_rpa)
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, CVM_WQE_GET_LEN(work));
+			}
+			else
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_CAPWAP, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
+			}
+
 			encap_802_3_cw_packet(work, prule, true_ip);
+			
 			if(prule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_802_3_ICMP)
 			{
 				add_rpa_head(work, prule);
@@ -1795,6 +1902,7 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 			else
 			{
 				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 1);
+				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 			}
 			
 			if (1 == prule->rules.nat_flag)
@@ -2184,7 +2292,7 @@ failed_handle_packet:
  *  lutao add
  */
 void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
-            cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th, cvm_common_ip_hdr_t *true_ip, rule_item_t *prule, cvmx_spinlock_t *first_lock)
+            cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th, cvm_common_ip_hdr_t *true_ip, rule_item_t *prule, cvmx_spinlock_t *first_lock, uint8_t input_rpa)
 {
 	cvm_common_udp_hdr_t *uh = NULL;
 	uint16_t pko_ip_offset = 0;
@@ -2328,17 +2436,30 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 						"flow_action_process: Eth ==> Eth.\n");
 
+				if (1 == input_rpa)
+				{
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, CVM_WQE_GET_LEN(work));
+				}
+				else
+				{
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_ETH, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
+				}
+
 				encap_eth_packet(work, prule, true_ip);
 				
 				if(prule->rules.action_type == FLOW_ACTION_RPA_ETH_FORWARD)
 				{
 					add_rpa_head(work,prule);
-					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_RPA, 1);
 				}
 				else
 				{
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
 				}
+
+
 				
 				if (1 == prule->rules.nat_flag)
 				{
@@ -2352,7 +2473,21 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 			{           
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 						"flow_action_process: now in CAPWAP 802.11 ==> ETH.\n");
+
+				if (1 == input_rpa)
+				{
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, CVM_WQE_GET_LEN(work));
+				}
+				else
+				{
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_CAPWAP, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
+				}
+
+				
 				encap_eth_packet(work, prule, true_ip);
+				
 				if(prule->rules.action_type == FLOW_ACTION_RPA_ETH_FORWARD)
 				{
 					add_rpa_head(work,prule);
@@ -2360,6 +2495,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 				else
 				{
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
 				}
 				
 				if (1 == prule->rules.nat_flag)
@@ -2375,7 +2511,20 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 						"flow_action_process: now in CAPWAP 802.3 ==> ETH.\n");
+
+				if (1 == input_rpa)
+				{
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, CVM_WQE_GET_LEN(work));
+				}
+				else
+				{
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_CAPWAP, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
+				}
+
 				encap_eth_packet(work, prule,true_ip);
+				
 				if(prule->rules.action_type == FLOW_ACTION_RPA_ETH_FORWARD)
 				{
 					add_rpa_head(work,prule);
@@ -2383,6 +2532,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 				else
 				{
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
 				}
 				
 				if (1 == prule->rules.nat_flag)
@@ -2415,8 +2565,20 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 						"flow_action_process: Eth ==> CAPWAP 802.11.\n");
+
+				if (1 == input_rpa)
+				{
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, CVM_WQE_GET_LEN(work));
+				}
+				else
+				{
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_ETH, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
+				}
 				
-				encap_802_11_cw_packet(work, prule, true_ip);           
+				encap_802_11_cw_packet(work, prule, true_ip); 
+				
 				if(prule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_FORWARD)
 				{	
 					add_rpa_head(work,prule);
@@ -2424,6 +2586,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 				else 
 				{
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 				}
 				
 				if (1 == prule->rules.nat_flag)
@@ -2438,7 +2601,20 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 						"flow_action_process: CAPWAP 802.11 ==> CAPWAP 802.11.\n");
+
+				if (1 == input_rpa)
+				{
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, CVM_WQE_GET_LEN(work));
+				}
+				else
+				{
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_CAPWAP, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
+				}
+				
 				encap_802_11_cw_packet(work, prule, true_ip);
+				
 				if(prule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_FORWARD)
 				{	
 					add_rpa_head(work,prule);
@@ -2446,6 +2622,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 				else 
 				{
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 				}
 								
 				if (1 == prule->rules.nat_flag)
@@ -2468,6 +2645,17 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 						"flow_action_process: eth 802.3 ==> CAPWAP 802.3.\n");
 
+				if (1 == input_rpa)
+				{
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, CVM_WQE_GET_LEN(work));
+				}
+				else
+				{
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_ETH, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
+				}
+
 				encap_802_3_cw_packet(work, prule, true_ip);
 
 				if(prule->rules.action_type == FLOW_ACTION_RPA_CAP802_3_FORWARD)
@@ -2477,8 +2665,9 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 				else 
 				{
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 				}
-						
+				
 				if (1 == prule->rules.nat_flag)
 				{
 					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
@@ -2491,7 +2680,20 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 						"flow_action_process: capwap 802.3 ==> CAPWAP 802.3.\n");
+
+				if (1 == input_rpa)
+				{
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, CVM_WQE_GET_LEN(work));
+				}
+				else
+				{
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS_CAPWAP, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
+				}
+				
 				encap_802_3_cw_packet(work, prule, true_ip);
+				
 				if(prule->rules.action_type == FLOW_ACTION_RPA_CAP802_3_FORWARD)
 				{
 					add_rpa_head(work,prule);
@@ -2499,8 +2701,9 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 				else 
 				{
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 1);
+					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 				}
-								
+				
 				if (1 == prule->rules.nat_flag)
 				{
 					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
@@ -2517,7 +2720,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 				(prule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_802_11_ICMP) ||
 				(prule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_802_3_ICMP))
 		{
-			flow_icmp_fast_path(prule, work, true_ip);
+			flow_icmp_fast_path(prule, work, true_ip, input_rpa);
 			return;
 		}
 		else
@@ -2974,7 +3177,7 @@ static inline int acl_cache_flow(cvmx_wqe_t* work, control_cmd_t * fccp_cmd)
 	    uint64_t fau_addr = 0;
     	int32_t i = (CVM_FAU_PKO_ERRORS - CVMX_FAU_REG_64_START) >> 3;
 
-    	for(;fau_addr < CVMX_FAU_REG_64_END; i++)
+    	for(;fau_addr < CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP_PPPOE; i++)
     	{
     		fau_addr = CVMX_FAU_REG_64_ADDR(i);
     		cvmx_fau_atomic_write64(fau_addr, 0);
@@ -2988,23 +3191,35 @@ static inline int acl_cache_flow(cvmx_wqe_t* work, control_cmd_t * fccp_cmd)
         else
             return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
 	}
-	else if(fccp_cmd->cmd_opcode == FCCP_CMD_SHOW_OUT_ETH_FAU64)
+	else if(fccp_cmd->cmd_opcode == FCCP_CMD_CLEAR_PART_FAU64)
 	{
-	    if(RETURN_ERROR == fastfwd_show_out_eth_fau64(&fccp_cmd->fccp_data.fau64_out_eth_info))
+	    uint64_t fau_addr = 0;
+    	int32_t i = (CVM_FAU_ENET_OUTPUT_PACKETS_ETH - CVMX_FAU_REG_64_START) >> 3;
+
+    	for(;fau_addr < CVM_FAU_ENET_INPUT_BYTES_RPA; i++)
+    	{
+    		fau_addr = CVMX_FAU_REG_64_ADDR(i);
+    		cvmx_fau_atomic_write64(fau_addr, 0);
+    	}
+	    return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
+	}
+	else if(fccp_cmd->cmd_opcode == FCCP_CMD_SHOW_ETH_FAU64)
+	{
+	    if(RETURN_ERROR == fastfwd_show_eth_fau64(&fccp_cmd->fccp_data.fau64_eth_info))
 	        return_fccp(work, FCCP_RETURN_ERROR, fccp_cmd, product_info.to_linux_fccp_group);
         else
             return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
 	}
-	else if(fccp_cmd->cmd_opcode == FCCP_CMD_SHOW_OUT_CAPWAP_FAU64)
+	else if(fccp_cmd->cmd_opcode == FCCP_CMD_SHOW_CAPWAP_FAU64)
 	{
-	    if(RETURN_ERROR == fastfwd_show_out_capwap_fau64(&fccp_cmd->fccp_data.fau64_out_capwap_info))
+	    if(RETURN_ERROR == fastfwd_show_capwap_fau64(&fccp_cmd->fccp_data.fau64_capwap_info))
 	        return_fccp(work, FCCP_RETURN_ERROR, fccp_cmd, product_info.to_linux_fccp_group);
         else
             return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
 	}
-	else if(fccp_cmd->cmd_opcode == FCCP_CMD_SHOW_OUT_RPA_FAU64)
+	else if(fccp_cmd->cmd_opcode == FCCP_CMD_SHOW_RPA_FAU64)
 	{
-	    if(RETURN_ERROR == fastfwd_show_out_rpa_fau64(&fccp_cmd->fccp_data.fau64_out_rpa_info))
+	    if(RETURN_ERROR == fastfwd_show_rpa_fau64(&fccp_cmd->fccp_data.fau64_rpa_info))
 	        return_fccp(work, FCCP_RETURN_ERROR, fccp_cmd, product_info.to_linux_fccp_group);
         else
             return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
@@ -3215,12 +3430,15 @@ static inline void fwd_process_fccp_pkt(cvmx_wqe_t *work, control_cmd_t *fccp_cm
  *  rule:
  *  work:
  *
+ * Return:
+ *  action_type: 
+ *
  */
-void fwd_filter_large_pkts(rule_item_t  *rule, cvmx_wqe_t* work)
+uint32_t  fwd_filter_large_pkts(rule_item_t  *rule, cvmx_wqe_t* work)
 {
     if((rule == NULL) || (work == NULL))
-        return;
-
+        return RETURN_OK;
+	
     /* if packet len > downlink mtu, send to linux */
     if(rule->rules.action_type == FLOW_ACTION_CAPWAP_FORWARD)
     {
@@ -3242,7 +3460,7 @@ void fwd_filter_large_pkts(rule_item_t  *rule, cvmx_wqe_t* work)
                 if(cmp_len > mtu) 
                 {
                     cvmx_fau_atomic_add64(CVM_FAU_LARGE_ETH2CW_PACKET, 1);
-                    rule->rules.action_type = FLOW_ACTION_TOLINUX;
+					return FLOW_ACTION_TOLINUX;
                 }
             }
         }
@@ -3252,7 +3470,7 @@ void fwd_filter_large_pkts(rule_item_t  *rule, cvmx_wqe_t* work)
         if(CVM_WQE_GET_LEN(work) > (int)(downlink_mtu - RPA_HEAD_LEN))
         {
             cvmx_fau_atomic_add64(CVM_FAU_LARGE_CW_RPA_FWD_PACKET, 1);
-            rule->rules.action_type = FLOW_ACTION_TOLINUX;
+			return FLOW_ACTION_TOLINUX;
         }
     }
     if(rule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_FORWARD)
@@ -3260,9 +3478,11 @@ void fwd_filter_large_pkts(rule_item_t  *rule, cvmx_wqe_t* work)
         if(CVM_WQE_GET_LEN(work) > (int)(downlink_mtu - RPA_HEAD_LEN))
         {
             cvmx_fau_atomic_add64(CVM_FAU_LARGE_CW8023_RPA_FWD_PACKET, 1);
-            rule->rules.action_type = FLOW_ACTION_TOLINUX;
+			return FLOW_ACTION_TOLINUX;
         }
     }
+
+	return RETURN_OK;
 }
 
 
@@ -3289,6 +3509,7 @@ static void application_main_loop(unsigned int coremask_data)
 	uint32_t loop_tag = 1;
 	/* Build a PKO pointer to this packet */
 	pko_command.u64 = 0;
+	uint8_t input_rpa = 0;
 
 	if(cvmx_coremask_first_core(coremask_data)) 
 	{
@@ -3393,6 +3614,7 @@ static void application_main_loop(unsigned int coremask_data)
             continue;
 		}
 
+
 		if(fwd_equipment_test_enable == FUNC_ENABLE)
 		{
             if(fwd_equipment_test_fun)
@@ -3404,6 +3626,13 @@ static void application_main_loop(unsigned int coremask_data)
 
 		cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_PACKETS, 1);
 		cvmx_fau_atomic_add64(CVM_FAU_ENET_INPUT_BYTES, CVM_WQE_GET_LEN(work));
+
+		/* slave cpu fastfwd disable packet to linux */
+		if (FUNC_DISABLE == standalone_fwd_enable)
+		{
+			action_type = FLOW_ACTION_TOLINUX;          
+            goto scheme_execute;  	
+		}
 
         /* filter bcast & mcast */
         if((work->word2.s.is_bcast) || (work->word2.s.is_mcast))
@@ -3429,6 +3658,7 @@ static void application_main_loop(unsigned int coremask_data)
 		    (work->word2.s.vlan_valid && (((vlan_eth_hdr_t*)tmp_eth_header)->h_eth_type == RPA_COOKIE)))
 		{
 		    cvmx_fau_atomic_add64(CVM_FAU_RPA_PACKETS, 1);
+			input_rpa = 1;
 			if(RETURN_ERROR == rpa_packet_handle(work,&ip,&action_type))
 			{
 			    cvmx_fau_atomic_add64(CVM_FAU_RPA_TOLINUX_PACKETS, 1);
@@ -3767,9 +3997,13 @@ scheme_execute:
         }
 
         /* filter large pkts.(maybe over mtu) */
-		fwd_filter_large_pkts(rule, work);
+		if (FLOW_ACTION_TOLINUX == fwd_filter_large_pkts(rule, work))
+		{
+			action_type = FLOW_ACTION_TOLINUX;
+			rule = NULL;
+		}
 
-		flow_action_process(work,action_type,ip,th,true_ip,rule,first_lock);
+		flow_action_process(work,action_type,ip,th,true_ip,rule,first_lock,input_rpa);
 		action_type = 0;
 		ip = NULL;
 		th = NULL;

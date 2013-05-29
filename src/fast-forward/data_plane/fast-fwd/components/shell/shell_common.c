@@ -148,7 +148,7 @@ void clear_fau_64()
 	uint64_t fau_addr = 0;
 	int32_t i = (CVM_FAU_PKO_ERRORS - CVMX_FAU_REG_64_START) >> 3;
 
-	for(;fau_addr < CVMX_FAU_REG_64_END; i++)
+	for(;fau_addr < CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP_PPPOE; i++)
 	{
 		fau_addr = CVMX_FAU_REG_64_ADDR(i);
 		cvmx_fau_atomic_write64(fau_addr, 0);
@@ -693,9 +693,6 @@ static void show_fau_dump_64()
 	printf("64-bit counter used for total ethernet output qinq packets = %lu\r\n", cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_QINQ, 0));
 	printf("64-bit counter used for total ethernet output eth pppoe packets = %lu\r\n", cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH_PPPOE, 0));
 	printf("64-bit counter used for total ethernet output capwap pppoe packets = %lu\r\n", cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP_PPPOE, 0));
-	printf("64-bit counter used for total ethernet output eth packets = %lu\r\n", cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH, 0));
-	printf("64-bit counter used for total ethernet output capwap packets = %lu\r\n", cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 0));
-	printf("64-bit counter used for total ethernet output rpa packets = %lu\r\n", cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_RPA, 0));
 	printf("64-bit counter used for total capwap 802.11 decap error = %lu\r\n", cvmx_fau_fetch_and_add64(CVM_FAU_CW802_11_DECAP_ERROR, 0));
 	printf("64-bit counter used for total capwap 802.3 decap error = %lu\r\n", cvmx_fau_fetch_and_add64(CVM_FAU_CW802_3_DECAP_ERROR, 0));
 	printf("---------------------------------------------------\n");
