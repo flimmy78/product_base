@@ -1188,6 +1188,8 @@ prepare_config:
 	@echo " prepare configs for private" 
 	@echo "/* Automatically generated  header file.*/" > ${ACCAPI_PB_DIR}/config/auteware_config.h
 	@echo "/* Automatically generated  header file for NPD.*/" > ${ACCAPI_PB_DIR}/config/npd_config.h
+	@echo "/* Automatically soft link form accapi_pb to accapi */"
+	./link-accapi.sh link
 ifeq (${WEB},1)
 	@echo "#define __WITH_AUTEWARE_WEB 1" >> ${ACCAPI_DIR}/config/auteware_config.h
 endif
