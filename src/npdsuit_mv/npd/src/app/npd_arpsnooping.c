@@ -8717,8 +8717,10 @@ DBusMessage * npd_dbus_set_stale_time_for_interface(DBusConnection *conn, DBusMe
 
 	int stale_time;
 	unsigned char slot_no = 0,port_no = 0;
+	unsigned char cpu_no = 0, cpu_port_no = 0;
 	unsigned int tag2 = 0;
-
+	char *cpu_name[2]={"f","s"};
+	
 	unsigned short vlanId;
     unsigned int isVlanIntf = 0;
 
@@ -8791,8 +8793,12 @@ DBusMessage * npd_dbus_set_stale_time_for_interface(DBusConnection *conn, DBusMe
 		system(cmdstr);		
 	}
 	else if (isVlanIntf == IS_VE_INTERFACE) {
-		sprintf(cmdstr, "echo %d > /proc/sys/net/ipv4/neigh/ve%d.%d/base_reachable_time",
-				stale_time, slot_no,vlanId);
+		/*wangchong for AXSSZFI-1540 ,the "port" used for "cpu_no&cpu_port_no"*/
+		cpu_no = (unsigned char)((port_no >> 4) & 0xf);
+		cpu_port_no = (unsigned char)(port_no & 0xf);
+
+		sprintf(cmdstr, "echo %d > /proc/sys/net/ipv4/neigh/ve%02d%s%d.%d/base_reachable_time",
+				stale_time, slot_no,cpu_name[cpu_no-1],cpu_port_no,vlanId);
 		system(cmdstr);
 	}
 	else if (isVlanIntf == IS_EBR_INTERFACE)
@@ -9250,6 +9256,8 @@ DBusMessage * npd_dbus_interface_static_arp(DBusConnection *conn, DBusMessage *m
     unsigned int isVlanIntf = 0;
     unsigned char slot_no = 0,port_no = 0;
     unsigned int eth_g_index = 0;
+	unsigned char cpu_no = 0, cpu_port_no = 0;
+	char *cpu_name[2]={"f","s"};
     unsigned int tag2 = 0;
     unsigned int intfType = 0;
 	int rpa_interface = -1;
@@ -9307,12 +9315,15 @@ DBusMessage * npd_dbus_interface_static_arp(DBusConnection *conn, DBusMessage *m
 		ret = ARP_RETURN_CODE_ERROR;
 	}
 	/* for the 7605i product*/	
-	if((ret == ARP_RETURN_CODE_SUCCESS)&&(PRODUCT_TYPE == AUTELAN_PRODUCT_AX7605I) && (is_master || (slot_no != slot_num))) {
+	if((ret == ARP_RETURN_CODE_SUCCESS)&&(PRODUCT_TYPE == AUTELAN_PRODUCT_AX7605I) && (is_master || (slot_no != slot_num))) 
+	{
 		syslog_ax_arpsnooping_dbg(" The path of 7605i !!!\n");
 		
 		ret = ARP_RETURN_CPU_INTERFACE_CODE_SUCCESS;
 		if (isVlanIntf == IS_VE_INTERFACE){
-			sprintf(ifname, "ve%d.%d",slot_no, vlanId);
+    		cpu_no = (unsigned char)((port_no >> 4) & 0xf);
+    		cpu_port_no = (unsigned char)(port_no & 0xf);
+			sprintf(ifname, "ve%02d%s%d.%d",slot_no,cpu_name[cpu_no-1],cpu_port_no,vlanId);
 		}else if (isVlanIntf == IS_ETH_PORT_INTERFACE){
 		    sprintf(ifname,"%s%d-%d","eth",slot_no,port_no);
 		}else if (isVlanIntf == IS_ETH_SUBINTERFACE){
@@ -9375,17 +9386,20 @@ DBusMessage * npd_dbus_interface_static_arp(DBusConnection *conn, DBusMessage *m
 	}
 	
 	/* for the 8610 product*/	
-	else if((ret == ARP_RETURN_CODE_SUCCESS)&&(PRODUCT_TYPE == AUTELAN_PRODUCT_AX8610)
-		  	    &&((IS_MNG_INTERFACE == isVlanIntf)||(port_no < asic_board->asic_port_start_no) || (slot_no != slot_num)
+	else if((ret == ARP_RETURN_CODE_SUCCESS)\
+		&&((PRODUCT_TYPE == AUTELAN_PRODUCT_AX8610)||(PRODUCT_TYPE == AUTELAN_PRODUCT_AX8606)||(PRODUCT_TYPE == AUTELAN_PRODUCT_AX8800))\
+		  	    &&((IS_MNG_INTERFACE == isVlanIntf)||(port_no < asic_board->asic_port_start_no) || (slot_no != slot_num) || (isVlanIntf == IS_VE_INTERFACE)
 		   			/*|| ((slot_no != slot_num) && (BOARD_TYPE_AX71_2X12G12S != board_info.board_type))*/))
 	{
 		
-		syslog_ax_arpsnooping_dbg(" The path of 8610!!!\n");
+		syslog_ax_arpsnooping_dbg(" The path of 8610 or 8606 or 8800!!!\n");
 	    ret = ARP_RETURN_CPU_INTERFACE_CODE_SUCCESS;    
 			if (isVlanIntf == IS_MNG_INTERFACE) {
 				sprintf(ifname,"%s%d-%d","mng",slot_no,port_no);
 			}else if (isVlanIntf == IS_VE_INTERFACE){
-				sprintf(ifname, "ve%d.%d",slot_no, vlanId);
+    		cpu_no = (unsigned char)((port_no >> 4) & 0xf);
+    		cpu_port_no = (unsigned char)(port_no & 0xf);
+			sprintf(ifname, "ve%02d%s%d.%d",slot_no,cpu_name[cpu_no-1],cpu_port_no,vlanId);
 			}else if(isVlanIntf == IS_VLAN_ADVANCED){
 				sprintf(ifname,"vlan%d",vlanId);
 			}else if (isVlanIntf == IS_ETH_PORT_INTERFACE){				
