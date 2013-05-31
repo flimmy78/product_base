@@ -1191,14 +1191,14 @@ prepare_config:
 	@echo "/* Automatically soft link form accapi_pb to accapi */"
 	./link-accapi.sh link
 ifeq (${WEB},1)
-	@echo "#define __WITH_AUTEWARE_WEB 1" >> ${ACCAPI_DIR}/config/auteware_config.h
+	@echo "#define __WITH_AUTEWARE_WEB 1" >> ${ACCAPI_PB_DIR}/config/auteware_config.h
 endif
 
 ifeq (${AP_MAX_FLAG},1)
-	@echo "#define __AP_MAX_COUNTER 2048" >> ${ACCAPI_DIR}/config/auteware_config.h
+	@echo "#define __AP_MAX_COUNTER 2048" >> ${ACCAPI_PB_DIR}/config/auteware_config.h
 endif
 ifeq (${AP_MAX_FLAG},2)
-	@echo "#define __AP_MAX_COUNTER 4096" >> ${ACCAPI_DIR}/config/auteware_config.h
+	@echo "#define __AP_MAX_COUNTER 4096" >> ${ACCAPI_PB_DIR}/config/auteware_config.h
 endif
 	
 ifeq (${CSCD},1)
