@@ -34,6 +34,7 @@ extern "C"
 #include "../product_ax8610.h"
 #include "sem/sem_tipc.h"
 #include "../product_feature.h"
+#include "config/auteware_config.h"
 
 
 static unsigned short phy_ctl_copper[] = {0x1140, 0x1140};
@@ -260,6 +261,22 @@ static int local_board_dbm_file_create(board_fix_param_t *board)
 		return -1;
 	}
 	fprintf(fd, "%d\n", board->board_id);
+	fclose(fd);
+
+	fd = fopen("/dbm/local_board/board_ap_max_counter", "w+");
+	if (fd == NULL)
+	{
+		sem_syslog_dbg("open /dbm/local_board/board_ap_max_counter failed\n");
+		return -1;
+	}
+	#ifndef __AP_MAX_COUNTER
+	fprintf(fd, "%d\n", board->board_ap_max_counter);
+	sem_syslog_dbg("board->board_ap_max_counter = %d\n",board->board_ap_max_counter);
+	#else
+	board->board_ap_max_counter = (__AP_MAX_COUNTER > AX81_CRSMU_AP_MAX) ? AX81_CRSMU_AP_MAX: __AP_MAX_COUNTER;
+	fprintf(fd, "%d\n", board->board_ap_max_counter);
+	sem_syslog_dbg("__AP_MAX_COUNTER = %d\n",__AP_MAX_COUNTER);
+	#endif
 	fclose(fd);
 	return 0;
 }
@@ -1577,6 +1594,7 @@ board_fix_param_t ax81_smu =
 	.obc_port = {{CPU, 1, 12, "obc0", OBC_PORT, NOT_CSCD_PORT, 0}},
 	.cscd_port_num = 0,
 	.board_state = BOARD_INSERTED,
+	.board_ap_max_counter = BOARD_DEFAULT_AP_COUNTER,
 	.master_active_or_backup_state_set = NULL,
 	.get_remote_board_master_state = NULL,
 	.get_slot_id = NULL,

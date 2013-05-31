@@ -1890,7 +1890,7 @@ void update_port_state(int slot, int port)
     start_fp[slot][port].attr_bitmap = port_info.attr_bitmap;
     start_fp[slot][port].port_type = port_info.port_type;
 	
-	msync(start_fp[slot], sizeof(struct global_ethport_s)*BOARD_GLOBAL_ETHPORTS_MAXNUM, MS_ASYNC);
+	msync(start_fp[slot], sizeof(struct global_ethport_s)*BOARD_GLOBAL_ETHPORTS_MAXNUM, MS_SYNC);
 
 	char chTmp[512] = {0};
     memcpy(chTmp, &start_fp[slot][port], sizeof(global_ethport_t));

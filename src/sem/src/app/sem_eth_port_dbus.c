@@ -552,7 +552,7 @@ DBusMessage* sem_dbus_config_ethport_attr(DBusConnection *conn, DBusMessage *msg
 		}
         start_fp[local_board->slot_id][eth_l_index].attr_bitmap = port_info.attr_bitmap;
 		start_fp[local_board->slot_id][eth_l_index].mtu = port_info.mtu;
-		msync(start_fp[local_board->slot_id], sizeof(struct global_ethport_s)*BOARD_GLOBAL_ETHPORTS_MAXNUM, MS_ASYNC);	
+		msync(start_fp[local_board->slot_id], sizeof(struct global_ethport_s)*BOARD_GLOBAL_ETHPORTS_MAXNUM, MS_SYNC);	
 
         char chTmp[512] = {0};
 	    memcpy(chTmp, &start_fp[local_board->slot_id][eth_l_index], sizeof(global_ethport_t));
@@ -639,7 +639,7 @@ DBusMessage* sem_dbus_config_ethport_media(DBusConnection *conn, DBusMessage *ms
 		}
 		start_fp[local_board->slot_id][eth_l_index].attr_bitmap = port_info.attr_bitmap;
 		start_fp[local_board->slot_id][eth_l_index].port_type = port_info.port_type;
-		msync(start_fp[local_board->slot_id], sizeof(struct global_ethport_s)*BOARD_GLOBAL_ETHPORTS_MAXNUM, MS_ASYNC);	
+		msync(start_fp[local_board->slot_id], sizeof(struct global_ethport_s)*BOARD_GLOBAL_ETHPORTS_MAXNUM, MS_SYNC);	
 
         char chTmp[512] = {0};
 	    memcpy(chTmp, &start_fp[local_board->slot_id][eth_l_index], sizeof(global_ethport_t));

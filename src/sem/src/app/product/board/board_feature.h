@@ -6,6 +6,8 @@
 
 #define bool char
 
+#define BOARD_DEFAULT_AP_COUNTER 1024
+
 /**
   * read write phy_QT Command parameter
 .
@@ -116,6 +118,7 @@ struct board_fix_param_s
 	unsigned int cscd_port_num;
 	obc_cscd_port_t cscd_port[MAX_CSCD_PORT_NUM];
 	int board_state;
+	unsigned int board_ap_max_counter;
 	int (* master_active_or_backup_state_set)(unsigned int state);
 	int (* get_remote_board_master_state)(unsigned int *state);
 	int (* get_slot_id)(unsigned int *slot_id);

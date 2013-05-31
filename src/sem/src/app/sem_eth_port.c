@@ -116,7 +116,7 @@ void poll_QT2025_link_status()
 			temp = val;
 		}
 		
-		msync(start_fp[local_board->slot_id], sizeof(struct global_ethport_s)*BOARD_GLOBAL_ETHPORTS_MAXNUM, MS_ASYNC);
+		msync(start_fp[local_board->slot_id], sizeof(struct global_ethport_s)*BOARD_GLOBAL_ETHPORTS_MAXNUM, MS_SYNC);
         if(local_board->slot_id != active_master_slot_id)
         {
             sprintf(file_path, "/dbm/shm/ethport/shm%d", local_board->slot_id+1);
@@ -413,7 +413,7 @@ int sem_ethports_init()
 	
     for(i = 0; i < SLOT_COUNT; i++)
     {
-        msync(start_fp[i], sizeof(struct global_ethport_s)*BOARD_GLOBAL_ETHPORTS_MAXNUM, MS_ASYNC);
+        msync(start_fp[i], sizeof(struct global_ethport_s)*BOARD_GLOBAL_ETHPORTS_MAXNUM, MS_SYNC);
     }
 	
 	sem_syslog_dbg("\t-------------------------sem_ethports_init end--------------------------\n");

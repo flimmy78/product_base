@@ -21,6 +21,7 @@
 #define FPGA_BM_FILE_PATH	"/dev/bm0"
 #define BM_IOC_FPGA_WRITE 				_IOWR(BM_IOC_MAGIC,20,fpga_file) //FPGA online burning
 
+#define AX71_1X12G12S_AP_MAX 2048
 /*
 typedef struct fpga_abnormal_tipc_s
 {

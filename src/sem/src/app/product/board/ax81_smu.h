@@ -41,4 +41,6 @@ typedef union
 #define MV_88E6185_CTRL_AUTONEG_EN           0x0400
 #define MV_88E6185_CTRL_ANBYPASS_EN          0x0800
 
+#define AX81_CRSMU_AP_MAX 1024
+
 #endif
