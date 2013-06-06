@@ -1217,6 +1217,8 @@ EXPORT_SYMBOL(octnet_get_netdev_gmxport);
 
 int octnet_get_nic_ifcount(void)
 {
+	if(octprops[0] == NULL)
+		return -1;
     return octprops[0]->ifcount;
 }
 EXPORT_SYMBOL(octnet_get_nic_ifcount);
