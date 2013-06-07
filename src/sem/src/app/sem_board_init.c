@@ -15,6 +15,7 @@ extern "C"
 #include "product/product_ax8606.h"
 #include "product/product_ax8603.h"
 #include "product/board/board_feature.h"
+#include "config/auteware_config.h"
 
 
 extern int sem_read_cpld(int reg, int *read_value);
@@ -329,6 +330,13 @@ int set_local_board(void)
 	}
 	local_board = *(product->support_board_arr+index);
 
+	#ifndef __AP_MAX_COUNTER
+	sem_syslog_dbg("board->board_ap_counter = %d\n",local_board->board_ap_counter);
+	#else
+	local_board->board_ap_counter = (__AP_MAX_COUNTER > local_board->board_ap_max_counter) ? local_board->board_ap_max_counter : __AP_MAX_COUNTER;
+	sem_syslog_dbg("define __AP_MAX_COUNTER = %d\n",__AP_MAX_COUNTER);
+	#endif
+
 	/*the first parameter is useless*/
 	ret = product->get_slot_id(local_board->is_master, &local_board->slot_id);
 
@@ -566,7 +574,7 @@ int board_init(void)
 	board_info_to_syn.is_active_master = local_board->is_active_master;
 	board_info_to_syn.asic_start_no = local_board->asic_start_no;
 	board_info_to_syn.asic_port_num = local_board->asic_port_num;
-
+    board_info_to_syn.board_ap_counter = local_board->board_ap_counter;
 	//board_info_to_syn.is_use_default_master = local_board->is_use_default_master;// TODO: is needed? 
 
 	product->product_slot_board_info[local_board->slot_id].board_code = local_board->board_code;
@@ -577,6 +585,7 @@ int board_init(void)
 	product->product_slot_board_info[local_board->slot_id].board_state = local_board->board_state;
 	product->product_slot_board_info[local_board->slot_id].asic_start_no = local_board->asic_start_no;
 	product->product_slot_board_info[local_board->slot_id].asic_port_num = local_board->asic_port_num;
+	product->product_slot_board_info[local_board->slot_id].board_ap_counter = local_board->board_ap_counter;
 	local_board->local_board_dbm_file_create(local_board);
 
 	product_info_syn.product_slot_board_info[local_board->slot_id].board_code = product->product_slot_board_info[local_board->slot_id].board_code;
@@ -587,7 +596,7 @@ int board_init(void)
 	product_info_syn.product_slot_board_info[local_board->slot_id].board_state = product->product_slot_board_info[local_board->slot_id].board_state;
     product_info_syn.product_slot_board_info[local_board->slot_id].asic_start_no = product->product_slot_board_info[local_board->slot_id].asic_start_no;
     product_info_syn.product_slot_board_info[local_board->slot_id].asic_start_no = product->product_slot_board_info[local_board->slot_id].asic_port_num;
-
+    product_info_syn.product_slot_board_info[local_board->slot_id].board_ap_counter = product->product_slot_board_info[local_board->slot_id].board_ap_counter;
 	if (local_board->is_master)
 	{
 		//sem_syslog_dbg("111111111111111\n");

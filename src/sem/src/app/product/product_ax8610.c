@@ -2776,6 +2776,17 @@ int ax81_product_dbm_file_create(product_info_syn_t *product)
 		}
 		fprintf(fd, "%d\n", product->product_slot_board_info[i].asic_port_num);
 		fclose(fd);
+
+		strcpy(temp_buf2, temp_buf);
+		strcat(temp_buf2, "/board_ap_counter");
+		fd = fopen(temp_buf2, "w+");
+		if (fd == NULL)
+		{
+			sem_syslog_dbg("open %s failed\n", temp_buf2);
+			return -1;
+		}
+		fprintf(fd, "%d\n", product->product_slot_board_info[i].board_ap_counter);
+		fclose(fd);	
 	}
 
 	fd = fopen("/dbm/product_state", "w+");
@@ -2883,6 +2894,7 @@ int ax81_syn_product_info(board_info_syn_t *temp)
 		product->product_slot_board_info[temp->slot_id].is_active_master = temp->is_active_master;
 		product->product_slot_board_info[temp->slot_id].asic_start_no = temp->asic_start_no;
 		product->product_slot_board_info[temp->slot_id].asic_port_num = temp->asic_port_num;
+		product->product_slot_board_info[temp->slot_id].board_ap_counter = temp->board_ap_counter;
 		if (temp->is_master && local_board->slot_id != temp->slot_id)
 		{
 			product->more_than_one_master_board_on = 1;
@@ -2897,6 +2909,7 @@ int ax81_syn_product_info(board_info_syn_t *temp)
 		product_info_syn.product_slot_board_info[temp->slot_id].is_active_master = product->product_slot_board_info[temp->slot_id].is_active_master;
         product_info_syn.product_slot_board_info[temp->slot_id].asic_start_no = product->product_slot_board_info[temp->slot_id].asic_start_no;
         product_info_syn.product_slot_board_info[temp->slot_id].asic_port_num = product->product_slot_board_info[temp->slot_id].asic_port_num;
+        product_info_syn.product_slot_board_info[temp->slot_id].board_ap_counter = product->product_slot_board_info[temp->slot_id].board_ap_counter;
 		product_info_syn.product_state = product->product_state;
 		product_info_syn.more_than_one_master_board_on = product->more_than_one_master_board_on;
 		product_info_syn.active_master_slot_id = product->active_master_slot_id;

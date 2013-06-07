@@ -26,6 +26,7 @@ extern "C"
 #include "board_feature.h"
 #include "sem_eth_port_dbus.h"
 #include "sem_dbus.h"
+#include "config/auteware_config.h"
 
 
 extern product_fix_param_t *product;
@@ -358,6 +359,144 @@ int hardware_reset_prepare(int sd, int slot_id)
 	}
 
 	return 0;
+}
+
+int board_dbm_file_create(board_fix_param_t *board)
+{
+    FILE *fd;
+	system("mkdir -p /dbm/local_board/");
+
+	//system("touch /dbm/local_board/name");
+
+	fd = fopen("/dbm/local_board/name", "w+");
+	if (fd == NULL)
+	{
+		sem_syslog_dbg("open /dbm/local_board/name failed\n");
+		return -1;
+	}
+	fprintf(fd, "%s\n", board->name);
+	fclose(fd);
+
+	fd = fopen("/dbm/local_board/board_code", "w+");
+	if (fd == NULL)
+	{
+		sem_syslog_dbg("open /dbm/local_board/board_code failed\n");
+		return -1;
+	}
+	fprintf(fd, "%d\n", board->board_code);
+	fclose(fd);
+	
+	fd = fopen("/dbm/local_board/slot_id", "w+");
+	if (fd == NULL)
+	{
+		sem_syslog_dbg("open /dbm/local_board/slot_id failed\n");
+		return -1;
+	}
+	fprintf(fd, "%d\n", board->slot_id+1);
+	fclose(fd);
+	
+	fd = fopen("/dbm/local_board/is_master", "w+");
+	if (fd == NULL)
+	{
+		sem_syslog_dbg("open /dbm/local_board/is_master failed\n");
+		return -1;
+	}
+	fprintf(fd, "%d\n", board->is_master);
+	fclose(fd);
+
+	fd = fopen("/dbm/local_board/is_active_master", "w+");
+	if (fd == NULL)
+	{
+		sem_syslog_dbg("open /dbm/local_board/is_active_master failed\n");
+		return -1;
+	}
+	fprintf(fd, "%d\n", board->is_active_master);
+	fclose(fd);
+
+	fd = fopen("/dbm/local_board/is_use_default_master", "w+");
+	if (fd == NULL)
+	{
+		sem_syslog_dbg("open /dbm/local_board/is_use_default_master failed\n");
+		return -1;
+	}
+	fprintf(fd, "%d\n", board->is_use_default_master);
+	fclose(fd);
+
+
+	fd = fopen("/dbm/local_board/port_num_on_panel", "w+");
+	if (fd == NULL)
+	{
+		sem_syslog_dbg("open /dbm/local_board/port_num_on_panel failed\n");
+		return -1;
+	}
+	fprintf(fd, "%d\n", board->port_num_on_panel);
+	fclose(fd);
+
+	fd = fopen("/dbm/local_board/port_num_on_panel", "w+");
+	if (fd == NULL)
+	{
+		sem_syslog_dbg("open /dbm/local_board/port_num_on_panel failed\n");
+		return -1;
+	}
+	fprintf(fd, "%d\n", board->port_num_on_panel);
+	fclose(fd);
+
+	fd = fopen("/dbm/local_board/obc_port_num", "w+");
+	if (fd == NULL)
+	{
+		sem_syslog_dbg("open /dbm/local_board/obc_port_num failed\n");
+		return -1;
+	}
+	fprintf(fd, "%d\n", board->obc_port_num);
+	fclose(fd);
+
+	fd = fopen("/dbm/local_board/cscd_port_num", "w+");
+	if (fd == NULL)
+	{
+		sem_syslog_dbg("open /dbm/local_board/cscd_port_num failed\n");
+		return -1;
+	}
+	fprintf(fd, "%d\n", board->cscd_port_num);
+	fclose(fd);
+
+	fd = fopen("/dbm/local_board/function_type", "w+");
+	if (fd == NULL)
+	{
+		sem_syslog_dbg("open /dbm/local_board/function_type failed\n");
+		return -1;
+	}
+	fprintf(fd, "%d\n", board->function_type);
+	fclose(fd);
+
+	fd = fopen("/dbm/local_board/board_state", "w+");
+	if (fd == NULL)
+	{
+		sem_syslog_dbg("open /dbm/local_board/board_state failed\n");
+		return -1;
+	}
+	fprintf(fd, "%d\n", board->board_state);
+	fclose(fd);
+	
+	fd = fopen("/dbm/local_board/board_id", "w+");
+	if (fd == NULL)
+	{
+		sem_syslog_dbg("open /dbm/local_board/board_id failed\n");
+		return -1;
+	}
+	fprintf(fd, "%d\n", board->board_id);
+	fclose(fd);
+
+	fd = fopen("/dbm/local_board/board_ap_counter", "w+");
+	if (fd == NULL)
+	{
+		sem_syslog_dbg("open /dbm/local_board/board_ap_counter failed\n");
+		return -1;
+	}
+	fprintf(fd, "%d\n", board->board_ap_counter);
+	fclose(fd);
+
+	return 0;
+
 }
 
 

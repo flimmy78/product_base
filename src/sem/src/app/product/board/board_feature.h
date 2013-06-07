@@ -92,6 +92,7 @@ typedef struct
 	int board_state;
 	unsigned int asic_start_no;
 	unsigned int asic_port_num;
+	unsigned int board_ap_counter;
 }board_info_syn_t;
 
 typedef struct board_fix_param_s board_fix_param_t;
@@ -118,6 +119,7 @@ struct board_fix_param_s
 	unsigned int cscd_port_num;
 	obc_cscd_port_t cscd_port[MAX_CSCD_PORT_NUM];
 	int board_state;
+	unsigned int board_ap_counter;
 	unsigned int board_ap_max_counter;
 	int (* master_active_or_backup_state_set)(unsigned int state);
 	int (* get_remote_board_master_state)(unsigned int *state);

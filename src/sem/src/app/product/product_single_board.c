@@ -62,7 +62,7 @@ board_fix_param_t *product_single_board_support_board_arr[] =
 	[BOARD_TYPE_AX81_1X12G12S] = &ax81_1x12g12s,
 	[BOARD_TYPE_AX81_2X12G12S] = &ax81_2x12g12s,
 	[BOARD_TYPE_AX81_12X] = &ax81_12x,
-	[BOARD_TYPE_AX81_12X] = &ax71_1x12g12s,
+	[BOARD_TYPE_AX71_1X12G12S] = &ax71_1x12g12s,
 	[BOARD_TYPE_AX81_MAX] = NULL
 };
 
@@ -848,6 +848,7 @@ static int syn_product_info(board_info_syn_t *temp)
 		product->product_slot_board_info[temp->slot_id].is_active_master = temp->is_active_master;
 		product->product_slot_board_info[temp->slot_id].asic_start_no = temp->asic_start_no;
 		product->product_slot_board_info[temp->slot_id].asic_port_num = temp->asic_port_num;
+		product->product_slot_board_info[temp->slot_id].board_ap_counter = temp->board_ap_counter;
 		if (temp->is_master && local_board->slot_id != temp->slot_id)
 		{
 			product->more_than_one_master_board_on = 1;
@@ -860,8 +861,9 @@ static int syn_product_info(board_info_syn_t *temp)
 		strcpy(product_info_syn.product_slot_board_info[temp->slot_id].name, product->product_slot_board_info[temp->slot_id].name);
 		product_info_syn.product_slot_board_info[temp->slot_id].board_state = product->product_slot_board_info[temp->slot_id].board_state;
 		product_info_syn.product_slot_board_info[temp->slot_id].is_active_master = product->product_slot_board_info[temp->slot_id].is_active_master;
-	        product_info_syn.product_slot_board_info[temp->slot_id].asic_start_no = product->product_slot_board_info[temp->slot_id].asic_start_no;
-	        product_info_syn.product_slot_board_info[temp->slot_id].asic_port_num = product->product_slot_board_info[temp->slot_id].asic_port_num;
+        product_info_syn.product_slot_board_info[temp->slot_id].asic_start_no = product->product_slot_board_info[temp->slot_id].asic_start_no;
+        product_info_syn.product_slot_board_info[temp->slot_id].asic_port_num = product->product_slot_board_info[temp->slot_id].asic_port_num;
+        product_info_syn.product_slot_board_info[temp->slot_id].board_ap_counter = product->product_slot_board_info[temp->slot_id].board_ap_counter;
 		product_info_syn.product_state = product->product_state;
 		product_info_syn.more_than_one_master_board_on = product->more_than_one_master_board_on;
 		product_info_syn.active_master_slot_id = product->active_master_slot_id;

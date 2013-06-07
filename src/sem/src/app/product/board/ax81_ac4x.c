@@ -136,145 +136,11 @@ static int syn_board_info(int sd, board_info_syn_t *board_info)
 
 static int local_board_dbm_file_create(board_fix_param_t *board)
 {
-	FILE *fd;
-	system("mkdir -p /dbm/local_board/");
-
-	//system("touch /dbm/local_board/name");
-
-	fd = fopen("/dbm/local_board/name", "w+");
-	if (fd == NULL)
+	if(!board_dbm_file_create(board))
 	{
-		sem_syslog_dbg("open /dbm/local_board/name failed\n");
+        sem_syslog_dbg("board dbm file create failed!\n");
 		return -1;
 	}
-	fprintf(fd, "%s\n", board->name);
-	fclose(fd);
-
-	fd = fopen("/dbm/local_board/board_code", "w+");
-	if (fd == NULL)
-	{
-		sem_syslog_dbg("open /dbm/local_board/board_code failed\n");
-		return -1;
-	}
-	fprintf(fd, "%d\n", board->board_code);
-	fclose(fd);
-	
-	fd = fopen("/dbm/local_board/slot_id", "w+");
-	if (fd == NULL)
-	{
-		sem_syslog_dbg("open /dbm/local_board/slot_id failed\n");
-		return -1;
-	}
-	fprintf(fd, "%d\n", board->slot_id + 1);
-	fclose(fd);
-	
-	fd = fopen("/dbm/local_board/is_master", "w+");
-	if (fd == NULL)
-	{
-		sem_syslog_dbg("open /dbm/local_board/is_master failed\n");
-		return -1;
-	}
-	fprintf(fd, "%d\n", board->is_master);
-	fclose(fd);
-
-	fd = fopen("/dbm/local_board/is_active_master", "w+");
-	if (fd == NULL)
-	{
-		sem_syslog_dbg("open /dbm/local_board/is_active_master failed\n");
-		return -1;
-	}
-	fprintf(fd, "%d\n", board->is_active_master);
-	fclose(fd);
-
-	fd = fopen("/dbm/local_board/is_use_default_master", "w+");
-	if (fd == NULL)
-	{
-		sem_syslog_dbg("open /dbm/local_board/is_use_default_master failed\n");
-		return -1;
-	}
-	fprintf(fd, "%d\n", board->is_use_default_master);
-	fclose(fd);
-
-
-	fd = fopen("/dbm/local_board/port_num_on_panel", "w+");
-	if (fd == NULL)
-	{
-		sem_syslog_dbg("open /dbm/local_board/port_num_on_panel failed\n");
-		return -1;
-	}
-	fprintf(fd, "%d\n", board->port_num_on_panel);
-	fclose(fd);
-
-	fd = fopen("/dbm/local_board/port_num_on_panel", "w+");
-	if (fd == NULL)
-	{
-		sem_syslog_dbg("open /dbm/local_board/port_num_on_panel failed\n");
-		return -1;
-	}
-	fprintf(fd, "%d\n", board->port_num_on_panel);
-	fclose(fd);
-
-	fd = fopen("/dbm/local_board/obc_port_num", "w+");
-	if (fd == NULL)
-	{
-		sem_syslog_dbg("open /dbm/local_board/obc_port_num failed\n");
-		return -1;
-	}
-	fprintf(fd, "%d\n", board->obc_port_num);
-	fclose(fd);
-
-	fd = fopen("/dbm/local_board/cscd_port_num", "w+");
-	if (fd == NULL)
-	{
-		sem_syslog_dbg("open /dbm/local_board/cscd_port_num failed\n");
-		return -1;
-	}
-	fprintf(fd, "%d\n", board->cscd_port_num);
-	fclose(fd);
-
-	fd = fopen("/dbm/local_board/function_type", "w+");
-	if (fd == NULL)
-	{
-		sem_syslog_dbg("open /dbm/local_board/function_type failed\n");
-		return -1;
-	}
-	fprintf(fd, "%d\n", board->function_type);
-	fclose(fd);
-
-	fd = fopen("/dbm/local_board/board_state", "w+");
-	if (fd == NULL)
-	{
-		sem_syslog_dbg("open /dbm/local_board/board_state failed\n");
-		return -1;
-	}
-	fprintf(fd, "%d\n", board->board_state);
-	fclose(fd);
-	
-	fd = fopen("/dbm/local_board/board_id", "w+");
-	if (fd == NULL)
-	{
-		sem_syslog_dbg("open /dbm/local_board/board_id failed\n");
-		return -1;
-	}
-	fprintf(fd, "%d\n", board->board_id);
-	fclose(fd);
-
-	fd = fopen("/dbm/local_board/board_ap_max_counter", "w+");
-	if (fd == NULL)
-	{
-		sem_syslog_dbg("open /dbm/local_board/board_ap_max_counter failed\n");
-		return -1;
-	}
-	#ifndef __AP_MAX_COUNTER
-	fprintf(fd, "%d\n", board->board_ap_max_counter);
-	sem_syslog_dbg("board->board_ap_max_counter = %d\n",board->board_ap_max_counter);
-	#else
-	board->board_ap_max_counter = (__AP_MAX_COUNTER > AX81_AC4X_AP_MAX) ? AX81_AC4X_AP_MAX: __AP_MAX_COUNTER;
-	fprintf(fd, "%d\n", board->board_ap_max_counter);
-	sem_syslog_dbg("__AP_MAX_COUNTER = %d\n",__AP_MAX_COUNTER);
-	#endif
-	fclose(fd);
-	return 0;
 }
 
 /*
@@ -788,7 +654,8 @@ board_fix_param_t ax81_ac4x =
 				 {CPU, 0, 13, "obc1", OBC_PORT, NOT_CSCD_PORT, 1}},
 	.cscd_port = 0,
 	.board_state = BOARD_INSERTED,
-	.board_ap_max_counter = BOARD_DEFAULT_AP_COUNTER,
+	.board_ap_counter = BOARD_DEFAULT_AP_COUNTER,
+	.board_ap_max_counter = AX81_AC4X_AP_MAX,
 	.master_active_or_backup_state_set = NULL,
 	.get_remote_board_master_state = NULL,
 	.get_slot_id = NULL,
