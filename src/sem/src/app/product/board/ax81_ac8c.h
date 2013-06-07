@@ -8,6 +8,8 @@
 #define VSC_VSC8558_AUX_CTL_STATUS    0x1c
 #define VSC_VSC8558_LED_MODE_SELECT   0x1d
 
+#define AX81_AC8C_AP_MAX 1024
+
 typedef union
 {
 	uint16_t  u16;

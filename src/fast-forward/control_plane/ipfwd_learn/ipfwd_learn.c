@@ -2247,6 +2247,10 @@ static int __init ipfwd_learn_init(void)
         }
         ipfwd_learn_mode |= IPFWD_LEARN_MODE_STANDALONE_ENABLE;
     }
+    else
+    {
+        printk("ipfwd_learn cann't into standalone mode, maybe slave cpu not running. nic_ifcount = %d\n", nic_ifcount);
+    }
 #endif
 
     /* detect coexist fastfwd */

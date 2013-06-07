@@ -1783,9 +1783,8 @@ DBusMessage *sem_dbus_apply_patch(DBusConnection *conn, DBusMessage *msg, void *
 	unsigned int reset_bitmask = 0x0;
 	int ret = 0;
 	int status;
-	char temp_name[128];
 	char *name=NULL;
-    char temp_buf[100]={0};
+    char temp_buf[400]={0};
 	int fd;
 	//char execute_result_buf[PATCH_EXECUTE_RESULT_BUF_LEN] = {0};
 	char *execute_result_buf = NULL;
@@ -1805,8 +1804,7 @@ DBusMessage *sem_dbus_apply_patch(DBusConnection *conn, DBusMessage *msg, void *
 			}
 			return NULL;
 	}
-	//strcpy(temp_name, name);
-	//strcat(name, ".sp");
+
 	sprintf(temp_buf, "/mnt/patch/%s", name);
 	fd = open(temp_buf, O_RDONLY);
 	if(fd < 0)
@@ -1869,20 +1867,16 @@ DBusMessage *sem_dbus_apply_patch(DBusConnection *conn, DBusMessage *msg, void *
 		}
 	}
 	
-	
 	reply = dbus_message_new_method_return(msg);
-	
 	dbus_message_iter_init_append (reply, &iter);
-	
 	dbus_message_iter_append_basic (&iter,
 									 DBUS_TYPE_INT32,
 									 &ret);
 	dbus_message_iter_append_basic (&iter,
 									 DBUS_TYPE_STRING,
 									 &execute_result_buf);
-	if (execute_result_buf) {
-		free(execute_result_buf);
-	}
+	free(execute_result_buf);
+	
 	return reply;
 
 }

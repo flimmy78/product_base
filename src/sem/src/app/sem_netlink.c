@@ -593,7 +593,7 @@ void sem_netlink_recv_thread(void)
 						start_fp[local_board->slot_id][nl_msg->ipgport].lastLinkChange = info.uptime; /* for mobile test */
 						start_fp[local_board->slot_id][nl_msg->ipgport].linkchanged += 1;						
 						
-            			msync(start_fp[local_board->slot_id], sizeof(struct global_ethport_s)*BOARD_GLOBAL_ETHPORTS_MAXNUM, MS_ASYNC);
+            			msync(start_fp[local_board->slot_id], sizeof(struct global_ethport_s)*BOARD_GLOBAL_ETHPORTS_MAXNUM, MS_SYNC);
 
         				char chTmp[512] = {0};
                 	    memcpy(chTmp, &start_fp[local_board->slot_id][nl_msg->ipgport], sizeof(global_ethport_t));

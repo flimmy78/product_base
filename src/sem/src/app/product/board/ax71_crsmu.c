@@ -34,6 +34,7 @@ extern "C"
 #include "../product_ax7605i.h"
 #include "sem/sem_tipc.h"
 #include "../product_feature.h"
+#include "config/auteware_config.h"
 
 
 //extern int update_local_board_state(board_fix_param_t *board);
@@ -265,6 +266,22 @@ static int local_board_dbm_file_create(board_fix_param_t *board)
 		return -1;
 	}
 	fprintf(fd, "%d\n", board->board_id);
+	fclose(fd);
+
+	fd = fopen("/dbm/local_board/board_ap_max_counter", "w+");
+	if (fd == NULL)
+	{
+		sem_syslog_dbg("open /dbm/local_board/board_ap_max_counter failed\n");
+		return -1;
+	}
+	#ifndef __AP_MAX_COUNTER
+	fprintf(fd, "%d\n", board->board_ap_max_counter);
+	sem_syslog_dbg("board->board_ap_max_counter = %d\n",board->board_ap_max_counter);
+	#else
+	board->board_ap_max_counter = (__AP_MAX_COUNTER > AX71_CRSMU_AP_MAX) ? AX71_CRSMU_AP_MAX: __AP_MAX_COUNTER;
+	fprintf(fd, "%d\n", board->board_ap_max_counter);
+	sem_syslog_dbg("__AP_MAX_COUNTER = %d\n",__AP_MAX_COUNTER);
+	#endif
 	fclose(fd);
 	return 0;
 }
@@ -1784,6 +1801,7 @@ board_fix_param_t ax71_crsmu =
 	.cscd_port_num = 1,
 	.cscd_port = {{ASIC, 1, 12, "cscd0", NOT_OBC_PORT, CSCD_PORT, 2}},
 	.board_state = BOARD_INSERTED,
+	.board_ap_max_counter = BOARD_DEFAULT_AP_COUNTER,
 	.master_active_or_backup_state_set = NULL,
 	.get_remote_board_master_state = NULL,
 	.get_slot_id = NULL,
