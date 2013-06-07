@@ -22,6 +22,12 @@ elif [ $RET -eq 68 ] ; then
 LICTYPE=5
 elif [ $RET -eq 69 ] ; then
 LICTYPE=6
+elif [ $RET -eq 70 ] ; then
+LICTYPE=7
+elif [ $RET -eq 71 ] ; then
+LICTYPE=8
+elif [ $RET -eq 72 ] ; then
+LICTYPE=9
 else
 exit $RET
 fi
@@ -33,4 +39,5 @@ mv --backup=t /mnt/lic/newtmplic${LICTYPE} /mnt/lic/maxwtpcount${LICTYPE}.lic
 sor.sh cp lic/maxwtpcount${LICTYPE}.lic 30
 
 printf ${LIC_MAXWTPCOUNT_VALUE} > /devinfo/maxwtpcount${LICTYPE}
+sudo chmod 777 -R /mnt/lic
 exit 0
