@@ -48,6 +48,9 @@ LIC_TYPE_MAXWTPCOUNT3=03
 LIC_TYPE_MAXWTPCOUNT4=04
 LIC_TYPE_MAXWTPCOUNT5=05
 LIC_TYPE_MAXWTPCOUNT6=06
+LIC_TYPE_MAXWTPCOUNT7=07
+LIC_TYPE_MAXWTPCOUNT8=08
+LIC_TYPE_MAXWTPCOUNT9=09
 LIC_TYPE=${LIC_CLEAR:40:2}
 if [  x${LIC_TYPE} = x${LIC_TYPE_MAXWTPCOUNT} ] ; then
 	sudo echo ${LICREQ_NEW} > /devinfo/licreq
@@ -73,6 +76,18 @@ elif [  x${LIC_TYPE} = x${LIC_TYPE_MAXWTPCOUNT6} ] ; then
 	sudo echo ${LICREQ_NEW} > /devinfo/licreq6
 	printf ${LIC_MAXWTPCOUNT_VALUE}
 	exit 69;
+elif [  x${LIC_TYPE} = x${LIC_TYPE_MAXWTPCOUNT7} ] ; then
+	sudo echo ${LICREQ_NEW} > /devinfo/licreq7
+	printf ${LIC_MAXWTPCOUNT_VALUE}
+	exit 70;
+elif [  x${LIC_TYPE} = x${LIC_TYPE_MAXWTPCOUNT8} ] ; then
+	sudo echo ${LICREQ_NEW} > /devinfo/licreq8
+	printf ${LIC_MAXWTPCOUNT_VALUE}
+	exit 71;
+elif [  x${LIC_TYPE} = x${LIC_TYPE_MAXWTPCOUNT9} ] ; then
+	sudo echo ${LICREQ_NEW} > /devinfo/licreq9
+	printf ${LIC_MAXWTPCOUNT_VALUE}
+	exit 72;
 else
 	echo "Unsupported license type ${LIC_TYPE}."
 	exit 4;

@@ -27,7 +27,7 @@ fi
 
 echo "Currently Installed license:"
 if [ ${LICTYPE} -eq 0 ] ; then
-	for i in 1 2 3 4 5 6
+	for i in 1 2 3 4 5 6 7 8 9
 	do
 	dump_one_lic $i
 	done
