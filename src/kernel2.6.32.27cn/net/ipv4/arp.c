@@ -332,6 +332,9 @@ static void arp_solicit(struct neighbour *neigh, struct sk_buff *skb)
 	__be32 target = *(__be32*)neigh->primary_key;
 	int probes = atomic_read(&neigh->probes);
 	struct in_device *in_dev = in_dev_get(dev);
+    unsigned char ha_buff[(MAX_ADDR_LEN+sizeof(unsigned long)-1)&~(sizeof(unsigned long)-1)] = {0};
+    u64 starttime = 0;
+    u64 endtime = 0;
 
 	if (!in_dev)
 		return;
@@ -365,19 +368,40 @@ static void arp_solicit(struct neighbour *neigh, struct sk_buff *skb)
 	if ((probes -= neigh->parms->ucast_probes) < 0) {
 		if (!(neigh->nud_state&NUD_VALID))
 			printk(KERN_DEBUG "trying to ucast probe in NUD_INVALID\n");
+		#if 1    /* bugfix ONLINEBUG-975, modify for arp softlockup, make unlock before arp_send. zhangdi@autelan.com 2013-06-17 */
+		dst_ha = ha_buff;
+        if(neigh->ha==NULL)
+        {
+            return;
+		}		
+		read_lock_bh(&neigh->lock);
+        memcpy(ha_buff, neigh->ha,(MAX_ADDR_LEN+sizeof(unsigned long)-1)&~(sizeof(unsigned long)-1));
+		read_unlock_bh(&neigh->lock);
+		#else
 		dst_ha = neigh->ha;
 		read_lock_bh(&neigh->lock);
+		#endif
 	} else if ((probes -= neigh->parms->app_probes) < 0) {
 #ifdef CONFIG_ARPD
 		neigh_app_ns(neigh);
 #endif
 		return;
 	}
+    starttime = jiffies;
 
 	arp_send(ARPOP_REQUEST, ETH_P_ARP, target, dev, saddr,
 		 dst_ha, dev->dev_addr, NULL);
+	
+	endtime = jiffies;
+    #if 1	
+	if(endtime - starttime > 10000)
+	{
+		printk(KERN_EMERG "arp send spend too long time from %llu to %llu\n", starttime, endtime);
+	}
+    #else
 	if (dst_ha)
 		read_unlock_bh(&neigh->lock);
+	#endif
 }
 
 static int arp_ignore(struct in_device *in_dev, __be32 sip, __be32 tip)
