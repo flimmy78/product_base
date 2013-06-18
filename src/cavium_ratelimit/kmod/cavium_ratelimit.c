@@ -402,8 +402,8 @@ protocol_match_item_t protocol_rate_limiter[MAX_MATCH_RULES_NUM] =
 	},
 	{	/*CAPWAP data packet (UDP: sport 32769, dport 5247)*/
 		"CAPWAP_D_D_ARP",
-		{0x0,0x08004500,0x11,0x0,0x8001147f0000,0x0000002000000000/*capwap bit18-22*/,0x0,0x0/*802.11 bit2-4*/,0x0,0x0,0x0,0x0806000000000000/*LLC bit 48-63*/}/*rule*/,
-		{0x0,0xffffff00,0xff,0x0,0xffffffff0000,0x0000ffff00000000/*capwap bit18-22*/,0x0,0x0/*802.11 bit2-4*/,0x0,0x0,0x0,0xffff000000000000/*LLC bit 48-63*/}/*mask*/,TP_CAPWAPD_D_ARP_PPS /*rateLimit (pps)*/
+		{0x0,0x08004500,0x11,0x0,0x8001147f0000,0x0000002000000000/*capwap bit18-22*/,0x0,0x0/*802.11 bit2-4*/,0x0,0x0,0x0,0x0000000008060000/*LLC bit 48-63*/}/*rule*/,
+		{0x0,0xffffff00,0xff,0x0,0xffffffff0000,0x0000ffff00000000/*capwap bit18-22*/,0x0,0x0/*802.11 bit2-4*/,0x0,0x0,0x0,0x00000000ffff0000/*LLC bit 48-63*/}/*mask*/,TP_CAPWAPD_D_ARP_PPS /*rateLimit (pps)*/
 	},
 	{	/*CAPWAP data packet (UDP: sport 32769, dport 5247)*/
 		"CAPWAP_D_D_ICMP",

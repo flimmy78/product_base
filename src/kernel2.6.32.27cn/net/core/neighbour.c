@@ -267,6 +267,8 @@ static struct neighbour *neigh_alloc(struct neigh_table *tbl)
 	if (entries >= tbl->gc_thresh3 ||
 	    (entries >= tbl->gc_thresh2 &&
 	     time_after(now, tbl->last_flush + 5 * HZ))) {
+        /* Add touch watchdog to avoid softlockup when arp attack is happen. zhangdi@autelan.com 2013-06-16 */
+		touch_softlockup_watchdog();
 		if (!neigh_forced_gc(tbl) &&
 		    entries >= tbl->gc_thresh3)
 			goto out_entries;
