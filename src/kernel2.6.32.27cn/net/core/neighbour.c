@@ -130,6 +130,13 @@ static int neigh_forced_gc(struct neigh_table *tbl)
 {
 	int shrunk = 0;
 	int i;
+	unsigned long now = jiffies;
+
+    /* Call neigh_forced_gc at lest 2s, aviod cpu 100% when Neighbour table overflow. zhangdi@autelan.com 2013-06-19 */
+	if(time_after(now, tbl->last_flush + 2 * HZ))
+    {
+    	return shrunk;		
+    }
 
 	NEIGH_CACHE_STAT_INC(tbl, forced_gc_runs);
 
