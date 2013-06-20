@@ -537,7 +537,8 @@ int board_init(void)
 	}
 	else
 	{
-		fscanf(fd, "%s\n", name);
+		if(!fscanf(fd, "%s\n", name))
+		sem_syslog_dbg("fscanf error\n");
 		fclose(fd);
 
 		if ((strncmp(name, "MASTER", 6) == 0) || (strlen(name) == 0))

@@ -937,7 +937,8 @@ DBusMessage *sem_dbus_capwap_tunnel_show_running(DBusConnection *conn,
 
     if (stream1 != NULL)
     {
-        fread(retbuf1, sizeof(char), sizeof(retbuf1), stream1);
+        if(!fread(retbuf1, sizeof(char), sizeof(retbuf1), stream1))
+		sem_syslog_dbg("fread error\n");
         pclose(stream1);
         rstat1 = atoi(retbuf1);
     }
@@ -1737,7 +1738,10 @@ static DBusHandlerResult sem_dbus_msg_handler (
 	
     if (reply)
     {
-        dbus_connection_send (conn, reply, NULL);
+        if (!dbus_connection_send (conn, reply, NULL)){
+    		sem_syslog_dbg("Signal send error, Out Of Memory!\n"); 
+    		return 1;
+	    }
         dbus_connection_flush(conn);
         dbus_message_unref (reply);
     }

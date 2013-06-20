@@ -1185,7 +1185,8 @@ DBusMessage *show_all_slot_sys_info(DBusConnection *conn, DBusMessage *msg, void
 				fp = popen("free","r");
 				if(NULL != fp)
 				{
-					fread(ret_temp,1,1024,fp);
+					if(!fread(ret_temp,1,1024,fp))
+					sem_syslog_dbg("fread error\n", time);
 					fclose(fp);
 				}else{
 					sprintf(ret_temp,"Can not get mem info\n");
@@ -1362,7 +1363,8 @@ DBusMessage *sem_dbus_md5_img_slot(DBusConnection *conn, DBusMessage *msg, void 
 				
 			if(NULL != fp)
 			{
-				fread(ret_temp,1,1024,fp);
+				if(!fread(ret_temp,1,1024,fp));
+				sem_syslog_dbg("fread error\n");
 				fclose(fp);
 			}
 			else

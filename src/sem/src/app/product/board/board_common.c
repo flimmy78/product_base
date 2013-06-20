@@ -292,6 +292,7 @@ int get_interface_name(char *buf, char **name)
 
 	/* Cut interface name. */
 	end = strrchr (buf, ':');
+	if(end)
 	*end++ = '\0';
 
 	return 0;

@@ -122,6 +122,7 @@ int insert_wan_if_linklist(char *name)
 	if(ret)
 	{
         sem_syslog_dbg("function:insert_wan_if_linklist;interface %s is exist!\n",name);
+		free(wan_if_list_node);
 		return 2;
 	}
 	memset(wan_if_list_node,0,sizeof(struct wan_if_linklist_node_s));
@@ -4952,14 +4953,15 @@ DBusMessage *sem_dbus_show_wan_if(DBusConnection *conn, DBusMessage *msg, void *
 	}
 	
 	wan_if = show_wan_if_node(count);
-	if(wan_if == NULL)
+	if(!wan_if)
 	{
         sem_syslog_warning("**show_wan_if_node failed \n");
 		FLAG = 1;
+	}else{
+        memcpy(name,wan_if->name,WAN_IF_NAME_LEN);
+        sem_syslog_event("**show_wan_if_node success %s  %s\n",wan_if->name,name);       
 	}
 
-	memcpy(name,wan_if->name,WAN_IF_NAME_LEN);
-	sem_syslog_event("**show_wan_if_node success %s  %s\n",wan_if->name,name);
 	
 	reply = dbus_message_new_method_return(msg);
 
@@ -5026,13 +5028,15 @@ DBusMessage *sem_dbus_if_wan_state_set(DBusConnection *conn, DBusMessage *msg, v
 
 	//sem_syslog_warning("ifname %s wan_state %d\n", if_name, wan_state);
 	fd_dbm = fopen("/dbm/local_board/is_active_master", "r");
-	if (fd_dbm == NULL)
-	{
+	if (!fd_dbm){
 		fprintf(stderr,"Get production information [2] error\n");
 		FLAG = 1;
+	}else{
+    	if(fscanf(fd_dbm, "%d", &is_active_master) != 1){
+    		FLAG = 1;
+		}
+    	fclose(fd_dbm);
 	}
-	fscanf(fd_dbm, "%d", &is_active_master);
-	fclose(fd_dbm);
 	
 	ret = parse_slot_id_from_ifname(if_name, &dest_slot_id);
 	
@@ -5817,6 +5821,7 @@ DBusMessage *sem_dbus_restore_car_table(DBusConnection *conn, DBusMessage *msg, 
 								 DBUS_TYPE_INT32,
 								 &ret);
 	//sem_syslog_warning("**get the car count  = %lld ret=%d \n",car_count,ret);
+	free(car_node_param);
 	return reply;
 }
 
@@ -6210,7 +6215,7 @@ DBusMessage *sem_dbus_write_car(DBusConnection *conn, DBusMessage *msg, void *us
 	else
 	{
         sem_syslog_warning("bad CAR_VALID = 0x%x******\n",CAR_VALID);
-		flag == 1;
+		flag = 1;
 	}
     //display_car_linklist();
 	reply = dbus_message_new_method_return(msg);
@@ -10366,7 +10371,7 @@ DBusMessage *sem_dbus_show_ram_detection(DBusConnection *conn, DBusMessage *msg,
         write_car_param_base->linkup = 0x1;
         write_car_param_base->car_valid = 0x1;
         write_car_param_base->usr_ip = 0x55555555;
-		write_car_param->credit = 0x0;
+		write_car_param_base->credit = 0x0;
         write_car_param_base->byte_drop_count = 0x5555555555ULL;
         write_car_param_base->byte_set_count = 0x5555555555ULL;
         write_car_param_base->package_drop_count = 0x55555555ULL;
@@ -10378,7 +10383,7 @@ DBusMessage *sem_dbus_show_ram_detection(DBusConnection *conn, DBusMessage *msg,
         write_car_param_compare->linkup = 0x1;
         write_car_param_compare->car_valid = 0x1;
         write_car_param_compare->usr_ip = 0xaaaaaaaa;
-		write_car_param->credit = 0x0;
+		write_car_param_base->credit = 0x0;
         write_car_param_compare->byte_drop_count = 0xaaaaaaaaaaULL;
         write_car_param_compare->byte_set_count = 0xaaaaaaaaaaULL;
         write_car_param_compare->package_drop_count = 0xaaaaaaaaULL;

@@ -574,9 +574,7 @@ int get_num_from_file(char *filename, int *value)
 		close(fd);
 	}
 	else
-	{        
-		//sem_syslog_dbg("Open file:%s error!\n",filename);
-		close(fd);
+	{
 		return -1;
 	}
 
