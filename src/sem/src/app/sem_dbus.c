@@ -65,6 +65,8 @@ extern thread_index_sd_t thread_id_arr[MAX_SLOT_NUM];/*clx*/
 extern sd_sockaddr_tipc_t g_send_sd_arr[MAX_SLOT_NUM];/*clx*/
 extern sd_sockaddr_tipc_t g_recv_sd_arr[MAX_SLOT_NUM];/*clx*/
 extern product_fix_param_t *product;/*clx*/
+extern int miisw_read(unsigned int devaddr, unsigned int regaddr);
+extern int miisw_write(unsigned int devaddr, unsigned int regaddr, unsigned short value);
 extern DBusMessage * sem_dbus_config_port_interface_mode(DBusConnection *conn, DBusMessage *msg, void *user_data);
 extern DBusMessage * sem_dbus_config_port_mode(DBusConnection *conn, DBusMessage *msg, void *user_data);
 extern DBusMessage * sem_dbus_config_ethport(DBusConnection *conn, DBusMessage *msg, void *user_data);
@@ -439,6 +441,85 @@ DBusMessage *sem_dbus_show_slot_id(DBusConnection *conn,
 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &slot_id);
     return reply;
 }
+
+
+DBusMessage *sem_dbus_show_6185(DBusConnection *conn,
+                        DBusMessage *msg,
+                        void *user_data)
+{
+	DBusMessage *reply = NULL;
+	DBusMessageIter iter;
+	DBusError err;
+    unsigned int dev_addr;
+	unsigned int reg_addr;
+	unsigned int val;
+
+	sem_syslog_dbg("sem_dbus_show_6185\n");
+	dbus_error_init(&err);
+
+	if (!(dbus_message_get_args (msg, &err,
+        				 		DBUS_TYPE_UINT32, &dev_addr,
+        				 		DBUS_TYPE_UINT32, &reg_addr,
+								DBUS_TYPE_INVALID)))
+	{
+		if (dbus_error_is_set(&err))
+		{
+			dbus_error_free(&err);
+		}
+		return NULL;
+	}
+	
+	//sem_syslog_dbg("dev_addr = 0x%x\n",dev_addr);
+	//sem_syslog_dbg("reg_addr = 0x%x\n",reg_addr);
+	val = miisw_read(dev_addr, reg_addr);
+	//sem_syslog_dbg("val = 0x%x\n",val);
+	
+	reply = dbus_message_new_method_return(msg);
+    dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_UINT32, &val);
+    return reply;
+}
+
+DBusMessage *sem_dbus_set_6185(DBusConnection *conn,
+                        DBusMessage *msg,
+                        void *user_data)
+{
+	DBusMessage *reply = NULL;
+	DBusMessageIter iter;
+	DBusError err;
+    unsigned int dev_addr;
+	unsigned int reg_addr;
+	unsigned short val;
+	int ret;
+
+	sem_syslog_dbg("sem_dbus_set_6185\n");
+	dbus_error_init(&err);
+
+	if (!(dbus_message_get_args (msg, &err,
+        				 		DBUS_TYPE_UINT32, &dev_addr,
+        				 		DBUS_TYPE_UINT32, &reg_addr,
+        				 		DBUS_TYPE_UINT16, &val,
+								DBUS_TYPE_INVALID)))
+	{
+		if (dbus_error_is_set(&err))
+		{
+			dbus_error_free(&err);
+		}
+		return NULL;
+	}
+	
+	//sem_syslog_dbg("dev_addr = 0x%x\n",dev_addr);
+	//sem_syslog_dbg("reg_addr = 0x%x\n",reg_addr);
+	//sem_syslog_dbg("val = 0x%x\n",val);
+	ret = miisw_write(dev_addr, reg_addr,val);
+	
+	reply = dbus_message_new_method_return(msg);
+    dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+    return reply;
+}
+
+
 
 DBusMessage *sem_dbus_show_slot_n_info(DBusConnection *conn,
                         DBusMessage *msg,
@@ -1245,6 +1326,14 @@ static DBusHandlerResult sem_dbus_msg_handler (
 		else if (dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_SHOW_SLOT_ID))
 		{
 			reply = sem_dbus_show_slot_id(conn, msg, user_data);
+		}
+		else if (dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_SHOW_6185))
+		{
+			reply = sem_dbus_show_6185(conn, msg, user_data);
+		}
+		else if (dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_SET_6185))
+		{
+			reply = sem_dbus_set_6185(conn, msg, user_data);
 		}
 		else if (dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_CONF_48GE))
 		{

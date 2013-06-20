@@ -159,6 +159,8 @@ xufujun
 #define SEM_DBUS_FLASH_ERASE_PARTITIO  "flash_erase_partition"
 #define WRITE_BOOT_TO_FLASH		"write_boot_to_flash"
 
+#define SEM_DBUS_SHOW_6185		"sem_dbus_show_6185"
+#define SEM_DBUS_SET_6185		"sem_dbus_set_6185"
 
 #define SEM_MAC_LEN 6
  

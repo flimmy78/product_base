@@ -279,14 +279,14 @@ static int sem_oct_mii_write(int port, int location, uint16_t value)
 	return 0;
 }
 
-static int miisw_read(unsigned int devaddr, unsigned int regaddr)
+int miisw_read(unsigned int devaddr, unsigned int regaddr)
 {
 	smi_cmd_88e6185_reg_t smi_cmd;
 	int return_value;
 	smi_cmd.u16 = 0;
 	smi_cmd.s.smi_busy = 1;
 	smi_cmd.s.smi_mode = 1; 
-	smi_cmd.s.smi_op = 0;   /* 0 = read */
+	smi_cmd.s.smi_op = 2;   /* 0 = read */
 	smi_cmd.s.dev_addr = devaddr;
 	smi_cmd.s.reg_addr = regaddr;
 
@@ -307,7 +307,7 @@ static int miisw_read(unsigned int devaddr, unsigned int regaddr)
 }
 
 
-static int miisw_write(unsigned int devaddr, unsigned int regaddr, unsigned short value)
+int miisw_write(unsigned int devaddr, unsigned int regaddr, unsigned short value)
 {
 	smi_cmd_88e6185_reg_t smi_cmd;
 	
@@ -344,12 +344,12 @@ int ax81_smu_init(void)
 	unsigned short data = 0;
 	int value;
 
-	//data = 0x200;
-	//data = 0x3fff;
-	//for (port = 0x10; port < 0x19; port++)
-	//{
-	//	miisw_write(port, MV_88E6185_PORT_BASED_VLAN_MAP, data);
-	//}
+	data = 0x200;
+	for (port = 0x10; port < 0x19; port++)
+	{
+		miisw_write(port, MV_88E6185_PORT_BASED_VLAN_MAP, data);
+	}
+#if 0
     data = 0x2FE;
 	miisw_write(0x10, MV_88E6185_PORT_BASED_VLAN_MAP, data);
     data = 0x2FD;
@@ -368,7 +368,7 @@ int ax81_smu_init(void)
 	miisw_write(0x17, MV_88E6185_PORT_BASED_VLAN_MAP, data);
     data = 0x200;
 	miisw_write(0x18, MV_88E6185_PORT_BASED_VLAN_MAP, data);
-
+#endif
 	data = 0x1ff;
 	miisw_write(0x19, MV_88E6185_PORT_BASED_VLAN_MAP, data);
 
