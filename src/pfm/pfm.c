@@ -1354,21 +1354,22 @@ int parse_ip_check(char * str)
             return -1;
 		}
 		token=strtok(ipAddr,sep);
-		if((NULL == token)||("" == token)||(strlen(token) < 1)||\
+		if((NULL == token)||(strcmp(token,"")==0)||(strlen(token) < 1)||\
 			((strlen(token) > 1) && ('0' == token[0]))){ 
 			return -1;
-		}
+		}/*coverity modify for CID 10049 */
 		if(NULL != token){
 		    ip_long[0] = strtoul(token,NULL,10);
 		}
-		else {
+	/*	else {
 			return -1;
 		}
+		*//*coverity modify for CID 10543 */
 		i=1;
 		while((token!=NULL)&&(i<4))
 		{
 			token=strtok(NULL,sep);
-			if((NULL == token)||("" == token)||(strlen(token) < 1)|| \ 
+			if((NULL == token)||(strcmp(token,"")==0)||(strlen(token) < 1)|| \ 
 				((strlen(token) > 1) && ('0' == token[0]))){
 				return -1;
 			}
@@ -2041,6 +2042,7 @@ int init_product_info()
 	if(1 != fscanf(fd, "%d", &product_serial))
 	{
 		product_serial=8;
+		fclose(fd);/*coverity modify for CID 17193 */
 		return -1;
 	}
 	fclose(fd);
