@@ -71,6 +71,11 @@ extern "C"
 #include <linux/sched.h>   /* for TASK_INTERRUPTIBLE in sdk2.2 */
 #include <net/net_namespace.h>  /* for struct net init_net in sdk2.2 */
 #include <linux/smp_lock.h>   /* for lock_kernel in sdk2.2 */
+#include <linux/fs.h>
+#include <asm/uaccess.h>
+#include <linux/mm.h>
+#include <linux/types.h>
+#include <linux/syscalls.h>
 
 #include "if_kap.h"
 #if 0
@@ -80,6 +85,7 @@ extern cvmx_bootinfo_t *octeon_bootinfo;
 #endif
 extern int mac_addr_get(unsigned char * mac);
 extern struct net init_net;
+extern unsigned long simple_strtoul(const char *cp,char **endp,unsigned int base);
 
 #ifdef KAP_DEBUG
 static int kap_debug = 0;
@@ -96,6 +102,74 @@ MODULE_PARM_DESC(kap_debug,"Enable debug messages.");
 static struct semaphore kapReadPacketSem;
 
 
+
+static int kap_read_from_file(char *filename,char *buff,int len)
+{
+	struct file *filp;
+	struct inode *inode;
+	mm_segment_t old_fs = get_fs();
+	
+	if((filename == NULL) || (buff == NULL))
+		return -1;
+
+	set_fs(KERNEL_DS);
+	filp = filp_open(filename, O_RDONLY, 0);
+	if(IS_ERR(filp)) 
+	{
+	    DBG(KERN_INFO  "Kap open file:%s error!\n",filename);
+		set_fs(old_fs);
+		return -1;
+	}
+	else
+	{
+		#if 0
+		if(vfs_read(filp, buff, len,&filp->f_pos) == len)
+		#endif
+		if(filp->f_op->read(filp, buff, len,&filp->f_pos) == len)
+		{
+			DBG(KERN_INFO  "Kap read filename is %s\n",filename);
+			DBG(KERN_INFO  "Kap read MAC is %s ,len is %d\n",buff,len);
+		    filp_close(filp,NULL);
+	    	set_fs(old_fs);
+			return 0;
+	    }
+		else
+		{
+			DBG(KERN_INFO "Can not READ out MAC info.\n");
+		    filp_close(filp,NULL);
+	    	set_fs(old_fs);
+			return -1;
+		}
+	}
+
+}
+
+static int get_board_mac_from_devinfo(unsigned char *mac_addr)
+{
+    
+	int j;
+	char tmp_mac_chars[13];
+	unsigned char temp_2char[3] = {0x00, 0x00, 0x00};
+    memset(tmp_mac_chars, 0x00, 13);
+	if(0 == kap_read_from_file("/devinfo/local_mac",tmp_mac_chars,12))
+	{
+		DBG(KERN_INFO "read MAC string is %s.\n",tmp_mac_chars);
+		if(0 == simple_strtoul(tmp_mac_chars, 0, 16))
+			return -2;
+	}
+	else
+	{
+		return -1;
+	}
+	for (j=0; j<12; j+=2)
+	{
+		memcpy(temp_2char, tmp_mac_chars+j, 2);
+		mac_addr[j/2] = (unsigned char)simple_strtoul((char *)temp_2char, 0, 16);
+//		printk("%02x:",mac_addr[j/2]);
+	}
+//	printk("\n");
+	return 0;
+}
 /* Net device open. */
 static int kap_net_open(struct net_device *dev)
 {
@@ -209,6 +283,21 @@ static void kap_net_init(struct net_device *dev)
 		#if 0
 		random_ether_addr(dev->dev_addr);
 		#endif
+		DBG(KERN_INFO "Before read from devinfo/basemac\n");
+		DBG(KERN_INFO "MAC is %02x:%02x:%02x:%02x:%02x:%02x\n",kap->if_mac_addr[0],\
+													 		   kap->if_mac_addr[1],\
+													 		   kap->if_mac_addr[2],\
+													 		   kap->if_mac_addr[3],\
+													 		   kap->if_mac_addr[4],\
+															   kap->if_mac_addr[5]);
+		get_board_mac_from_devinfo(kap->if_mac_addr);
+		DBG(KERN_INFO "After read from devinfo/basemac\n");
+		DBG(KERN_INFO "MAC is %02x:%02x:%02x:%02x:%02x:%02x\n",kap->if_mac_addr[0],\
+													 		   kap->if_mac_addr[1],\
+													 		   kap->if_mac_addr[2],\
+													 		   kap->if_mac_addr[3],\
+													 		   kap->if_mac_addr[4],\
+															   kap->if_mac_addr[5]);
 		dev->dev_addr[0] = kap->if_mac_addr[0];
 		dev->dev_addr[1] = kap->if_mac_addr[1];
 		dev->dev_addr[2] = kap->if_mac_addr[2];
@@ -1911,9 +2000,9 @@ static int kap_chr_open(struct inode *inode, struct file * file)
 	init_waitqueue_head(&kap->read_wait);	
 
 	INIT_LIST_HEAD(&kap->dev_list);
-	
-    mac_addr_get(kap->if_mac_addr);
+	get_board_mac_from_devinfo(kap->if_mac_addr);
 #if 0
+    mac_addr_get(kap->if_mac_addr);
 	kap->if_mac_addr[0] = octeon_bootinfo->mac_addr_base[0];
 	kap->if_mac_addr[1] = octeon_bootinfo->mac_addr_base[1];
 	kap->if_mac_addr[2] = octeon_bootinfo->mac_addr_base[2];

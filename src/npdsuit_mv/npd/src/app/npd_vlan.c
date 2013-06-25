@@ -72,6 +72,7 @@ extern "C"
 #include "sysdef/returncode.h"
 #include "npd_mld_snp_com.h"
 #include "cvm/autelan_product.h"
+#include "npd_dynamic_trunk.h"
 
 #include "board/netlink.h"   /* for netlink msg */
 netlink_msg_t n_vlan_msg;
@@ -85,6 +86,9 @@ extern unsigned short advanced_routing_default_vid;
 
 extern unsigned char igmpSnpEnable;
 extern unsigned char mldSnpEnable;
+extern unsigned int dynamic_trunk_allow_vlan_untag[MAX_DYNAMIC_TRUNKID+1][NPD_MAX_VLAN_ID+1];
+extern unsigned int dynamic_trunk_allow_vlan_tag[MAX_DYNAMIC_TRUNKID+1][NPD_MAX_VLAN_ID+1];
+
 unsigned int npd_vlan_qinq_disable(unsigned short vlanId);
 unsigned int npd_vlan_trunk_qinq_disable(unsigned short trunkId,unsigned short vlanId);
 
@@ -13118,6 +13122,7 @@ void npd_vlan_check_state(void)
 	unsigned char	old_state =0, new_state = 0;
 	unsigned char old_vlan_state[4096] = {0};
 	int vlan_state_changed = 0;
+	unsigned char slot_no = 0,port_no = 0;
 
 	/* tell my thread id */
 	npd_init_tell_whoami("NpdVlanCheckState", 0);	
@@ -13250,7 +13255,24 @@ void npd_vlan_check_state(void)
 						continue;
 					}
 				}
-				
+			
+				if((dynamic_trunk_allow_vlan_untag[0][vid_index] == 1) || (dynamic_trunk_allow_vlan_tag[0][vid_index] == 1))
+				{
+					for(i=0;i<8;i++)
+					{
+						slot_no = DYNAMIC_TRUNK_PORT_SLOT_NUM(1,i);
+						port_no = DYNAMIC_TRUNK_PORT_PORT_NUM(1,i);
+						if(DYNAMIC_TRUNK_PORT_IS_ADDED(1,i) && (slot_no <= CHASSIS_SLOT_COUNT) && (port_no <= 64))
+						{
+							if(((start_fp[slot_no-1][port_no-1].attr_bitmap >>1) & 0x1) == 1) 
+							{
+								count_up++;
+								break;
+							}
+						}
+					}
+				}
+			
 				if(count_up > 0)
 				{
 				    new_state = VLAN_UP;

@@ -1549,6 +1549,8 @@ unsigned long nam_packet_rx_handling
 
 	/* TODO: check if vlan legal and status up */
 	status = npd_check_vlan_status(vid);
+	if((packetType == NAM_PACKET_TYPE_LACP_E) && (vid == 1))
+		status = 1;
 	if(status >= 2) {
 		loglength += sprintf(bufPtr," vlan %d(%s)",vid, "NOT-EXiST");
 		bufPtr = logbuffer + loglength;

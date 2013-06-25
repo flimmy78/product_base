@@ -1834,8 +1834,11 @@ struct arp_snooping_item_s *npd_arp_snooping_find_item_byip
 
 	item = hash_search(arp_snoop_db_s,&data,npd_arp_snooping_compare_byip,ARP_HASH_KEY_IP);
 	if(NULL == item) {
+		/*zhangcl@autelan.com clean the print messages*/
+		#if 0
 		syslog_ax_arpsnooping_dbg("not found arp item of %d.%d.%d.%d\n", \
 			(ipAddr>>24)&0xFF,(ipAddr>>16)&0xFF,(ipAddr>>8)&0xFF,(ipAddr)&0xFF);
+		#endif
 		return item; /* return null pointer*/
 	}
 
@@ -1882,8 +1885,11 @@ struct arp_snooping_item_s *npd_arp_snooping_find_item_byip_only
 
 	item = hash_search(arp_snoop_db_s,&data,npd_arp_snooping_compare_byip,ARP_HASH_KEY_IP);
 	if(NULL == item) {
+		/*zhangcl@autelan.com clean the print messages*/
+		#if 0
 		syslog_ax_arpsnooping_dbg("not found arp item of %d.%d.%d.%d by ip only\n", \
 			(ipAddr>>24)&0xFF,(ipAddr>>16)&0xFF,(ipAddr>>8)&0xFF,(ipAddr)&0xFF);
+		#endif
 		return item; /* return null pointer*/
 	}
 
@@ -6402,7 +6408,10 @@ int npd_arp_snooping_neigh_get_info
 		return ARP_RETURN_CODE_ERROR;
 
 	neighEntry->ifIndex = msgPtr->ndm_ifindex;
+	/*zhangcl@autelan.com clean the print message*/
+	#if 0
 	syslog_ax_arpsnooping_dbg("neigh ifindex %x",neighEntry->ifIndex);
+	#endif
 	neighEntry->state = msgPtr->ndm_state;
 	
 	rtattrptr = (struct rtattr *) RTM_RTA(msgPtr);
@@ -6415,17 +6424,27 @@ int npd_arp_snooping_neigh_get_info
 			case NDA_DST:
 				dst = (struct in_addr*)(RTA_DATA(rtattrptr));
 				neighEntry->ipAddr = dst->s_addr;
+				/*zhangcl@autelan.com clean the print message*/
+				#if 0
 				syslog_ax_arpsnooping_dbg("neigh ip address %d.%d.%d.%d",(neighEntry->ipAddr>>24)&0xFF,	\
 					(neighEntry->ipAddr>>16)&0xFF,(neighEntry->ipAddr>>8)&0xFF,neighEntry->ipAddr&0xFF);
+				#endif
 				break;
 			/* MAC address */
 			case NDA_LLADDR:
 				tmp = (unsigned char*)RTA_DATA(rtattrptr);
 				memcpy(neighEntry->mac,tmp,6);
+				/*zhangcl@autelan.com clean the print message*/
+				#if 0
 				syslog_ax_arpsnooping_dbg("neigh mac %02x:%02x:%02x:%02x:%02x:%02x",tmp[0],tmp[1],tmp[2],tmp[3],tmp[4],tmp[5]);
+				#endif
 				break;
 			default:
+				/*zhangcl@autelan.com clean the print message*/
+				#if 0
 				syslog_ax_arpsnooping_err("ignore attributes %d\n",rtattrptr->rta_type);
+				#endif
+				break;
 		}
 	}
 	
@@ -6485,10 +6504,12 @@ int npd_arp_snooping_synchronize_item
 	    !(ndm->ndm_state&~NUD_NOARP))
 		return ARP_RETURN_CODE_SUCCESS;
 
+/*zhangcl@autelan.com clean the print message*/
+#if 0
 	syslog_ax_arpsnooping_dbg("get msg family %d, ifindex %d, flags %d, type %d, state %d\n ",		\
 					ndm->ndm_family,ndm->ndm_ifindex,ndm->ndm_flags,
 				    ndm->ndm_type,ndm->ndm_state);
-
+#endif
 	npd_arp_snooping_parse_rtattr(tb, NDA_MAX, NDA_RTA(ndm), len);
 
 	if (!tb[NDA_DST])
@@ -6528,7 +6549,10 @@ int npd_arp_snooping_synchronize_item
 #ifndef AX_NEIGH_USER
 		case RTM_NEWNEIGH:
 		case RTM_DELNEIGH:
+			/*zhangcl@autelan.com clean the print message*/
+			#if 0
 			syslog_ax_arpsnooping_dbg("message for new neighbour entry %s",RTM_NEWNEIGH ? "attached":"detached");
+			#endif
 			neighEntry = (struct ndmsg *) NLMSG_DATA(n);
 			payloadoff = RTM_PAYLOAD(n);
 			memset(&neighInfo,0,sizeof(struct neigh_tbl_info));
@@ -6544,9 +6568,12 @@ int npd_arp_snooping_synchronize_item
 				pthread_mutex_lock(&arpHashMutex);
 				arpInfo = npd_arp_snooping_find_item_byip(neighInfo.ifIndex,neighInfo.ipAddr);
 				if(NULL == arpInfo) {
+					/*zhangcl@autelan.com clean the print message*/
+					#if 0
 					syslog_ax_arpsnooping_err("no arp item for %#0x %d.%d.%d.%d in FAILED\n", \
 						neighInfo.ifIndex,(neighInfo.ipAddr >> 24)&0xFF, \
 						(neighInfo.ipAddr >> 16)&0xFF,(neighInfo.ipAddr >> 8)&0xFF,neighInfo.ipAddr&0xFF);
+					#endif
 					pthread_mutex_unlock(&arpHashMutex);
 					break;
 				}
@@ -6574,10 +6601,13 @@ int npd_arp_snooping_synchronize_item
 				pthread_mutex_lock(&arpHashMutex);
 				arpInfo = npd_arp_snooping_find_item_bymacip(neighInfo.ifIndex,neighInfo.mac,neighInfo.ipAddr);
 				if(NULL == arpInfo) {
+					/*zhangcl@autelan.com clean the print message*/
+					#if 0
 					syslog_ax_arpsnooping_err("no arp item for %#0x %02x:%02x:%02x:%02x:%02x:%02x %d.%d.%d.%d in STALE\n", \
 						neighInfo.ifIndex,neighInfo.mac[0],neighInfo.mac[1],neighInfo.mac[2],neighInfo.mac[3], \
 						neighInfo.mac[4],neighInfo.mac[5],(neighInfo.ipAddr >> 24)&0xFF, \
 						(neighInfo.ipAddr >> 16)&0xFF,(neighInfo.ipAddr >> 8)&0xFF,neighInfo.ipAddr&0xFF);
+					#endif
 					pthread_mutex_unlock(&arpHashMutex);
 					break;
 				}
@@ -6587,7 +6617,10 @@ int npd_arp_snooping_synchronize_item
 				}
 			}
 			else {
+				/*zhangcl@autelan.com clean the print message*/
+				#if 0
 				syslog_ax_arpsnooping_dbg("ignore neigh message as state %d",neighInfo.state);
+				#endif
 			}
 			break;
 #endif
@@ -8793,7 +8826,7 @@ DBusMessage * npd_dbus_set_stale_time_for_interface(DBusConnection *conn, DBusMe
 		system(cmdstr);		
 	}
 	else if (isVlanIntf == IS_VE_INTERFACE) {
-		/*wangchong for AXSSZFI-1540 ,the "port" used for "cpu_no&cpu_port_no"*/
+		/*wangchong for AXSSZFI-1539 ,the "port" used for "cpu_no&cpu_port_no"*/
 		cpu_no = (unsigned char)((port_no >> 4) & 0xf);
 		cpu_port_no = (unsigned char)(port_no & 0xf);
 
@@ -9321,6 +9354,7 @@ DBusMessage * npd_dbus_interface_static_arp(DBusConnection *conn, DBusMessage *m
 		
 		ret = ARP_RETURN_CPU_INTERFACE_CODE_SUCCESS;
 		if (isVlanIntf == IS_VE_INTERFACE){
+		/*wangchong for AXSSZFI-1540 ,the "port" used for "cpu_no&cpu_port_no"*/		
     		cpu_no = (unsigned char)((port_no >> 4) & 0xf);
     		cpu_port_no = (unsigned char)(port_no & 0xf);
 			sprintf(ifname, "ve%02d%s%d.%d",slot_no,cpu_name[cpu_no-1],cpu_port_no,vlanId);

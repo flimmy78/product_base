@@ -308,8 +308,11 @@ GT_STATUS write_msg_to_drv_for_syn(void *ptr,int totlemsglen,unsigned int srcpid
 	for(;NLMSG_OK(nlp, totlemsglen);nlp=NLMSG_NEXT(nlp, totlemsglen))
 	{
 		if(RTM_NEWROUTE != nlp->nlmsg_type && RTM_DELROUTE != nlp->nlmsg_type &&RTM_GETROUTE != nlp->nlmsg_type)
-		{		
+		{	
+			/*zhangcl@autelan.com clean the print message */
+			#if 0
 			syslog_ax_route_dbg("Discard non route msg pid %u type %s",srcpid, NL_MSG_TYPE_DESC(nlp->nlmsg_type));
+			#endif
 			continue;
 		}	
 
@@ -670,8 +673,11 @@ void read_newlink(void* ptr,int totlemsglen, unsigned int src_pid)
 	
 	/* check whether this message is for L3 interface mac address update*/
 	if(ifaddr && ifname) {
+		/*zhangcl@autelan.com clean the print message*/
+		#if 0
 		syslog_ax_route_dbg("RTM_NEWLINK message for interface %s change mac %02x:%02x:%02x:%02x:%02x:%02x\n", \
 						ifname, ifaddr[0],ifaddr[1],ifaddr[2],ifaddr[3],ifaddr[4],ifaddr[5]);
+		#endif
 		/*notify to npd to modified the sysmac and L3 static fdb entry*/
 		sprintf(macComp,"%02x%02x%02x%02x%02x%02x", \
 				ifaddr[0],ifaddr[1],ifaddr[2],ifaddr[3],ifaddr[4],ifaddr[5]);
@@ -962,9 +968,11 @@ void syn_kernelRT_to_drv(int sockfd)
 			syslog_ax_route_err("ignore NLMSG_DONE message\n");
 			continue;
 		}
+		/*zhangcl@autelan.com clean the print message */
+		#if 0
 		syslog_ax_route_dbg("netlink socket %d rcv msg type %s len %d from pid %d group %#x\n",  \
 							sockfd, NL_MSG_TYPE_DESC(nlp->nlmsg_type),msglen, snl.nl_pid, snl.nl_groups);
-
+		#endif
 		write_msg_to_drv_for_syn(nlp,msglen,snl.nl_pid);
 		read_newlink(nlp,msglen, snl.nl_pid);
 		read_ip(nlp,msglen);

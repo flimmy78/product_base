@@ -60,7 +60,7 @@ extern "C"
 #include "npd_eth_port.h"
 #include "sysdef/returncode.h"
 #include "npd_board.h"
-
+#include "npd_dynamic_trunk.h"
 #include <sys/mman.h>  /* for mmap() MS_SYNC */
 #include "board/board_define.h"   /* MASTER_BOARD */
 
@@ -82,6 +82,7 @@ char *trkLBalanc[LOAD_BANLC_MAX] = {
 unsigned int g_loadBalanc = LOAD_BANLC_MAC_IP_L4;
 unsigned int npd_dst_trunk_valid(unsigned short trunkId,char *trunkName);
 unsigned int npd_dst_trunk_invalid(unsigned short trunkId);
+unsigned int npd_trunk_port_del_for_dynamic_trunk(unsigned short trunkId,unsigned int eth_index);
 
 
 void npd_init_trunks
@@ -1544,8 +1545,12 @@ int npd_trunk_port_link_change
 	unsigned short trkid = portTrunk->trunkId;
 	unsigned int ret = 0;
 	unsigned char tlinkstate = TRUNK_STATE_DOWN_E;
-	
+
 	if(ETH_PORT_NOTIFIER_LINKDOWN_E == event){
+		if(trkid == 119)
+		{
+			return NPD_SUCCESS;
+		}
 		/* TODO:check trunk status*/
 		syslog_ax_trunk_dbg("port %d down, trunkId is %d\n",eth_g_index,trkid);
 		if(NPD_SUCCESS != npd_modify_trunk_status_by_portdown(trkid)){
@@ -1589,15 +1594,18 @@ int npd_trunk_port_link_change
 		}
 	}
 
-	if(g_dst_trunk[trkid-1].tLinkState != tlinkstate)
+	if(trkid != 119)
 	{
-		g_dst_trunk[trkid-1].tLinkState = tlinkstate;
-		ret = msync(g_dst_trunk, sizeof(dst_trunk_s)*127, MS_SYNC);
-		if( ret!=0 )
-	    {
-	        syslog_ax_trunk_err("msync shm_trunk failed \n" ); 
-			return TRUNK_RETURN_CODE_ERR_GENERAL;
-	    }
+		if(g_dst_trunk[trkid-1].tLinkState != tlinkstate)
+		{
+			g_dst_trunk[trkid-1].tLinkState = tlinkstate;
+			ret = msync(g_dst_trunk, sizeof(dst_trunk_s)*127, MS_SYNC);
+			if( ret!=0 )
+		    {
+		        syslog_ax_trunk_err("msync shm_trunk failed \n" ); 
+				return TRUNK_RETURN_CODE_ERR_GENERAL;
+		    }
+		}
 	}
 	
 	return NPD_SUCCESS;
@@ -2068,6 +2076,82 @@ unsigned int npd_trunk_port_add_for_dynamic_trunk
 	return ret;
 }
 
+unsigned int npd_trunk_port_endis_for_dynamic_trunk
+(
+	unsigned short	trunkId,
+	unsigned int	eth_index,
+	unsigned char endis
+)
+{
+	unsigned int i = 0, ret = TRUNK_RETURN_CODE_ERR_NONE;
+	unsigned char devNum = 0, virPortNum = 0, isTagged = 0;
+	unsigned int cretMbrBmp0 = 0, cretMbrBmp1 = 0;
+	static unsigned short vid[NPD_MAX_VLAN_ID] = {0};
+	unsigned int m_eth_index = 0, vCount = 0;
+	
+	ret = npd_get_devport_by_global_index(eth_index,&devNum,&virPortNum);
+	if (ret != 0) 
+	{
+		 syslog_ax_trunk_err("global_index %d convert to devPort error ret %d\n",eth_index,ret);
+		ret = TRUNK_RETURN_CODE_BADPARAM;
+		return ret;
+	}
+	
+	/*test devNum virPortNum Is Legal*/
+	if (CHECK_DEV_NO_ISLEGAL(devNum))
+	{
+		if(CHECK_VIRPORT_NO_ISLEGAL(virPortNum))
+		{
+			syslog_ax_trunk_dbg("Legal devNum %d,virPortNum %d\n",devNum,virPortNum);
+			ret = TRUNK_RETURN_CODE_ERR_NONE;
+		} 
+		else 
+		{
+			syslog_ax_trunk_err("virPortNum error.\n");
+			ret = TRUNK_RETURN_CODE_BADPARAM;
+			return ret;
+		}
+	} 
+	else
+	{
+		syslog_ax_trunk_err("devNum error.\n");
+		ret = TRUNK_RETURN_CODE_BADPARAM;
+		return ret;
+	}
+	
+	/*if NOT Steps into the (trunk-config CMD node),trunk exists or not Test is wanted.*/
+	/*if Steps into (trunk-config CMD node), it does NOT need test trunk node exist or not,because*/
+	ret = npd_check_trunk_exist(trunkId);
+	if (TRUNK_RETURN_CODE_TRUNK_EXISTS != ret) 
+	{
+		syslog_ax_trunk_err("trunk %d not exist.\n",trunkId);
+		return TRUNK_RETURN_CODE_TRUNK_NOTEXISTS;/*can NOT directed Return.*/
+	}
+	
+	/*here MUST check the ETH-port is already member of the TRUNK or NOT*/
+	ret = npd_trunk_check_port_membership(trunkId,eth_index);
+	if (NPD_FALSE == ret) 
+	{
+		syslog_ax_trunk_err("Port %d was not the member of trunk % d\n",virPortNum,trunkId);
+		return TRUNK_RETURN_CODE_PORT_NOTEXISTS;
+	}
+
+	/*check the port is master port or NOT of the trunk*/
+
+	ret = nam_asic_trunk_port_endis(devNum,virPortNum,trunkId,endis);
+	if(ret != TRUNK_RETURN_CODE_ERR_NONE)
+	{
+		syslog_ax_trunk_err("%s dev %d,port %d from trunk %d failed!\n",endis?"En":"Dis",devNum,virPortNum,trunkId);
+	}
+	else
+	{
+		syslog_ax_trunk_err("%s dev %d,port %d from trunk %d successfully!\n",endis?"En":"Dis",devNum,virPortNum,trunkId);
+	}
+	return ret;
+}
+
+
+
 unsigned int npd_trunk_port_add
 (
 	unsigned short trunkId, 
@@ -2332,7 +2416,8 @@ unsigned int npd_trunk_port_del
 	}
 
 	/*return to Default vlan 1.*/
-	npd_vlan_interface_port_add(DEFAULT_VLAN_ID, eth_index,NPD_FALSE);syslog_ax_trunk_dbg("add port to default vlan \n");
+	npd_vlan_interface_port_add(DEFAULT_VLAN_ID, eth_index,NPD_FALSE);
+	syslog_ax_trunk_dbg("add port to default vlan \n");
 	return ret;
 }
 
@@ -2696,7 +2781,8 @@ unsigned int npd_trunk_destroy_node
 		syslog_ax_trunk_dbg("trunk %d does not exist.\n",trunkId);
 	 	return ret;  
 	}
-	else {
+	else 
+	{
 		/*first disable trunk qinq in special vlan*/
 		if((SYSTEM_TYPE == IS_DISTRIBUTED) || (PRODUCT_ID == PRODUCT_ID_AX7K_I))
 		{
@@ -2749,7 +2835,8 @@ unsigned int npd_trunk_destroy_node
 				ret = TRUNK_RETURN_CODE_ERR_NONE;
 			}		
 		}
-		
+
+		syslog_ax_trunk_dbg("delete trunk members and added to default vlan !\n");
 		/*delete NON-master port*/
 		ret = npd_trunk_member_port_index_get_all(trunkId,eth_g_index,&mbrCount);
 		if(NPD_TRUE == ret) {

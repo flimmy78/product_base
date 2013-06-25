@@ -1511,7 +1511,7 @@ void npd_init_eth_ports(void) {
 
     for(i = 0; i < CHASSIS_SLOT_COUNT; i++)
     {
-        msync(start_fp[i], sizeof(struct global_ethport_s)*BOARD_GLOBAL_ETHPORTS_MAXNUM, MS_ASYNC);
+        msync(start_fp[i], sizeof(struct global_ethport_s)*BOARD_GLOBAL_ETHPORTS_MAXNUM, MS_SYNC);
     }
 	/*
 	 * by qinhs@autelan.com on 10/23/2008 

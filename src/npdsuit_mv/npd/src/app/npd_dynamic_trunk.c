@@ -49,6 +49,8 @@ extern "C"
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/socket.h>
+#include <fcntl.h>
+#include <sys/mman.h>  /* for mmap() */
 
 
 #include "npd_log.h"
@@ -68,14 +70,18 @@ extern "C"
 unsigned int dynamic_trunk_member[MAX_DYNAMIC_TRUNKID + 1][MAX_DYNAMIC_TRUNK_MEMBER] = {0};/* & 0xff0000,trunk is add, &0xff00, slot, &0xff port*/
 unsigned int dynamic_trunk_member_count[MAX_DYNAMIC_TRUNKID + 1] = {0};/*dynamic trunk port member count */
 
-unsigned int dynamin_trunk_allow_vlan_untag[MAX_DYNAMIC_TRUNKID+1][NPD_MAX_VLAN_ID] = {0};
-unsigned int dynamin_trunk_allow_vlan_tag[MAX_DYNAMIC_TRUNKID+1][NPD_MAX_VLAN_ID] = {0};
+unsigned int dynamic_trunk_allow_vlan_untag[MAX_DYNAMIC_TRUNKID+1][NPD_MAX_VLAN_ID+1] = {0};
+unsigned int dynamic_trunk_allow_vlan_tag[MAX_DYNAMIC_TRUNKID+1][NPD_MAX_VLAN_ID+1] = {0};
 
 #define CMD_LINE_LEN 128  /*longgest command length*/
 
 #define DYNAMIC_ONLY_HW 0
 
+#define DYNAMIC_TRUNK_ENDIS 0
+
 extern int errno;
+extern char g_dis_dev[MAX_ASIC_NUM];
+
 
 /*****************************************************************************
  * npd_dynamic_trunk_port_exist_check
@@ -334,7 +340,7 @@ int npd_dynamic_trunk_create_delete_trunk
 	sprintf(trunkIfname, "trunk%d", trunkId);
 	if(isCreate){/*create dynamic trunk interface*/
 		memset(cmd, 0, CMD_LINE_LEN);
-		sprintf(cmd, "sudo modprobe trunking -o %s bondname=%s", trunkIfname, trunkIfname);
+		sprintf(cmd, "sudo modprobe trunking -o %s bondname=%s miimon=1000", trunkIfname, trunkIfname);
 		ret = system(cmd);
 		if(ret){
 			npd_syslog_err("cmd %s, ret %#x,error: %s\n", cmd, ret, errno ? strerror(errno) : "null");
@@ -482,6 +488,11 @@ DBusMessage * npd_dbus_dynamic_trunk_add_delete_port_member
 	unsigned int ifindex = ~0UI;
 	unsigned int enable = 0;
 	unsigned int isSlave = 0;
+	unsigned char actdevNum = 0,virportnum = 0,endis = 0;
+	unsigned int port_link_state = 0;
+	unsigned short vlanId = 0;
+	unsigned int index = 0;
+	unsigned char port_isadded = 0;
 	
 	DBusError err;	
 	dbus_error_init(&err);
@@ -509,6 +520,7 @@ DBusMessage * npd_dbus_dynamic_trunk_add_delete_port_member
 			{
 				if(DYNAMIC_TRUNK_ID_IS_AVALIABLE(trunkId))
 				{
+					npd_syslog_dbg("trunk count = %d\n",dynamic_trunk_member_count[trunkId]);
 					if(!DYNAMIC_TRUNK_MEMBER_IS_NOT_FULL(trunkId))
 					{
 						npd_syslog_dbg("add port (%d/%d) to dynamic trunk %d failed, port member for this dynamic trunk is full", \
@@ -520,48 +532,98 @@ DBusMessage * npd_dbus_dynamic_trunk_add_delete_port_member
 						npd_syslog_dbg("add port to dynamic trunk failed, the dynamic trunk %d is not exists\n", trunkId);
 						ret = TRUNK_RETURN_CODE_TRUNK_NOTEXISTS;
 					}
-					else if((NPD_TRUE == npd_eth_port_interface_check(eth_g_index, &ifindex))&&(~0UI != ifindex))
+					
+					if(ret == TRUNK_RETURN_CODE_ERR_NONE)
 					{
-						if_indextoname(ifindex, ethIntfName);
-						if((NPD_SUCCESS == npd_eth_port_interface_l3_flag_get(eth_g_index,&enable))&&(!enable))
-						{
-							if(!npd_dynamic_trunk_port_isslave_check(ethIntfName,&isSlave))
+						for(index = 0; index < MAX_DYNAMIC_TRUNK_MEMBER; index++)
+						{/*try to match the port and clear it*/
+							if(DYNAMIC_TRUNK_PORT_IS_ADDED(trunkId,index) && (DYNAMIC_TRUNK_PORT_SLOT_NUM(trunkId,index) == slot_no) && (DYNAMIC_TRUNK_PORT_PORT_NUM(trunkId,index) == local_port_no))
 							{
-								if(!isSlave)
-								{
-									npd_syslog_dbg("add interface %s to interface trunk%d\n",ethIntfName,trunkId);																								
-									ret = TRUNK_RETURN_CODE_ERR_NONE;
-									if(npd_dynamic_trunk_add_del_port(trunkId, ethIntfName, slot_no, local_port_no, isAdd))
-									{
-										npd_syslog_err("add port(%d/%d) to dynamic trunk %d, command execute failed\n", \
-											slot_no, local_port_no, trunkId);
-										ret = TRUNK_RETURN_CODE_ERR_GENERAL;
-									}								
-								}
-								else
-								{
-									npd_syslog_dbg("add port (%d/%d) to trunk %d failed, the port is already a member of a dynamic trunk\n ", slot_no, local_port_no, trunkId);
-									ret = TRUNK_RETURN_CODE_MEMBERSHIP_CONFICT;
-								}
+								port_isadded = 1;
+								break;
 							}
-							else 
+						}
+						if(port_isadded == 0)
+						{
+							npd_port_vlan_free(eth_g_index);
+
+							/*add trunk port to default vlan 1 as untagged port member */
+							ret = npd_vlan_interface_port_add_for_dynamic_trunk(DEFAULT_VLAN_ID, eth_g_index, NPD_FALSE);
+							if(VLAN_RETURN_CODE_ERR_NONE != ret && VLAN_RETURN_CODE_PORT_EXISTS != ret && NPD_TRUE != ret) /*NPD_TRUE -- vlan is L3 interface*/
+							{	
+								syslog_ax_trunk_err("port %d add to vlan 1 error. ret %d\n",eth_g_index,ret);
+								ret = TRUNK_RETURN_CODE_MEMBER_ADD_ERR;
+							}
+							
+							if((NPD_TRUE == npd_eth_port_interface_check(eth_g_index, &ifindex))&&(~0UI != ifindex))
 							{
-								npd_syslog_err("add port (%d/%d) to trunk %d, port is slave check failed\n", slot_no, local_port_no, trunkId);
-								ret = TRUNK_RETURN_CODE_ERR_GENERAL;
-							}								
+								if_indextoname(ifindex, ethIntfName);
+								npd_syslog_dbg("port (%d,%d) is already a L3 interface\n",slot_no,local_port_no);
+							}
+							else
+							{
+								npd_syslog_dbg("port(%d,%d) is not a L3 interface,enable L3 function\n",slot_no,local_port_no);
+								sprintf(ethIntfName,"eth%d-%d",slot_no,local_port_no);
+								ret = npd_port_type_deal_for_lacp(eth_g_index,ethIntfName,isAdd);
+								if(ret != TRUNK_RETURN_CODE_ERR_NONE)
+								{
+									npd_syslog_err("npd_port_type_deal err re_value is %#x \n",ret);
+								}
+								usleep(500000);
+							}
+							if((NPD_SUCCESS == npd_eth_port_interface_l3_flag_get(eth_g_index,&enable))&&(!enable))
+							{
+								if(!npd_dynamic_trunk_port_isslave_check(ethIntfName,&isSlave))
+								{
+									if(!isSlave)
+									{
+										npd_syslog_dbg("add interface %s to interface trunk%d\n",ethIntfName,trunkId);																								
+										ret = TRUNK_RETURN_CODE_ERR_NONE;
+										if(npd_dynamic_trunk_add_del_port(trunkId, ethIntfName, slot_no, local_port_no, isAdd))
+										{
+											npd_syslog_err("add port(%d/%d) to dynamic trunk %d, command execute failed\n", \
+												slot_no, local_port_no, trunkId);
+											ret = TRUNK_RETURN_CODE_ERR_GENERAL;
+										}
+										#if DYNAMIC_TRUNK_ENDIS
+										else
+										{
+											ret = npd_trunk_port_add_for_dynamic_trunk(trunkId + MAX_STATIC_TRUNK_ID, eth_g_index);
+											if(ret)
+											{
+												npd_syslog_err("try to add port to trunk %d failed, ret %#x\n", trunkId + MAX_STATIC_TRUNK_ID, ret);
+											}
+										}
+										#endif
+									}
+									else
+									{
+										npd_syslog_dbg("add port (%d/%d) to trunk %d failed, the port is already a member of a dynamic trunk\n ", slot_no, local_port_no, trunkId);
+										ret = TRUNK_RETURN_CODE_MEMBERSHIP_CONFICT;
+									}
+								}
+								else 
+								{
+									npd_syslog_err("add port (%d/%d) to trunk %d, port is slave check failed\n", slot_no, local_port_no, trunkId);
+									ret = TRUNK_RETURN_CODE_ERR_GENERAL;
+								}								
+							}
+							else
+							{
+								npd_syslog_dbg("port(%d %d) index %d is not a l3 disable interface, do not allow add to trunk.\n", \
+									slot_no, local_port_no, eth_g_index);
+								ret = TRUNK_RETURN_CODE_INTERFACE_L3_ENABLE;
+							}
 						}
 						else
 						{
-							npd_syslog_dbg("port(%d %d) index %d is not a l3 disable interface, do not allow add to trunk.\n", \
-								slot_no, local_port_no, eth_g_index);
-							ret = TRUNK_RETURN_CODE_INTERFACE_L3_ENABLE;
+							npd_syslog_dbg("add port (%d/%d) to trunk %d failed, the port is already a member of a dynamic trunk\n ", slot_no, local_port_no, trunkId);
+							ret = TRUNK_RETURN_CODE_MEMBERSHIP_CONFICT;
 						}
 					}
 					else
 					{
-						npd_syslog_dbg("add port (%d/%d) to trunk %d failed, the interface is not exists\n", \
-							slot_no, local_port_no, trunkId);
-						ret = TRUNK_RETURN_CODE_INTERFACE_NOT_EXIST;
+						npd_syslog_err("enable port lacp function failed\n");
 					}
 				}
 				else
@@ -625,7 +687,7 @@ DBusMessage * npd_dbus_dynamic_trunk_add_delete_port_member
 
 #endif
 						}
-						if(TRUNK_RETURN_CODE_ERR_NONE == ret)
+						if((TRUNK_RETURN_CODE_ERR_NONE == ret) || (ret == TRUNK_RETURN_CODE_PORT_NOTEXISTS))
 						{/*delete port from dynamict trunk in software*/
 							if(npd_dynamic_trunk_add_del_port(trunkId, ethIntfName, slot_no, local_port_no, isAdd))
 							{
@@ -649,6 +711,14 @@ DBusMessage * npd_dbus_dynamic_trunk_add_delete_port_member
 #endif
 								ret = TRUNK_RETURN_CODE_ERR_GENERAL;
 							}
+							else
+							{/*disable port lacp function */
+								ret = npd_port_type_deal_for_lacp(eth_g_index,ethIntfName,isAdd);
+								if(ret != TRUNK_RETURN_CODE_ERR_NONE)
+								{
+									npd_syslog_err("npd_port_type_deal err re_value is %#x \n",ret);
+								}
+							}
 						}
 					}						
 				}
@@ -668,10 +738,86 @@ DBusMessage * npd_dbus_dynamic_trunk_add_delete_port_member
 		ret = TRUNK_RETURN_CODE_NO_SUCH_PORT;
 	}
 
+	if(ret == TRUNK_RETURN_CODE_ERR_NONE)
+	{
+		ret = npd_get_port_link_status(eth_g_index,&port_link_state);
+		if(TRUNK_RETURN_CODE_ERR_NONE != ret) 
+		{
+			syslog_ax_trunk_err("get port link status FAIL !\n");
+		}
+		else
+		{
+			if(ETH_ATTR_LINKUP == port_link_state) {
+				endis = NPD_TRUE;
+			}
+			else {
+				endis = NPD_FALSE;	
+			}
+		}
+		ret = npd_get_devport_by_global_index(eth_g_index,&devNum,&virportnum);
+		if (ret != TRUNK_RETURN_CODE_ERR_NONE) 
+		{
+			syslog_ax_trunk_err("global_index %d convert to devPort error.\n",eth_g_index);
+		}
+		actdevNum = g_dis_dev[0];
+
+
+		/* add for update the g_vlanlist[] of distributed */
+        if(isAdd==1)
+        {   
+            /* remove the port from all vlan */
+    		for (vlanId=1;vlanId<=4094;vlanId++)
+            {
+                if(g_vlanlist[vlanId-1].vlanStat == 1)
+        		{			
+                    if(local_port_no>32)
+                    {
+            			g_vlanlist[vlanId-1].untagPortBmp[slot_no-1].high_bmp &= (unsigned int)(~(1<<(local_port_no-33)));		/* remove from all vlan */		
+            			g_vlanlist[vlanId-1].tagPortBmp[slot_no-1].high_bmp &= (unsigned int)(~(1<<(local_port_no-33)));			
+                    }
+            		else
+            		{
+            			g_vlanlist[vlanId-1].untagPortBmp[slot_no-1].low_bmp &= (unsigned int)(~(1<<(local_port_no-1)));		/* remove from all vlan */			
+            			g_vlanlist[vlanId-1].tagPortBmp[slot_no-1].low_bmp &= (unsigned int)(~(1<<(local_port_no-1)));
+            		}
+                }
+    		}
+        }
+    	else
+    	{
+
+            if(local_port_no>32)
+            {
+    			g_vlanlist[0].untagPortBmp[slot_no-1].high_bmp |= (unsigned int)((1<<(local_port_no-33)));		/* add to default vlan  */		
+            }
+    		else
+    		{
+    	        g_vlanlist[0].untagPortBmp[slot_no-1].low_bmp |= (unsigned int)(1<<(local_port_no-1));		/* add to default vlan */	
+    		}
+    	}
+
+    	ret = msync(g_vlanlist, sizeof(vlan_list_t)*4096, MS_SYNC);
+    	if( ret!=0 )
+        {
+            syslog_ax_trunk_err("msync shm_vlan failed \n" );
+    		ret = TRUNK_RETURN_CODE_ERR_GENERAL;
+        }
+    	else
+    	{
+    		ret = TRUNK_RETURN_CODE_ERR_NONE;
+    	}
+	}
+
 	reply = dbus_message_new_method_return(msg);
 	
 	dbus_message_iter_init_append (reply, &iter);
 	
+	dbus_message_iter_append_basic (&iter,
+									DBUS_TYPE_BYTE,&actdevNum);
+	dbus_message_iter_append_basic (&iter,
+									DBUS_TYPE_BYTE,&virportnum);
+	dbus_message_iter_append_basic (&iter,
+									DBUS_TYPE_BYTE,&endis);
 	dbus_message_iter_append_basic (&iter,
 									 DBUS_TYPE_UINT32,
 									 &ret);
@@ -743,13 +889,15 @@ DBusMessage * npd_dbus_dynamic_trunk_create_trunk
 		if(!ret){
 #if DYNAMIC_ONLY_HW
 			ret = nam_asic_trunk_entry_active(trunkId + MAX_STATIC_TRUNK_ID);
-			if(TRUNK_CONFIG_SUCCESS != ret){
+			if(TRUNK_CONFIG_SUCCESS != ret)
+			{
 				npd_syslog_err("create dynamic trunk, create in hardware failed, ret %#x\n", ret);
 				/*try to rollback the dynamic trunk and ignore the error*/
 				npd_dynamic_trunk_create_delete_trunk(trunkId, !isCreate);
 				ret = TRUNK_RETURN_CODE_ERR_HW;
 			}
-			else{
+			else
+			{
 				ret = TRUNK_RETURN_CODE_ERR_NONE;
 			}
 #else
@@ -820,9 +968,10 @@ DBusMessage * npd_dbus_dynamic_trunk_delete_trunk
 	unsigned int ifindex = ~0UI;
 	int i = 0;
 	unsigned int oldPorts [MAX_DYNAMIC_TRUNK_MEMBER] = {0};
+	unsigned char actdevnum = 0;
 	DBusError err;
 	
-	 syslog_ax_trunk_dbg("Entering delete dynamic trunk one!\n");
+	syslog_ax_trunk_dbg("Entering delete dynamic trunk one!\n");
 	dbus_error_init(&err);
 	
 	if (!(dbus_message_get_args ( msg, &err,
@@ -835,24 +984,30 @@ DBusMessage * npd_dbus_dynamic_trunk_delete_trunk
 		}
 		return NULL;
 	}
-	if(!DYNAMIC_TRUNK_ID_IS_AVALIABLE(trunkId)){
+	if(!DYNAMIC_TRUNK_ID_IS_AVALIABLE(trunkId))
+	{
 		npd_syslog_dbg("dynamic trunk port exist, trunkId %d is out of range\n", trunkId);
 		ret = TRUNK_RETURN_CODE_BADPARAM;
 	}
-	else if(!npd_dynamic_trunk_check_exists(trunkId)){
+	else if(!npd_dynamic_trunk_check_exists(trunkId))
+	{
 		npd_syslog_dbg("delete dynamie trunk failed, dynamic trunk %d not exists\n", trunkId);
 		ret = TRUNK_RETURN_CODE_TRUNK_NOTEXISTS;
 	}
-	else{
-		if(DYNAMIC_TRUNK_MEMBER_IS_NOT_EMPTY(trunkId)){
+	else
+	{
+		if(DYNAMIC_TRUNK_MEMBER_IS_NOT_EMPTY(trunkId))
+		{
 			DYNAMIC_TRUNK_GET_TRUNK_PORTS_INFO(oldPorts, trunkId);
 			/*try to delete ports from dynamic trunk*/
 			isAdd = FALSE; /*delete ports info */
-			npd_dynamic_trunk_add_del_ports_for_trunk(trunkId, oldPorts, isAdd);
+			ret = npd_dynamic_trunk_add_del_ports_for_trunk(trunkId, oldPorts, isAdd);
 		}
-		if(TRUNK_RETURN_CODE_ERR_NONE == ret){
+		if(TRUNK_RETURN_CODE_ERR_NONE == ret)
+		{
 			isCreate = FALSE;/*delete*/
-			if(npd_dynamic_trunk_create_delete_trunk(trunkId, isCreate)){
+			if(npd_dynamic_trunk_create_delete_trunk(trunkId, isCreate))
+			{
 				/*rollback, try add ports to dynamic trunk*/
 				isAdd = TRUE;
 				npd_dynamic_trunk_add_del_ports_for_trunk(trunkId, oldPorts, isAdd);
@@ -861,11 +1016,13 @@ DBusMessage * npd_dbus_dynamic_trunk_delete_trunk
 			}
 		}
 			
-		if(TRUNK_RETURN_CODE_ERR_NONE == ret){
+		if(TRUNK_RETURN_CODE_ERR_NONE == ret)
+		{
 			syslog_ax_trunk_dbg("delete dynamic trunk entry %d.\n",trunkId);
 #if DYNAMIC_ONLY_HW
 			ret = nam_asic_trunk_delete(trunkId + MAX_STATIC_TRUNK_ID);
-			if(TRUNK_CONFIG_SUCCESS != ret){					
+			if(TRUNK_CONFIG_SUCCESS != ret)
+			{					
 				npd_syslog_err("npd trunk destroy failed, ret %#x\n", ret);
 				/*try to rollback and ignore the rollback error*/
 				npd_dynamic_trunk_create_delete_trunk(trunkId, !isCreate);
@@ -876,11 +1033,18 @@ DBusMessage * npd_dbus_dynamic_trunk_delete_trunk
 			}
 #else
 			ret = npd_trunk_destroy_node(trunkId + MAX_STATIC_TRUNK_ID);
-			if(TRUNK_RETURN_CODE_ERR_NONE == ret){
+			if(TRUNK_RETURN_CODE_ERR_NONE == ret)
+			{
 				/*delete trunk fdb entries*/
 				nam_fdb_table_delete_entry_with_trunk(trunkId + MAX_STATIC_TRUNK_ID);
+				for(i=0;i<=NPD_MAX_VLAN_ID;i++)
+				{
+					dynamic_trunk_allow_vlan_tag[trunkId-1][i] = 0;
+					dynamic_trunk_allow_vlan_untag[trunkId-1][i] = 0;
+				}
 			}
-			else{
+			else
+			{
 				npd_syslog_err("npd trunk destroy failed, ret %#x\n", ret);
 				/*try to rollback and ignore the rollback error*/
 				npd_dynamic_trunk_create_delete_trunk(trunkId, !isCreate);
@@ -890,13 +1054,17 @@ DBusMessage * npd_dbus_dynamic_trunk_delete_trunk
 				ret = TRUNK_RETURN_CODE_ERR_HW;
 			}					
 #endif				
-			
+			actdevnum = g_dis_dev[0];
+			slot_no = SLOT_ID;
 		}
 	}
 	reply = dbus_message_new_method_return(msg);
 	
 	dbus_message_iter_init_append (reply, &iter);
-	
+	dbus_message_iter_append_basic (&iter,
+									DBUS_TYPE_BYTE,&actdevnum);
+	dbus_message_iter_append_basic (&iter,
+									DBUS_TYPE_BYTE,&slot_no);
 	dbus_message_iter_append_basic (&iter,
 									 DBUS_TYPE_UINT32, 
 									 &ret);
@@ -928,28 +1096,129 @@ int npd_dynamic_trunk_add_del_ports_for_trunk(unsigned short trunkId, unsigned i
 	unsigned int eth_g_index = 0;
 	unsigned int ifindex = ~0UI;
 	unsigned char ethIntfName[MAX_IFNAME_LEN + 1] = {0};
+	int ret = 0;
+	unsigned short vlanId= 0;
 	
-	if(POINTER_IS_NULL(portsInfo)){
+	if(POINTER_IS_NULL(portsInfo))
+	{
 		npd_syslog_err("add ports to dynamic trunk %d, ports info is null pointer\n", trunkId);
 		return NPD_FAIL;
 	}
-	for(i = 0; i < MAX_DYNAMIC_TRUNK_MEMBER; i++){
-		if((portsInfo[i]>>16)&0xff){/*is need add*/
+	for(i = 0; i < MAX_DYNAMIC_TRUNK_MEMBER; i++)
+	{
+		if((portsInfo[i]>>16)&0xff)
+		{/*is need add*/
 			slot_no = (portsInfo[i]>>8)&0xff;/*get slot no*/
 			local_port_no = portsInfo[i]&0xff;/*get port no*/
+			syslog_ax_trunk_dbg("#####slot_no %d,port_no %d\n",slot_no,local_port_no);
 			eth_g_index = ETH_GLOBAL_INDEX_FROM_SLOT_PORT_LOCAL_NO(slot_no, local_port_no);
-			if((NPD_TRUE == npd_eth_port_interface_check(eth_g_index, &ifindex))&&(~0UI != ifindex)){/*for get ifname*/
+			if((NPD_TRUE == npd_eth_port_interface_check(eth_g_index, &ifindex))&&(~0UI != ifindex))
+			{/*for get ifname*/
+				syslog_ax_trunk_dbg("#####L3 interface exists !\n");
 				if_indextoname(ifindex, ethIntfName);							
 				syslog_ax_trunk_dbg("delete interface %s from interface trunk%d\n",ethIntfName,trunkId);
-				if(npd_dynamic_trunk_add_del_port(trunkId, ethIntfName, slot_no, local_port_no, isAdd)){/*just output syslog,and go on*/
+				if(npd_dynamic_trunk_add_del_port(trunkId, ethIntfName, slot_no, local_port_no, isAdd))
+				{/*just output syslog,and go on*/
 					npd_syslog_err("%s dynamic trunk , %s port (%d/%d) %s dynamic trunk %d error\n", \
 						isAdd ? "add" : "delete", isAdd ? "add" : "delete", \
 						slot_no, local_port_no, isAdd ? "to" : "from", trunkId);
+					ret = TRUNK_RETURN_CODE_ERR_GENERAL;
+					break;
 				}
-			}							
+				else
+				{
+					ret = npd_port_type_deal_for_lacp(eth_g_index,ethIntfName,isAdd);
+					if(ret != TRUNK_RETURN_CODE_ERR_NONE)
+					{
+						npd_syslog_err("npd_port_type_deal err re_value is %#x \n",ret);
+						break;
+					}
+					if(ret == TRUNK_RETURN_CODE_ERR_NONE)
+					{
+						npd_port_vlan_free(eth_g_index);
+
+						/*add trunk port to default vlan 1 as untagged port member */
+						ret = npd_vlan_interface_port_add_for_dynamic_trunk(DEFAULT_VLAN_ID, eth_g_index, NPD_FALSE);
+						if(VLAN_RETURN_CODE_ERR_NONE != ret && VLAN_RETURN_CODE_PORT_EXISTS != ret && NPD_TRUE != ret) /*NPD_TRUE -- vlan is L3 interface*/
+						{	
+							npd_syslog_err("port %d add to vlan 1 error. ret %d\n",eth_g_index,ret);
+							ret = TRUNK_RETURN_CODE_MEMBER_ADD_ERR;
+						}
+
+						if((ret == TRUNK_RETURN_CODE_ERR_NONE) || (ret == VLAN_RETURN_CODE_PORT_EXISTS))
+						{
+							if(isAdd==1)
+					        {   
+					            /* remove the port from all vlan */
+					    		for (vlanId=1;vlanId<=4094;vlanId++)
+					            {
+					                if(g_vlanlist[vlanId-1].vlanStat == 1)
+					        		{			
+					                    if(local_port_no>32)
+					                    {
+					            			g_vlanlist[vlanId-1].untagPortBmp[slot_no-1].high_bmp &= (unsigned int)(~(1<<(local_port_no-33)));		/* remove from all vlan */		
+					            			g_vlanlist[vlanId-1].tagPortBmp[slot_no-1].high_bmp &= (unsigned int)(~(1<<(local_port_no-33)));			
+					                    }
+					            		else
+					            		{
+					            			g_vlanlist[vlanId-1].untagPortBmp[slot_no-1].low_bmp &= (unsigned int)(~(1<<(local_port_no-1)));		/* remove from all vlan */			
+					            			g_vlanlist[vlanId-1].tagPortBmp[slot_no-1].low_bmp &= (unsigned int)(~(1<<(local_port_no-1)));
+					            		}
+					                }
+					    		}
+					        }
+					    	else
+					    	{
+
+					            if(local_port_no>32)
+					            {
+					    			g_vlanlist[0].untagPortBmp[slot_no-1].high_bmp |= (unsigned int)((1<<(local_port_no-33)));		/* add to default vlan  */		
+					            }
+					    		else
+					    		{
+					    	        g_vlanlist[0].untagPortBmp[slot_no-1].low_bmp |= (unsigned int)(1<<(local_port_no-1));		/* add to default vlan */	
+					    		}
+					    	}
+
+					    	ret = msync(g_vlanlist, sizeof(vlan_list_t)*4096, MS_SYNC);
+					    	if( ret!=0 )
+					        {
+					            syslog_ax_trunk_err("msync shm_vlan failed \n" );
+					    		ret = TRUNK_RETURN_CODE_ERR_GENERAL;
+					        }
+					    	else
+					    	{
+					    		ret = TRUNK_RETURN_CODE_ERR_NONE;
+					    	}
+						}
+					}
+					
+				}
+				
+			}
+			else if(isAdd)
+			{
+				sprintf(ethIntfName,"eth%d-%d",slot_no,local_port_no);
+				ret = npd_port_type_deal_for_lacp(eth_g_index,ethIntfName,isAdd);
+				if(ret != TRUNK_RETURN_CODE_ERR_NONE)
+				{
+					npd_syslog_err("npd_port_type_deal err re_value is %#x \n",ret);
+					break;
+				}
+				usleep(500000);
+				if(npd_dynamic_trunk_add_del_port(trunkId, ethIntfName, slot_no, local_port_no, isAdd))
+				{/*just output syslog,and go on*/
+					npd_syslog_err("%s dynamic trunk , %s port (%d/%d) %s dynamic trunk %d error\n", \
+						isAdd ? "add" : "delete", isAdd ? "add" : "delete", \
+						slot_no, local_port_no, isAdd ? "to" : "from", trunkId);
+					ret = TRUNK_RETURN_CODE_ERR_GENERAL;
+					break;
+				}
+				
+			}
 		}
-		return NPD_SUCCESS;
 	}
+	return ret;
 }
 
 /*********************************************************************
@@ -1145,9 +1414,11 @@ void npd_dynamic_trunk_save_cfg(char* buf,int bufLen)
 							memset(tmpBuf, 0, _1K);
 							tmpPtr = tmpBuf;
 						}
+						#if 0
 						length += sprintf(tmpPtr," enable port %d/%d lacp function\n", slot_no, local_port_no);
 						syslog_ax_trunk_dbg("%s\n",tmpPtr);
 						tmpPtr = tmpBuf+length;
+						#endif
 						length += sprintf(tmpPtr," add port %d/%d\n", slot_no, local_port_no);
 						syslog_ax_trunk_dbg("%s\n",tmpPtr);
 						tmpPtr = tmpBuf+length;
@@ -1155,13 +1426,13 @@ void npd_dynamic_trunk_save_cfg(char* buf,int bufLen)
 				}
 				for(vlanid = 0;vlanid<NPD_MAX_VLAN_ID;vlanid++)
 				{
-					if(dynamin_trunk_allow_vlan_untag[trunkId-1][vlanid] == 1)
+					if((dynamic_trunk_allow_vlan_untag[trunkId-1][vlanid] == 1) && (vlanid != 0))
 					{
 						length += sprintf(tmpPtr," allow vlan %d untag\n", vlanid+1);
 						syslog_ax_trunk_dbg("%s\n",tmpPtr);
 						tmpPtr = tmpBuf+length;
 					}
-					if(dynamin_trunk_allow_vlan_tag[trunkId-1][vlanid] == 1)
+					if(dynamic_trunk_allow_vlan_tag[trunkId-1][vlanid] == 1)
 					{
 						length += sprintf(tmpPtr," allow vlan %d tag\n", vlanid+1);
 						syslog_ax_trunk_dbg("%s\n",tmpPtr);
@@ -1347,6 +1618,73 @@ DBusMessage * npd_dbus_dynamic_trunk_show_dynamic_trunk_list
 	return reply;
 }
 
+DBusMessage * npd_dbus_dynamic_trunk_show_dynamic_trunk_vlan_member_list
+(	DBusConnection *conn, 
+	DBusMessage *msg, 
+	void *user_data
+)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter	 iter;
+	DBusError err;
+	
+	unsigned int ret = 0;
+	unsigned char slot = 0, port = 0;
+	unsigned short trunkId = 0, vlanId = 1;
+	unsigned int haveMore = FALSE;
+	int index = 0;
+	unsigned int untag_vlan_count = 0,tag_vlan_count = 0;
+
+	for(vlanId = 0; vlanId <= NPD_MAX_VLAN_ID; vlanId++)
+	{
+		if(dynamic_trunk_allow_vlan_untag[0][vlanId] == 1)
+		{
+			npd_syslog_dbg("dynamic_trunk_allow_vlan_untag[0][%d] = %d\n",vlanId+1,dynamic_trunk_allow_vlan_untag[0][vlanId]);
+			untag_vlan_count++;
+		}
+		else if(dynamic_trunk_allow_vlan_tag[0][vlanId] == 1)
+		{
+			tag_vlan_count++;
+		}
+		else
+		{
+			continue;
+		}
+	}
+	if((DYNAMIC_TRUNK_MEMBER_COUNT(1) == 0) && (dynamic_trunk_allow_vlan_untag[0][0] == 1) && (tag_vlan_count == 0))
+	{
+		npd_syslog_dbg("do not need to display !\n");
+		untag_vlan_count = 0;
+	}
+	npd_syslog_dbg("untag vlan count = %d,tag_vlan_count = %d\n",untag_vlan_count,tag_vlan_count);
+	reply = dbus_message_new_method_return(msg);	
+	
+	dbus_message_iter_init_append (reply, &iter);	
+	dbus_message_iter_append_basic (&iter,
+								 DBUS_TYPE_UINT32,
+								 &untag_vlan_count);/*append the trunkId to dcli*/
+	dbus_message_iter_append_basic (&iter,
+								 DBUS_TYPE_UINT32,
+								 &tag_vlan_count);/*append the trunkId to dcli*/
+
+	for(vlanId = 0; vlanId <= NPD_MAX_VLAN_ID; vlanId++)
+	{
+		if((dynamic_trunk_allow_vlan_untag[0][vlanId] == 1) || (dynamic_trunk_allow_vlan_tag[0][vlanId] == 1))
+		{
+			npd_syslog_dbg("vlanId = %d\n",vlanId+1);
+			dbus_message_iter_append_basic (&iter,
+									 DBUS_TYPE_UINT16,
+									 &vlanId);
+		}
+		else 
+		{
+			continue;
+		}
+	}
+	return reply;
+}
+
+
 int npd_dynamic_trunk_show_hardware_information
 (
     unsigned short trunkId,
@@ -1370,38 +1708,51 @@ int npd_dynamic_trunk_show_hardware_information
 	ret = nam_asic_show_dynamic_trunk_hwinfo(trunkId+MAX_STATIC_TRUNK_ID,&numOfEnabledMembers,&numOfDisabledMembers,EnabledMembersArray,DisabledMembersArray);
 
 	if(TRUNK_RETURN_CODE_ERR_NONE == ret)
-	  {
-	  /*port in up status*/
-	   for(portnum = 0;portnum<numOfEnabledMembers;portnum++)
-		  {/*get port index*/
-		   if(!npd_get_global_index_by_devport(EnabledMembersArray[portnum].devNum,EnabledMembersArray[portnum].portNum,&eth_g_index))
-			  {/*get slot and port number according to index*/
-			   if(!npd_eth_port_get_slotno_portno_by_eth_g_index(eth_g_index,&slot_no,&port_no))
-			    {
-				   DynamicTrunkArray[portnum].slotNum = slot_no;
-				   DynamicTrunkArray[portnum].portNum = port_no;
-				   DynamicTrunkArray[portnum].status = 'e';				   
-			    }
-			   else{return NPD_FAIL;}
+	{
+		for(portnum = 0;portnum<numOfEnabledMembers;portnum++)
+		{/*get port index*/
+	  		EnabledMembersArray[portnum].devNum = 0;
+			if(!npd_get_global_index_by_devport(EnabledMembersArray[portnum].devNum,EnabledMembersArray[portnum].portNum,&eth_g_index))
+			{/*get slot and port number according to index*/
+				if(!npd_eth_port_get_slotno_portno_by_eth_g_index(eth_g_index,&slot_no,&port_no))
+				{
+					DynamicTrunkArray[portnum].slotNum = slot_no;
+					DynamicTrunkArray[portnum].portNum = port_no;
+					DynamicTrunkArray[portnum].status = 'e';				   
+				}
+				else
+				{
+					return NPD_FAIL;
+				}
 			}
-		   else{return NPD_FAIL;}
+			else
+			{
+				return NPD_FAIL;
+			}
 		}
-      portSum = portnum;/*store disabled member after enabled member*/
-	   /*port in down status*/
-	  for(portnum = 0;portnum<numOfDisabledMembers;portnum++)
-		  {/*get port index*/
-		   if(!npd_get_global_index_by_devport(DisabledMembersArray[portnum].devNum,DisabledMembersArray[portnum].portNum,&eth_g_index))
-			  {/*get slot and port number according to index*/
+      	portSum = portnum;/*store disabled member after enabled member*/
+	   	/*port in down status*/
+	  	for(portnum = 0;portnum<numOfDisabledMembers;portnum++)
+	  	{
+			DisabledMembersArray[portnum].devNum = 0;
+			if(!npd_get_global_index_by_devport(DisabledMembersArray[portnum].devNum,DisabledMembersArray[portnum].portNum,&eth_g_index))
+			{/*get slot and port number according to index*/
 			   if(!npd_eth_port_get_slotno_portno_by_eth_g_index(eth_g_index,&slot_no,&port_no))
-			   	{ 
+			   { 
 				   DynamicTrunkArray[portSum].slotNum = slot_no;
 				   DynamicTrunkArray[portSum].portNum = port_no;
 				   DynamicTrunkArray[portSum].status = 'd';
 				   portSum++;			  
-			   	}
-			   else{return NPD_FAIL;}
-		   }
-		   else{return NPD_FAIL;}
+			   }
+			   else
+			   {
+			   		return NPD_FAIL;
+			   }
+			}
+			else
+			{
+				return NPD_FAIL;
+			}
 	   }
 	}
 	*numofPortHW = portSum;
@@ -1603,24 +1954,27 @@ int npd_dynamic_trunk_allow_refuse_vlan_update
 		{
 			if(tagMode)
 			{
-				dynamin_trunk_allow_vlan_tag[trunkId-1][vlanid-1] = 1;
+				dynamic_trunk_allow_vlan_tag[trunkId-1][vlanid-1] = 1;
 				syslog_ax_trunk_dbg("dynamin_trunk_allow_vlan_tag[%d][%d] = 1",trunkId-1,vlanid-1);
 			}
 			else
 			{
-				dynamin_trunk_allow_vlan_untag[trunkId-1][vlanid-1] = 1;
+				dynamic_trunk_allow_vlan_untag[trunkId-1][vlanid-1] = 1;
+				dynamic_trunk_allow_vlan_untag[trunkId-1][0] = 0;
 				syslog_ax_trunk_dbg("dynamin_trunk_allow_vlan_untag[%d][%d] = 1",trunkId-1,vlanid-1);
 			}
+			syslog_ax_trunk_dbg("");
 		}
 		else
 		{
 			if(tagMode)
 			{
-				dynamin_trunk_allow_vlan_tag[trunkId-1][vlanid-1] = 0;
+				dynamic_trunk_allow_vlan_tag[trunkId-1][vlanid-1] = 0;
 			}
 			else
 			{
-				dynamin_trunk_allow_vlan_untag[trunkId-1][vlanid-1] = 0;
+				dynamic_trunk_allow_vlan_untag[trunkId-1][vlanid-1] = 0;
+				dynamic_trunk_allow_vlan_untag[trunkId-1][0] = 1;
 			}
 		}
 	}
@@ -1889,10 +2243,23 @@ DBusMessage * npd_dbus_dynamic_trunk_allow_refuse_vlan
 	}
 	npd_syslog_dbg("trunkId is %d\n",trunkId);
 	/*no need to check trunk existing or NOT*/
-	if(isAllow)
-		ret = npd_dynamic_trunk_allow_vlan(trunkId+MAX_STATIC_TRUNK_ID,vCount,vid,tagMode);
+	if(!IS_MASTER_NPD)
+	{
+		if(ret == VLAN_RETURN_CODE_VLAN_EXISTS)
+		{
+			if(isAllow)
+				ret = npd_dynamic_trunk_allow_vlan(trunkId+MAX_STATIC_TRUNK_ID,vCount,vid,tagMode);
+			else
+				ret = npd_dynamic_trunk_refuse_vlan(trunkId+MAX_STATIC_TRUNK_ID,vCount,vid,tagMode);
+		}
+	}
 	else
-		ret = npd_dynamic_trunk_refuse_vlan(trunkId+MAX_STATIC_TRUNK_ID,vCount,vid,tagMode);
+	{
+		if(ret == VLAN_RETURN_CODE_VLAN_EXISTS)
+		{
+			ret = TRUNK_RETURN_CODE_ERR_NONE;
+		}
+	}
 	if(ret == TRUNK_RETURN_CODE_ERR_NONE)
 	{
 		npd_dynamic_trunk_allow_refuse_vlan_update(trunkId,vCount,vid,tagMode,isAllow);
@@ -1927,6 +2294,7 @@ int npd_dynamic_trunk_init(){
 	int ret = 0;
 	int devNum = 0;
 	int devCount = 0;
+	int trunkId = 0;
 	devCount = nam_asic_get_instance_num();
 	for(devNum = 0; devNum < devCount; devNum++){
 		ret = nam_dynamic_trunk_lacp_trap_init(devNum);
@@ -1935,6 +2303,11 @@ int npd_dynamic_trunk_init(){
 			return NPD_FAIL;
 		}
 	}	
+	for(trunkId = 0;trunkId<MAX_DYNAMIC_TRUNKID;trunkId++)
+	{
+		/*for default dynamic trunk*/
+		dynamic_trunk_allow_vlan_untag[trunkId][0] = 1;
+	}
 	/*do it at npd...?*/
 	nam_thread_create("DynamicTrunkNetlink",(void *)npd_dynamic_trunk_netlink_thread_main,NULL,NPD_TRUE,NPD_FALSE);
 	return NPD_SUCCESS;
@@ -1974,7 +2347,8 @@ int npd_dynamic_trunk_netlink_thread_main(void)
 	src_addr.nl_pid = getpid(); /* Thread method */
 	src_addr.nl_groups = GRP_ID;
 	
-	if (bind(sock_fd, (struct sockaddr*)&src_addr, sizeof(src_addr)) < 0) {
+	if (bind(sock_fd, (struct sockaddr*)&src_addr, sizeof(src_addr)) < 0) 
+	{
 		npd_syslog_err("dynamic trunk netlink thread bind failed \n");
 		return -1;
 	}
@@ -1985,13 +2359,15 @@ int npd_dynamic_trunk_netlink_thread_main(void)
 	dest_addr.nl_groups = GRP_ID;
 
 	/* Initialize buffer */
-	if((nlh = (struct nlmsghdr*)malloc(NLMSG_SPACE(MAX_PAYLOAD))) == NULL) {
+	if((nlh = (struct nlmsghdr*)malloc(NLMSG_SPACE(MAX_PAYLOAD))) == NULL) 
+	{
 		npd_syslog_err("dynamic trunk netlink thread malloc failed \n");
 		close(sock_fd);
 		return -1;
 	}
 
-	while (1) {
+	while (1) 
+	{
 		memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));
 		iov.iov_base = (void *)nlh;
 		iov.iov_len = NLMSG_SPACE(MAX_PAYLOAD);
@@ -2010,51 +2386,97 @@ int npd_dynamic_trunk_netlink_thread_main(void)
 
 		nl_msg = (struct ad_event*)NLMSG_DATA(nlh);/*check nl_msg*/
 		npd_syslog_dbg("dynamic trunk netlink thread get flag %x \n", nl_msg->flag);
-		if(DYNAMIC_TRUNK_3AD_CHANE_IF_MSG == nl_msg->flag){
+		if(DYNAMIC_TRUNK_3AD_CHANE_IF_MSG == nl_msg->flag)
+		{
 			memset(nameb, 0, MAX_IFNAME_LEN + 1);
 			memset(names, 0, MAX_IFNAME_LEN + 1);
 			if_indextoname(nl_msg->bond_ifindex, nameb);
 			if_indextoname( nl_msg->slave_ifindex, names);
 			npd_syslog_dbg("bond_ifname %s, slave_ifname %s, state %d \n\n",
 					nameb, names, nl_msg->state);
-			if(!strncmp("trunk", nameb, 5)){
+			if(!strncmp("trunk", nameb, 5))
+			{
 				trunkId = strtoul(nameb + 5, NULL, 10);
-				if(!strncmp("eth", names, 3)){
+				if(!strncmp("eth", names, 3))
+				{
 					slot = port = 0;
-					if(NPD_SUCCESS != npd_dynamic_trunk_parse_slot_port_no(names + 3, &slot, &port)){
+					if(NPD_SUCCESS != npd_dynamic_trunk_parse_slot_port_no(names + 3, &slot, &port))
+					{
 						npd_syslog_err("dynamic trunk eth interface name %s parse slot port no failed \n", names);
 					}
-					else{						
+					else
+					{						
 						eth_g_index = ETH_GLOBAL_INDEX_FROM_SLOT_PORT_LOCAL_NO(slot,port);
 						
-						if(!(nl_msg->state)/*MICRO*/){
+						if(!(nl_msg->state)/*MICRO*/)
+						{
 							npd_syslog_dbg("dynamic trunk netlink add port to trunk %d \n", trunkId + MAX_STATIC_TRUNK_ID);
 #if DYNAMIC_ONLY_HW							
-							if(!npd_get_devport_by_global_index(eth_g_index,&devNum,&portNum)){
+							if(!npd_get_devport_by_global_index(eth_g_index,&devNum,&portNum))
+							{
 								/*ret*/ nam_asic_trunk_ports_add(devNum, trunkId, portNum, 1);
 							}
 							/*else*/
 #else
-							ret = npd_trunk_port_add_for_dynamic_trunk(trunkId + MAX_STATIC_TRUNK_ID, eth_g_index);
-							if(TRUNK_RETURN_CODE_ERR_NONE != ret){
-								npd_syslog_err("dynamic trunk netlink add port %d/%d to trunk%d failed, ret %#x", slot, port, trunkId, ret);
+
+#if DYNAMIC_TRUNK_ENDIS
+							ret = npd_trunk_port_endis_for_dynamic_trunk(trunkId + MAX_STATIC_TRUNK_ID,eth_g_index,1);
+							if(ret != TRUNK_RETURN_CODE_ERR_NONE)
+							{
+								npd_syslog_err("dynamic trunk netlink enable port %d/%d for trunk%d failed, ret %#x", slot, port, trunkId, ret);
+							}
+							else
+							{
+								npd_syslog_err("dynamic trunk netlink enable port %d/%d for trunk%d successfully, ret %#x", slot, port, trunkId, ret);
+							}
+#else
+							ret = npd_trunk_port_add_for_dynamic_trunk(trunkId + MAX_STATIC_TRUNK_ID, eth_g_index);	
+							if(TRUNK_RETURN_CODE_ERR_NONE != ret)
+							{
+								npd_syslog_err("dynamic trunk netlink add port %d/%d from trunk%d failed, ret %#x", slot, port, trunkId, ret);
+							}
+							else
+							{
+								npd_asic_dynamic_trunk_notifier(eth_g_index,1);
 							}
 #endif
+#endif
 						}
-						else if(1/*MICRO*/ == (nl_msg->state)){
+						else if(1/*MICRO*/ == (nl_msg->state))
+						{
 							npd_syslog_dbg("dynamic trunk netlink del port from trunk %d \n", trunkId + MAX_STATIC_TRUNK_ID);
 #if DYNAMIC_ONLY_HW
-							if(!npd_get_devport_by_global_index(eth_g_index,&devNum,&portNum)){
+							if(!npd_get_devport_by_global_index(eth_g_index,&devNum,&portNum))
+							{
 								nam_asic_trunk_ports_del(devNum, trunkId, portNum);
 							}
 #else
-							ret = npd_trunk_port_del_for_dynamic_trunk(trunkId + MAX_STATIC_TRUNK_ID, eth_g_index);
-							if(TRUNK_RETURN_CODE_ERR_NONE != ret){
+#if DYNAMIC_TRUNK_ENDIS
+							ret = npd_trunk_port_endis_for_dynamic_trunk(trunkId + MAX_STATIC_TRUNK_ID,eth_g_index,0);
+							if(ret != TRUNK_RETURN_CODE_ERR_NONE)
+							{
+								npd_syslog_err("dynamic trunk netlink disable port %d/%d for trunk%d failed, ret %#x", slot, port, trunkId, ret);
+							}
+							else
+							{
+								npd_syslog_err("dynamic trunk netlink disable port %d/%d for trunk%d successfully, ret %#x", slot, port, trunkId, ret);
+							}
+#else
+
+							ret = npd_trunk_port_del_for_dynamic_trunk(trunkId + MAX_STATIC_TRUNK_ID, eth_g_index);						
+							if(TRUNK_RETURN_CODE_ERR_NONE != ret)
+							{
 								npd_syslog_err("dynamic trunk netlink del port %d/%d from trunk%d failed, ret %#x", slot, port, trunkId, ret);
 							}
+							else
+							{
+								npd_asic_dynamic_trunk_notifier(eth_g_index,0);
+							}
+#endif
 #endif
 						}
-						else {
+						else 
+						{
 							npd_syslog_err("dynamic trunk netlink state error,state %d\n",nl_msg->state);
 						}
 					}
@@ -2067,6 +2489,378 @@ int npd_dynamic_trunk_netlink_thread_main(void)
 
 	return 0;
 }
+
+DBusMessage * npd_dbus_dynamic_trunk_update_map_table
+(
+	DBusConnection *conn, 
+	DBusMessage *msg, 
+	void *user_data
+)
+{	
+	DBusMessage* reply;
+	DBusMessageIter	 iter;
+
+	unsigned short	trunkId = 0;	
+	unsigned int 	ret = TRUNK_RETURN_CODE_ERR_NONE;
+	unsigned char isAdd = 0,actdevNum = 0,virportNum = 0,endis = 0;
+	unsigned long i = 0,numMembersPtr = 0;
+	unsigned char slot_no =0,port_no = 0;
+	unsigned int index =0;
+	unsigned short vlanId = 0;
+	
+	DBusError err;	
+	dbus_error_init(&err);
+	
+	if (!(dbus_message_get_args ( msg, &err,
+							DBUS_TYPE_BYTE,&isAdd,
+							DBUS_TYPE_UINT16,&trunkId,
+							DBUS_TYPE_BYTE,&actdevNum,
+							DBUS_TYPE_BYTE,&virportNum,
+							DBUS_TYPE_BYTE,&endis,
+							DBUS_TYPE_BYTE,&slot_no,
+							DBUS_TYPE_BYTE,&port_no,
+							DBUS_TYPE_INVALID))) {
+		 syslog_ax_trunk_err("Unable to get input args ");
+		if (dbus_error_is_set(&err)) {
+			 syslog_ax_trunk_err("%s raised: %s",err.name,err.message);
+			dbus_error_free(&err);
+		}
+		return NULL;
+	}	
+	syslog_ax_trunk_dbg("DYNAMIC isAdd = %d,trunkId = %d,actdevNum = %d,virportNum = %d,endis = %d\n",isAdd,trunkId,actdevNum,virportNum,endis);
+	if(((SYSTEM_TYPE == IS_DISTRIBUTED) || (PRODUCT_ID == PRODUCT_ID_AX7K_I)) && (CSCD_TYPE == 1))
+	{
+
+		if(DYNAMIC_TRUNK_MEMBER_COUNT(trunkId) == 0)
+		{
+			ret = nam_asic_trunk_entry_active(trunkId+MAX_STATIC_TRUNK_ID);
+			if(TRUNK_CONFIG_SUCCESS != ret)
+			{
+				npd_syslog_err("create dynamic trunk, create in hardware failed, ret %#x\n", ret);
+				/*try to rollback the dynamic trunk and ignore the error*/
+				ret = TRUNK_RETURN_CODE_ERR_HW;
+			}
+			else
+			{
+				ret = TRUNK_RETURN_CODE_ERR_NONE;
+			}
+		}
+
+		#if 0
+		ret = nam_asic_trunk_map_table_update(0,trunkId+MAX_STATIC_TRUNK_ID,actdevNum,virportNum,isAdd,endis);
+		if(TRUNK_RETURN_CODE_ERR_NONE != ret) 
+		{
+			syslog_ax_trunk_err("nam_asic_trunk_map_table_update failed ! ret %d\n",ret);
+		}
+		if(BOARD_TYPE_AX71_CRSMU == BOARD_TYPE)
+		{
+			ret = nam_asic_trunk_map_table_update(1,trunkId+MAX_STATIC_TRUNK_ID,actdevNum,virportNum,isAdd,endis);
+			if(TRUNK_RETURN_CODE_ERR_NONE != ret) 
+			{
+				syslog_ax_trunk_err("nam_asic_trunk_map_table_update faile !\n");
+			}
+		}
+		#endif
+	}
+
+	if((IS_MASTER_NPD) || (CSCD_TYPE == 1))
+	{
+		/*update dynamic info for global*/
+		if(isAdd)
+		{/*add */
+			for(index = 0; index < MAX_DYNAMIC_TRUNK_MEMBER; index++)
+			{
+				if(!DYNAMIC_TRUNK_PORT_IS_ADDED(trunkId, index))
+				{
+					DYNAMIC_TRUNK_PORT_SET(trunkId, index, slot_no, port_no);
+					DYNAMIC_TRUNK_MEMBER_COUNT_INCREASE(trunkId);
+					break;
+				}
+			}
+		}
+		else
+		{/*delete*/
+			for(index = 0; index < MAX_DYNAMIC_TRUNK_MEMBER; index++)
+			{/*try to match the port and clear it*/
+				if(DYNAMIC_TRUNK_PORT_IS_ADDED(trunkId,index) &&
+						(DYNAMIC_TRUNK_PORT_SLOT_NUM(trunkId,index) == slot_no) &&
+						(DYNAMIC_TRUNK_PORT_PORT_NUM(trunkId,index) == port_no))
+				{
+					DYNAMIC_TRUNK_PORT_CLEAR(trunkId, index);
+					DYNAMIC_TRUNK_MEMBER_COUNT_DECREASE(trunkId);
+					break;
+				}
+			}
+		}
+
+		if(isAdd==1)
+        {   
+            /* remove the port from all vlan */
+    		for (vlanId=1;vlanId<=4094;vlanId++)
+            {
+                if(g_vlanlist[vlanId-1].vlanStat == 1)
+        		{			
+                    if(port_no>32)
+                    {
+            			g_vlanlist[vlanId-1].untagPortBmp[slot_no-1].high_bmp &= (unsigned int)(~(1<<(port_no-33)));		/* remove from all vlan */		
+            			g_vlanlist[vlanId-1].tagPortBmp[slot_no-1].high_bmp &= (unsigned int)(~(1<<(port_no-33)));			
+                    }
+            		else
+            		{
+            			g_vlanlist[vlanId-1].untagPortBmp[slot_no-1].low_bmp &= (unsigned int)(~(1<<(port_no-1)));		/* remove from all vlan */			
+            			g_vlanlist[vlanId-1].tagPortBmp[slot_no-1].low_bmp &= (unsigned int)(~(1<<(port_no-1)));
+            		}
+                }
+    		}
+        }
+    	else
+    	{
+
+            if(port_no>32)
+            {
+    			g_vlanlist[0].untagPortBmp[slot_no-1].high_bmp |= (unsigned int)((1<<(port_no-33)));		/* add to default vlan  */		
+            }
+    		else
+    		{
+    	        g_vlanlist[0].untagPortBmp[slot_no-1].low_bmp |= (unsigned int)(1<<(port_no-1));		/* add to default vlan */	
+    		}
+    	}
+
+    	ret = msync(g_vlanlist, sizeof(vlan_list_t)*4096, MS_SYNC);
+    	if( ret!=0 )
+        {
+            syslog_ax_trunk_err("msync shm_vlan failed \n" );
+    		ret = TRUNK_RETURN_CODE_ERR_GENERAL;
+        }
+    	else
+    	{
+    		ret = TRUNK_RETURN_CODE_ERR_NONE;
+    	}
+	}
+	reply = dbus_message_new_method_return(msg);
+	
+	dbus_message_iter_init_append (reply, &iter);
+	
+	dbus_message_iter_append_basic (&iter,
+									 DBUS_TYPE_UINT32,
+									 &ret);
+	return reply;
+}
+
+
+DBusMessage * npd_dbus_dynamic_trunk_delete_map_table
+(
+	DBusConnection *conn, 
+	DBusMessage *msg, 
+	void *user_data
+)
+{	
+	DBusMessage* reply;
+	DBusMessageIter	 iter;
+
+	unsigned short	trunkId = 0;	
+	unsigned int 	ret = TRUNK_RETURN_CODE_ERR_NONE;
+	unsigned char isAdd = 0,actdevNum = 0,virportNum = 0,endis = 0;
+	unsigned long i = 0,numMembersPtr = 0;
+	unsigned char slot_no =0,port_no = 0;
+	unsigned int index =0;
+	unsigned int eth_g_index = 0;
+	unsigned char dev = 0;
+	unsigned short vlanId = 0;
+	DBusError err;	
+	dbus_error_init(&err);
+	
+	if (!(dbus_message_get_args ( msg, &err,
+							DBUS_TYPE_UINT16,&trunkId,
+							DBUS_TYPE_BYTE,&actdevNum,
+							DBUS_TYPE_INVALID))) 
+	{
+		 syslog_ax_trunk_err("Unable to get input args ");
+		if (dbus_error_is_set(&err)) 
+		{
+			 syslog_ax_trunk_err("%s raised: %s",err.name,err.message);
+			dbus_error_free(&err);
+		}
+		return NULL;
+	}
+	if(((SYSTEM_TYPE == IS_DISTRIBUTED) || (PRODUCT_ID == PRODUCT_ID_AX7K_I)))
+	{
+		for(index = 0;index < MAX_DYNAMIC_TRUNK_MEMBER;index++)
+		{
+			if((dynamic_trunk_member[trunkId][index]>>16)&0xff)
+			{	
+				slot_no = (dynamic_trunk_member[trunkId][index]>>8)&0xff;/*get slot no*/
+				port_no = dynamic_trunk_member[trunkId][index]&0xff;/*get port no*/
+				 
+	            /* remove the port from all vlan */
+	    		for (vlanId=1;vlanId<=4094;vlanId++)
+	            {
+	                if(g_vlanlist[vlanId-1].vlanStat == 1)
+	        		{			
+	                    if(port_no>32)
+	                    {
+	            			g_vlanlist[vlanId-1].untagPortBmp[slot_no-1].high_bmp &= (unsigned int)(~(1<<(port_no-33)));		/* remove from all vlan */		
+	            			g_vlanlist[vlanId-1].tagPortBmp[slot_no-1].high_bmp &= (unsigned int)(~(1<<(port_no-33)));			
+	                    }
+	            		else
+	            		{
+	            			g_vlanlist[vlanId-1].untagPortBmp[slot_no-1].low_bmp &= (unsigned int)(~(1<<(port_no-1)));		/* remove from all vlan */			
+	            			g_vlanlist[vlanId-1].tagPortBmp[slot_no-1].low_bmp &= (unsigned int)(~(1<<(port_no-1)));
+	            		}
+	                }
+	    		}
+		       
+	            if(port_no>32)
+	            {
+	    			g_vlanlist[0].untagPortBmp[slot_no-1].high_bmp |= (unsigned int)((1<<(port_no-33)));		/* add to default vlan  */		
+	            }
+	    		else
+	    		{
+	    	        g_vlanlist[0].untagPortBmp[slot_no-1].low_bmp |= (unsigned int)(1<<(port_no-1));		/* add to default vlan */	
+	    		}
+		    	
+
+		    	ret = msync(g_vlanlist, sizeof(vlan_list_t)*4096, MS_SYNC);
+		    	if( ret!=0 )
+		        {
+		            syslog_ax_trunk_err("msync shm_vlan failed \n" );
+		    		ret = TRUNK_RETURN_CODE_ERR_GENERAL;
+		        }
+		    	else
+		    	{
+		    		ret = TRUNK_RETURN_CODE_ERR_NONE;
+		    	}
+				/*is need add*/
+				DYNAMIC_TRUNK_PORT_CLEAR(trunkId, index);
+			}
+			for (vlanId=1;vlanId<=4094;vlanId++)
+			{
+				dynamic_trunk_allow_vlan_tag[trunkId-1][vlanId-1] = 0;
+				dynamic_trunk_allow_vlan_untag[trunkId-1][vlanId-1] = 0;
+				if(vlanId == 1)
+				{
+					dynamic_trunk_allow_vlan_untag[trunkId-1][vlanId-1] = 1;
+				}
+			}
+		}
+
+		DYNAMIC_TRUNK_MEMBER_COUNT_CLEAR(trunkId);
+
+		ret = nam_asic_trunk_delete(trunkId+MAX_STATIC_TRUNK_ID);
+		if(ret != TRUNK_RETURN_CODE_ERR_NONE)
+		{
+			syslog_ax_trunk_err("delete trunk failed !\n");
+		}
+		
+	}
+	
+	reply = dbus_message_new_method_return(msg);
+	
+	dbus_message_iter_init_append (reply, &iter);
+	
+	dbus_message_iter_append_basic (&iter,
+									 DBUS_TYPE_UINT32,
+									 &ret);
+	return reply;
+}
+
+
+#if 0
+DBusMessage * npd_dbus_dynamic_trunk_update_map_table
+(
+	DBusConnection *conn, 
+	DBusMessage *msg, 
+	void *user_data
+)
+{	
+	DBusMessage* reply;
+	DBusMessageIter	 iter;
+
+	unsigned short	trunkId = 0;	
+	unsigned int 	ret = TRUNK_RETURN_CODE_ERR_NONE;
+	unsigned char isAdd = 0,actdevNum = 0,virportNum = 0,endis = 0;
+	unsigned long i = 0,numMembersPtr = 0;
+	unsigned char slot_no =0,port_no = 0;
+	unsigned int index =0;
+	
+	DBusError err;	
+	dbus_error_init(&err);
+	
+	if (!(dbus_message_get_args ( msg, &err,
+							DBUS_TYPE_BYTE,&isAdd,
+							DBUS_TYPE_UINT16,&trunkId,
+							DBUS_TYPE_BYTE,&actdevNum,
+							DBUS_TYPE_BYTE,&virportNum,
+							DBUS_TYPE_BYTE,&endis,
+							DBUS_TYPE_BYTE,&slot_no,
+							DBUS_TYPE_BYTE,&port_no,
+							DBUS_TYPE_INVALID))) {
+		 syslog_ax_trunk_err("Unable to get input args ");
+		if (dbus_error_is_set(&err)) {
+			 syslog_ax_trunk_err("%s raised: %s",err.name,err.message);
+			dbus_error_free(&err);
+		}
+		return NULL;
+	}	
+	syslog_ax_trunk_dbg("DYNAMIC isAdd = %d,trunkId = %d,actdevNum = %d,virportNum = %d,endis = %d\n",isAdd,trunkId,actdevNum,virportNum,endis);
+	if(((SYSTEM_TYPE == IS_DISTRIBUTED) || (PRODUCT_ID == PRODUCT_ID_AX7K_I)) && (CSCD_TYPE == 1))
+	{
+		ret = nam_asic_trunk_map_table_update(0,trunkId+MAX_STATIC_TRUNK_ID,actdevNum,virportNum,isAdd,endis);
+		if(TRUNK_RETURN_CODE_ERR_NONE != ret) 
+		{
+			syslog_ax_trunk_err("nam_asic_trunk_map_table_update failed ! ret %d\n",ret);
+		}
+		if(BOARD_TYPE_AX71_CRSMU == BOARD_TYPE)
+		{
+			ret = nam_asic_trunk_map_table_update(1,trunkId+MAX_STATIC_TRUNK_ID,actdevNum,virportNum,isAdd,endis);
+			if(TRUNK_RETURN_CODE_ERR_NONE != ret) 
+			{
+				syslog_ax_trunk_err("nam_asic_trunk_map_table_update faile !\n");
+			}
+		}
+	}
+
+	if(IS_MASTER_NPD)
+	{
+		/*update dynamic info for global*/
+		if(isAdd)
+		{/*add */
+			for(index = 0; index < MAX_DYNAMIC_TRUNK_MEMBER; index++)
+			{
+				if(!DYNAMIC_TRUNK_PORT_IS_ADDED(trunkId, index))
+				{
+					DYNAMIC_TRUNK_PORT_SET(trunkId, index, slot_no, port_no);
+					DYNAMIC_TRUNK_MEMBER_COUNT_INCREASE(trunkId);
+					break;
+				}
+			}
+		}
+		else
+		{/*delete*/
+			for(index = 0; index < MAX_DYNAMIC_TRUNK_MEMBER; index++)
+			{/*try to match the port and clear it*/
+				if(DYNAMIC_TRUNK_PORT_IS_ADDED(trunkId,index) &&
+						(DYNAMIC_TRUNK_PORT_SLOT_NUM(trunkId,index) == slot_no) &&
+						(DYNAMIC_TRUNK_PORT_PORT_NUM(trunkId,index) == port_no))
+				{
+					DYNAMIC_TRUNK_PORT_CLEAR(trunkId, index);
+					DYNAMIC_TRUNK_MEMBER_COUNT_DECREASE(trunkId);
+					break;
+				}
+			}
+		}
+	}
+	reply = dbus_message_new_method_return(msg);
+	
+	dbus_message_iter_init_append (reply, &iter);
+	
+	dbus_message_iter_append_basic (&iter,
+									 DBUS_TYPE_UINT32,
+									 &ret);
+	return reply;
+}
+#endif
+
 /******************************************************************************
  * npd_dynamic_trunk_parse_slot_port_no
  * DESCRIPTION:

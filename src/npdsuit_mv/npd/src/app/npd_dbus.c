@@ -671,6 +671,14 @@ static DBusHandlerResult npd_dbus_message_handler (DBusConnection *connection, D
 			reply = npd_dbus_dynamic_trunk_delete_trunk(connection,message,user_data);
 		}/*delete dynamic trunk*/	
 		else if(dbus_message_is_method_call(message,NPD_DBUS_TRUNK_INTERFACE,	\
+								NPD_DBUS_TRUNK_METHOD_DYNAMIC_TRUNK_MAP_TABLE_UPDATE)) {
+			reply = npd_dbus_dynamic_trunk_update_map_table(connection,message,user_data);
+		}/*delete dynamic trunk*/	
+		else if(dbus_message_is_method_call(message,NPD_DBUS_TRUNK_INTERFACE,	\
+								NPD_DBUS_TRUNK_METHOD_DYNAMIC_TRUNK_DEL_MAP_TABLE)) {
+			reply = npd_dbus_dynamic_trunk_delete_map_table(connection,message,user_data);
+		}/*delete dynamic trunk*/	
+		else if(dbus_message_is_method_call(message,NPD_DBUS_TRUNK_INTERFACE,	\
 								NPD_DBUS_TRUNK_METHOD_DYNAMIC_TRUNK_PORT_MEMBER_ADD_DEL)) {
 			reply = npd_dbus_dynamic_trunk_add_delete_port_member(connection,message,user_data);
 		}/*add or delete port for dynamic trunk*/
@@ -689,6 +697,11 @@ static DBusHandlerResult npd_dbus_message_handler (DBusConnection *connection, D
 										NPD_DBUS_DYNAMIC_TRUNK_METHOD_SHOW_TRUNK_MEMBER_LIST)) {
 			reply = npd_dbus_dynamic_trunk_show_dynamic_trunk_list(connection,message,user_data);
 		} /*show dynamic trunk */
+		else if(dbus_message_is_method_call(message,NPD_DBUS_TRUNK_INTERFACE,  \
+										NPD_DBUS_DYNAMIC_TRUNK_METHOD_SHOW_TRUNK_VLAN_MEMBER_LIST)) {
+			reply = npd_dbus_dynamic_trunk_show_dynamic_trunk_vlan_member_list(connection,message,user_data);
+		} /*show dynamic trunk */
+		
 	}
 	else if(strcmp(dbus_message_get_path(message),NPD_DBUS_PVE_OBJPATH) == 0) {
 		syslog_ax_dbus_dbg("npd obj path"NPD_DBUS_PVE_OBJPATH);

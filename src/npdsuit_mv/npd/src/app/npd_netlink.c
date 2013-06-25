@@ -15,6 +15,7 @@ extern "C"
 #include "npd_board.h"
 #include "npd_vlan.h"
 #include "npd_trunk.h"
+#include "npd_dynamic_trunk.h"
 #include "sysdef/returncode.h"
 #include <cvm/autelan_product.h>   /* for product_info */
 
@@ -539,7 +540,47 @@ void npd_netlink_recv_thread(void)
 											}
 										}
 									}
+								
 									syslog_ax_board_dbg("#####  devnum = %d,virportNum = %d,action_type = %d,trunkId = %d \n",devnum,virportNum,action_type,trunkId);
+									break;
+								case ASIC_DYNAMIC_TRUNK_NOTIFIER_EVENT:								
+									devnum = nl_msg->msgData.portInfo.devNum;
+									virportNum = nl_msg->msgData.portInfo.virportNum;
+									action_type = nl_msg->msgData.portInfo.action_type;
+									trunkId = nl_msg->msgData.portInfo.trunkId;
+									slot_no = nl_msg->msgData.portInfo.slot_id;
+									port_no = nl_msg->msgData.portInfo.port_no;
+						
+		
+									if((trunkId > 118) && (trunkId < 127))
+									{
+										if(action_type == 1)
+												endis = 1;
+											else
+												endis = 0;
+										/*for dynamic trunk*/
+										if((CSCD_TYPE == 1) && (SLOT_ID != slot_no))/*only is CSCD system can endis trunk member*/
+										{
+										
+											ret = nam_asic_trunk_map_table_update(0,trunkId,devnum,virportNum,endis,endis);
+											if(ret != 0)
+											{
+												syslog_ax_board_err("nam_asic_trunk_port_endis_for_distributed fail ! ret %d\n",ret);
+											}
+											if(BOARD_TYPE == BOARD_TYPE_AX71_CRSMU)
+											{
+												ret = nam_asic_trunk_map_table_update(1,trunkId,devnum,virportNum,endis,endis);
+												if(ret != 0)
+												{
+													syslog_ax_board_err("nam_asic_trunk_port_endis_for_distributed fail ! \n");
+												}
+											}
+											
+											
+										}
+									}
+									syslog_ax_board_dbg("#####  devnum = %d,virportNum = %d,action_type = %d,trunkId = %d \n",devnum,virportNum,action_type,trunkId);
+									npd_syslog_info("LACP:  eth-port %d/%d %s Link Aggregate 1.\n",slot_no,port_no,endis?"joined":"left");	
 									break;
                 				default:
                 					syslog_ax_board_dbg("Error:npd recv an error message type\n");
@@ -796,6 +837,82 @@ int npd_asic_ehtport_update_notifier(unsigned int eth_g_index)
 	
 	return 0;
 }
+int npd_asic_dynamic_trunk_notifier(unsigned int eth_g_index,unsigned int endis)
+{	
+	char msgbuf[512] = {0};
+	int msgLen;
+	int i = 0,index = 0;;
+	unsigned long ret = 0,member = 0;
+	unsigned short trunkId = 0;
+	unsigned int port_link_state = 0,actdevNum = 0;
+	unsigned char devnum = 0,portNum = 0;
+	unsigned int slot_no = 0,port_no = 0;
+	unsigned int dy_slot_no = 0,dy_port_no = 0;
+    nl_msg_head_t *head = (nl_msg_head_t *)msgbuf;
+    netlink_msg_t *nl_msg = (netlink_msg_t *)(msgbuf + sizeof(nl_msg_head_t));
+	slot_no = CHASSIS_SLOT_INDEX2NO(SLOT_INDEX_FROM_ETH_GLOBAL_INDEX(eth_g_index));
+	port_no = ETH_LOCAL_INDEX2NO(SLOT_INDEX_FROM_ETH_GLOBAL_INDEX(eth_g_index),ETH_LOCAL_INDEX_FROM_ETH_GLOBAL_INDEX(eth_g_index));
+	
+	if((BOARD_TYPE != BOARD_TYPE_AX71_CRSMU) && (BOARD_TYPE != BOARD_TYPE_AX81_SMU))
+	{
+		port_link_state = endis;
+		ret = npd_get_devport_by_global_index(eth_g_index,&devnum,&portNum);
+		if (ret != 0) 
+		{
+			syslog_ax_board_err("global_index %d convert to devPort error.\n",eth_g_index);
+		}
+		syslog_ax_board_dbg("devNum = %d ,portNum = %d\n",devnum,portNum);
+		ret = nam_trunk_port_trunkId_get(devnum,portNum,&member,&trunkId);
+		if(ret != 0)
+		{
+			syslog_ax_board_err("get trunk ID err !\n");
+		}
+		if((member == 0) || (trunkId > 110))    /* code optimize: no need check 0. zhangdi@autelan.com 3013-01-18 */
+		{
+			trunkId = 0;/*if port is not a member of trunk ,set the trunk Id to zero*/
+		}
+		
+
+		if(DYNAMIC_TRUNK_MEMBER_IS_NOT_EMPTY(1))
+		{
+			for(index = 0;index < MAX_DYNAMIC_TRUNK_MEMBER;index++)
+			{
+				if((dynamic_trunk_member[1][index]>>16)&0xff)
+				{/*is need add*/
+						dy_slot_no = (dynamic_trunk_member[1][index]>>8)&0xff;/*get slot no*/
+						dy_port_no = dynamic_trunk_member[1][index]&0xff;/*get port no*/
+						if((dy_slot_no == slot_no) && (dy_port_no == port_no))
+						{
+							trunkId = 119;
+							break;
+						}
+				}
+			}
+		}
+		syslog_ax_eth_port_dbg("member = %d,trunkId = %d\n",member,trunkId);
+	}	
+    eth_g_index = eth_g_index + asic_board->asic_port_start_no-1;
+	
+	head->pid = getpid();
+	head->count = 1;
+    head->type = LOCAL_BOARD;
+	head->object = SEM_MODULE;
+
+    nl_msg->msgType = ASIC_DYNAMIC_TRUNK_NOTIFIER_EVENT;
+	nl_msg->msgData.portInfo.action_type = port_link_state;
+	nl_msg->msgData.portInfo.slot_id = slot_no;
+	nl_msg->msgData.portInfo.port_no = port_no;
+	nl_msg->msgData.portInfo.eth_l_index = global_ethport[eth_g_index]->local_port_no-1;
+	nl_msg->msgData.portInfo.devNum = g_dis_dev[0];
+	nl_msg->msgData.portInfo.virportNum = portNum;
+	nl_msg->msgData.portInfo.trunkId = trunkId;
+
+    msgLen = sizeof(nl_msg_head_t) + head->count*sizeof(netlink_msg_t);
+	npd_netlink_send(msgbuf, msgLen);
+	
+	return 0;
+}
+
 
 int npd_asic_vlan_notifier(unsigned int vlanId, unsigned int slotId)
 {	

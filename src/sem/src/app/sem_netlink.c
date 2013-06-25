@@ -175,6 +175,44 @@ void sem_eth_port_state_notifier(asic_port_update_t port_info)
 	return;
 }
 
+void sem_dynamic_trunk_notifier(asic_port_update_t port_info)
+{
+	char msgbuf[512] = {0};
+	int msgLen;
+	int i;
+    nl_msg_head_t *head = (nl_msg_head_t *)msgbuf;
+    netlink_msg_t *nl_msg = (netlink_msg_t *)(msgbuf + sizeof(nl_msg_head_t));
+	
+	head->pid = getpid();
+	head->count = 1;
+    head->type = OVERALL_UNIT;
+	head->object = NPD_MODULE;
+
+    nl_msg->msgType = ASIC_DYNAMIC_TRUNK_NOTIFIER_EVENT;
+	nl_msg->msgData.portInfo.action_type = port_info.action_type;
+	nl_msg->msgData.portInfo.devNum = port_info.devNum;
+	nl_msg->msgData.portInfo.virportNum = port_info.virportNum;
+	nl_msg->msgData.portInfo.trunkId = port_info.trunkId;
+	nl_msg->msgData.portInfo.slot_id = port_info.slot_id;
+	nl_msg->msgData.portInfo.port_no = port_info.port_no;
+
+    msgLen = sizeof(nl_msg_head_t) + head->count*sizeof(netlink_msg_t);
+	sem_netlink_send(msgbuf, msgLen);
+
+	sem_syslog_dbg("\tNetlink sem eth_port state\n");
+	
+	for(i = 0; i < product->slotcount;i++)
+	{
+       if(i != product->active_master_slot_id)
+       {
+            sem_tipc_send(i, SEM_NETLINK_MSG, msgbuf, msgLen);
+	   }
+	}
+	
+	return;
+}
+
+
 
 void sem_eth_port_state_send_to_active_mcb(asic_port_update_t port_info)
 {
@@ -190,6 +228,38 @@ void sem_eth_port_state_send_to_active_mcb(asic_port_update_t port_info)
 	head->object = NPD_MODULE;
 
     nl_msg->msgType = ASIC_ETHPORT_UPDATE_EVENT;
+	nl_msg->msgData.portInfo.action_type = port_info.action_type;
+	nl_msg->msgData.portInfo.devNum = port_info.devNum;
+	nl_msg->msgData.portInfo.virportNum = port_info.virportNum;
+	nl_msg->msgData.portInfo.trunkId = port_info.trunkId;
+	nl_msg->msgData.portInfo.slot_id = port_info.slot_id;
+	nl_msg->msgData.portInfo.port_no = port_info.port_no;
+	
+
+    msgLen = sizeof(nl_msg_head_t) + head->count*sizeof(netlink_msg_t);
+
+	sem_syslog_dbg("\tNetlink sem eth_port state\n");
+	
+	sem_tipc_send(product->active_master_slot_id, SEM_NETLINK_MSG_BROADCAST, msgbuf, msgLen);
+	
+	return;
+}
+
+
+void sem_dynamic_trunk_info_send_to_active_mcb(asic_port_update_t port_info)
+{
+	char msgbuf[512] = {0};
+	int msgLen;
+	int i;
+    nl_msg_head_t *head = (nl_msg_head_t *)msgbuf;
+    netlink_msg_t *nl_msg = (netlink_msg_t *)(msgbuf + sizeof(nl_msg_head_t));
+	
+	head->pid = getpid();
+	head->count = 1;
+    head->type = OVERALL_UNIT;
+	head->object = NPD_MODULE;
+
+    nl_msg->msgType = ASIC_DYNAMIC_TRUNK_NOTIFIER_EVENT;
 	nl_msg->msgData.portInfo.action_type = port_info.action_type;
 	nl_msg->msgData.portInfo.devNum = port_info.devNum;
 	nl_msg->msgData.portInfo.virportNum = port_info.virportNum;
@@ -817,6 +887,30 @@ void sem_netlink_recv_thread(void)
 										}
 										else {
 											sem_eth_port_state_send_to_active_mcb(port_info);
+										}
+									}
+                					break;
+								case ASIC_DYNAMIC_TRUNK_NOTIFIER_EVENT:
+                                    slot_id = nl_msg->msgData.portInfo.slot_id;
+                					eth_l_index = nl_msg->msgData.portInfo.eth_l_index;
+									port_info.action_type = nl_msg->msgData.portInfo.action_type;
+									port_info.devNum = nl_msg->msgData.portInfo.devNum;
+									port_info.virportNum = nl_msg->msgData.portInfo.virportNum;
+									port_info.trunkId = nl_msg->msgData.portInfo.trunkId;
+									port_info.slot_id = nl_msg->msgData.portInfo.slot_id;
+									port_info.port_no = nl_msg->msgData.portInfo.port_no;
+
+                    				sem_syslog_dbg("\tReceive dynamic trunk event from npd\n", \
+                    					slot_id, eth_l_index+1);
+
+          	
+									if((product->is_distributed) && (port_info.trunkId != 0))/* zhangcl added for dynamic trunk*/
+									{
+										if (local_board->is_active_master) {
+											sem_dynamic_trunk_notifier(port_info);
+										}
+										else {
+											sem_dynamic_trunk_info_send_to_active_mcb(port_info);
 										}
 									}
                 					break;
