@@ -834,9 +834,11 @@ static inline void encap_eth_packet(cvmx_wqe_t *work, rule_item_t *rule, cvm_com
 		*(uint64_t *)pkt_ptr = rule->rules.dsa_info;
 		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + PACKET_DSA_HEADER_LEN);	
 	}
-
-	pkt_ptr = pkt_ptr - 12;
-	memcpy(pkt_ptr, rule->rules.ether_dhost, 12);
+	/*add for coverity by wangjian*/
+	pkt_ptr = pkt_ptr - 6;
+	memcpy(pkt_ptr, rule->rules.ether_shost, 6);
+	pkt_ptr = pkt_ptr - 6;
+	memcpy(pkt_ptr, rule->rules.ether_dhost, 6);
 	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + 12);
 	work->packet_ptr.s.addr = cvmx_ptr_to_phys(pkt_ptr);
 	work->packet_ptr.s.back   = CVM_COMMON_CALC_BACK(work->packet_ptr);
@@ -974,6 +976,7 @@ static inline void encap_802_11_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, c
 		((struct ieee80211_qosframe*)ieee80211_hdr)->i_qos[0] = rule->rules.acl_tunnel_wifi_header_qos[0];
 		((struct ieee80211_qosframe*)ieee80211_hdr)->i_qos[1] = rule->rules.acl_tunnel_wifi_header_qos[1];
 		unsigned char *pchNull = NULL;
+		/*add for coverity by wangjian dont need modify*/
 		pchNull = ((struct ieee80211_qosframe*)ieee80211_hdr)->i_qos + 2;
 
 		*pchNull = 0x00;
@@ -983,6 +986,7 @@ static inline void encap_802_11_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, c
 	ieee80211_hdr->i_dur[0] = 0;
 	ieee80211_hdr->i_dur[1] = 0;
 
+	/*add for coverity by wangjian dont need modify*/
 	memcpy(ieee80211_hdr->i_addr1, &rule->rules.acl_tunnel_wifi_header_addr[0], MAC_LEN * 3);
 
 	ieee80211_hdr->i_seq[0] = (((uint16_t)gbl_80211_id) << 4) & 0xf0;
@@ -1065,8 +1069,11 @@ static inline void encap_802_11_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, c
 		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + PACKET_DSA_HEADER_LEN);
 	}
 
-	pkt_ptr = pkt_ptr - 12;
-	memcpy(pkt_ptr, rule->rules.ether_dhost, 12);
+	/*add for coverity by wangjian*/
+	pkt_ptr = pkt_ptr - 6;
+	memcpy(pkt_ptr, rule->rules.ether_shost, 6);
+	pkt_ptr = pkt_ptr - 6;
+	memcpy(pkt_ptr, rule->rules.ether_dhost, 6);
 	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + 12);
 	work->packet_ptr.s.addr = cvmx_ptr_to_phys(pkt_ptr);
 	work->packet_ptr.s.back   = CVM_COMMON_CALC_BACK(work->packet_ptr);
@@ -1155,8 +1162,11 @@ static inline void encap_802_3_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, cv
 	pkt_ptr = (uint8_t *)pkt_ptr - 2;
 	*(uint16_t *)pkt_ptr = rule->rules.acl_tunnel_eth_header_ether;   /* add by wangjian for support pppoe 2013-3-14 0x8864? */
 
-	pkt_ptr = pkt_ptr - 12;
-	memcpy(pkt_ptr, rule->rules.acl_tunnel_eth_header_dmac, 12);
+	/*add for coverity by wangjian*/
+	pkt_ptr = pkt_ptr - 6;
+	memcpy(pkt_ptr, rule->rules.acl_tunnel_eth_header_smac, 6);
+	pkt_ptr = pkt_ptr - 6;
+	memcpy(pkt_ptr, rule->rules.acl_tunnel_eth_header_dmac, 6);
 	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + ETH_H_LEN);
 
 	/* Encap CAPWAP */
@@ -1230,9 +1240,11 @@ static inline void encap_802_3_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, cv
 		*(uint64_t *)pkt_ptr = rule->rules.dsa_info;
 		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + PACKET_DSA_HEADER_LEN);
 	}
-
-	pkt_ptr = pkt_ptr - 12;
-	memcpy(pkt_ptr, rule->rules.ether_dhost, 12);
+	/*add for coverity by wangjian*/
+	pkt_ptr = pkt_ptr - 6;
+	memcpy(pkt_ptr, rule->rules.ether_shost, 6);
+	pkt_ptr = pkt_ptr - 6;
+	memcpy(pkt_ptr, rule->rules.ether_dhost, 6);
 	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + 12);
 	work->packet_ptr.s.addr = cvmx_ptr_to_phys(pkt_ptr);
 	work->packet_ptr.s.back   = CVM_COMMON_CALC_BACK(work->packet_ptr);

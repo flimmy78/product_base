@@ -1624,7 +1624,7 @@ int32_t cmd_show(int argc, char *argv[])
 				else
 				{
 					loop = atoi(argv[3]);
-					if((loop <CVMX_FPA_NUM_POOLS) && (loop >0))
+					if(loop <CVMX_FPA_NUM_POOLS)
 						cvm_common_analyze_fpa(loop);
 					else
 						return CMD_ERR_NOT_MATCH;
@@ -1651,7 +1651,7 @@ int32_t cmd_show(int argc, char *argv[])
 				else
 				{
 					loop = atoi(argv[3]);
-					if((loop <CVMX_FPA_NUM_POOLS-1) && (loop < CVMX_FPA_NUM_POOLS))
+					if(loop < CVMX_FPA_NUM_POOLS)
 						cvm_common_dump_fpa(loop);
 					else
 						return CMD_ERR_NOT_MATCH;

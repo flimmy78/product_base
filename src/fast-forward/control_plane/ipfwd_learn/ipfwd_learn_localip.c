@@ -222,11 +222,6 @@ void fwd_ifa_hash_rebuild(void)
 	   1.3code have dev_base*/
 	for_each_netdev(&init_net,dev)
 	{
-		if (NULL == dev)
-		{
-			log(EMERG_LVL, "ipfwd_learn: dev is NULL\n");
-			continue;
-		}
 		in_dev = __in_dev_get_rtnl(dev);
 		if(NULL == in_dev)
 			continue; 

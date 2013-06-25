@@ -354,20 +354,28 @@ static inline int32_t get_protocol_match_rule(cvmx_wqe_t *work)
 {
 	int i = 0;
 	int j = 0;
-	uint8_t* pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);   
-	int data_len = CVM_WQE_GET_LEN(work);
+
 	int match = MATCH_SUCCESS;
 	int match_len = 0;
 	MATCH_TYPE * rules_ptr = NULL;
 	MATCH_TYPE * masks_ptr = NULL;
-	uint32_t * tmp_pkt_ptr = (uint32_t*)pkt_ptr;
-	MATCH_TYPE * new_pkt_ptr = (MATCH_TYPE *)pkt_ptr;
+	uint8_t* pkt_ptr = NULL;
+	int data_len = 0;
+	uint32_t * tmp_pkt_ptr = NULL;
+	MATCH_TYPE * new_pkt_ptr = NULL;
+
 	uint64_t * long_pkt_ptr = NULL;
 	unsigned int tag1 = 0;
 	unsigned int tag2 = 0;
 
+	/*add for coverity by wangjian*/
     if(NULL == work)
         return MATCH_FAILED;
+
+	pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);   
+	data_len = CVM_WQE_GET_LEN(work);
+	tmp_pkt_ptr = (uint32_t*)pkt_ptr;
+	new_pkt_ptr = (MATCH_TYPE *)pkt_ptr;
     
 	if(ETH_TYPE_8021Q == ((tmp_pkt_ptr[3] & 0xffff0000) >> 16))
 	{/*tag process*/
@@ -376,6 +384,7 @@ static inline int32_t get_protocol_match_rule(cvmx_wqe_t *work)
 			new_pkt_ptr = (uint64_t*)(tmp_pkt_ptr + 2);
 			data_len -= ETH_VLAN_LEN*2;
 			tag2 = tmp_pkt_ptr[4] & 0xfff;
+			tag1 = tmp_pkt_ptr[3] & 0xfff;
 		}
 		else
 		{/*sigal tag process*/

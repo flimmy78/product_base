@@ -1132,10 +1132,8 @@ void se_agent_show_running_config(char *buf,struct sockaddr_tipc *client_addr,un
 	if(ret<0)
 	{
 		se_agent_syslog_err("show_running_config send to dcli failed:%s\n",strerror(errno));
-		return ;
 	}	
 	free(showStr);
-	showStr = NULL;
 }
 
 
@@ -2734,7 +2732,7 @@ void se_agent_cmd_handle(char *buf,struct sockaddr_tipc *client_addr,unsigned in
 	}
 	else
 	{
-		while(strcmp(se_buf->hand_cmd , cmd_func ->cmd_name) && cmd_func->next !=NULL)
+		while((cmd_func != NULL) && (strcmp(se_buf->hand_cmd , cmd_func ->cmd_name) != 0))
 		{
 			cmd_func = cmd_func->next;
 		}

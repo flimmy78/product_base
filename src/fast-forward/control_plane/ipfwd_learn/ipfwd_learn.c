@@ -135,14 +135,7 @@ static inline void dump_skb(struct sk_buff* skb)
     if((!skb) || (!skb->dev)){
         return ;
     }
-    if(skb->dev->name != NULL)
-    {
-        printk("ipfwd_learn receive skb packet from %s :\n", skb->dev->name);
-    }
-    else
-    {
-        printk("ipfwd_learn receive skb packet :\n");
-    }
+	printk("ipfwd_learn receive skb packet from %s :\n", skb->dev->name);
     
     for(i = 0; ((i<skb->len) && (i<256)); i++)
     {       
@@ -1151,7 +1144,7 @@ static inline int cw_cache_learned(struct sk_buff *skb,
 		fccp_cmd->fccp_data.rule_info.rule_param.acl_tunnel_wifi_header_qos[1] = \
 					                ((struct ieee80211_qosframe*)ieee80211_hdr)->i_qos[1];
 	}
-
+	/* add for coverity by wangjian dont need modify */
 	memcpy(fccp_cmd->fccp_data.rule_info.rule_param.tunnel_l2_header.wifi_header.addr, \
 			         ieee80211_hdr->i_addr1, MAC_LEN * 3); 
 
@@ -1647,6 +1640,7 @@ static inline int cw_802_11_icmp_cache_learned(struct sk_buff *skb,
 		fccp_cmd->fccp_data.rule_info.rule_param.acl_tunnel_wifi_header_qos[1] = \
 			                              ((struct ieee80211_qosframe*)ieee80211_hdr)->i_qos[1];
 	}
+	/* add for coverity by wangjian dont need modify */
 	memcpy(fccp_cmd->fccp_data.rule_info.rule_param.tunnel_l2_header.wifi_header.addr, \
 		                                  ieee80211_hdr->i_addr1, MAC_LEN * 3); 
 	fccp_cmd->fccp_data.rule_info.cw_cache.dip = ip->daddr;
@@ -2039,12 +2033,6 @@ int ipfwd_learn (struct sk_buff *skb,uint8_t dev_type)
         return IPFWD_LEARN_RETURN_OK;
 #endif        
 	}
-	else
-	{
-		cvmx_atomic_add64(&fwd_learn_stats.spe_if_name, 1);
-		log(DEBUG_LVL,"ipfwd_learn:unknown fwd dev type, dev_type = %d\n", dev_type);
-		return IPFWD_LEARN_RETURN_OK;
-	}
 
 	eth = (eth_hdr_t*)pkt_ptr;
 	eth->h_vlan_proto = FCCP_L2_ETH_TYPE;
@@ -2246,10 +2234,6 @@ static int __init ipfwd_learn_init(void)
             printk("%s: map slave cpu port %d\n",oct_dev_array[i]->name, octnet_get_netdev_gmxport(oct_dev_array[i]));
         }
         ipfwd_learn_mode |= IPFWD_LEARN_MODE_STANDALONE_ENABLE;
-    }
-    else
-    {
-        printk("ipfwd_learn cann't into standalone mode, maybe slave cpu not running. nic_ifcount = %d\n", nic_ifcount);
     }
 #endif
 

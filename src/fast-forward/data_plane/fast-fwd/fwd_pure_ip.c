@@ -24,18 +24,26 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 	if (ip == NULL)
 	{
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_WARNING,
-				"acl_table_lookup: NULL Pointer !...\r\n");	
+				"acl_table_pure_ip_lookup: NULL Pointer !...\r\n");	
 		return NULL;		
 	}
 
 	cvmx_fau_atomic_add64(CVM_FAU_TOTAL_ACL_LOOKUP, 1);
 	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
-			"acl_table_lookup: packet-fiveTuple----dip=%d.%d.%d.%d, sip=%d.%d.%d.%d.  \r\n",
+			"acl_table_pure_ip_lookup: packet-fiveTuple----dip=%d.%d.%d.%d, sip=%d.%d.%d.%d.  \r\n",
 			IP_FMT(ip->ip_dst),IP_FMT(ip->ip_src));
 
 	/*look up ACL Table and get the bucket*/
 	cvm_two_tupe_hash_lookup(ip->ip_dst, ip->ip_src);
 	rule = CASTPTR(rule_item_t, cvmx_scratch_read64(CVM_SCR_ACL_CACHE_PTR));
+
+	/* add for coverity by wangjian */
+	if (NULL == rule)
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_WARNING,
+				"acl_table_pure_ip_lookup: Hash rule is NULL Pointer !...\r\n");	
+		return NULL;		
+	}
 
 	head_rule = rule;
 	aging_cur_rule = rule;
@@ -48,7 +56,7 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
     /* debug trace.add by zhaohan */
     if((head_rule->valid_entries == acl_bucket_max_entries)&&(head_rule->next == NULL))
     {
-        printf("Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
+        printf("acl_table_pure_ip_lookup:Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
     }
 
 	/*if the first bucket is empty and there are no more buckets, then insert current flow*/
@@ -83,7 +91,7 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 			else
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
-						"acl_table_lookup: Should never come to here file%s, line %d, rule=0x%p, num=0x%d,next=0x%p.\r\n",__FILE__, __LINE__,rule,rule->valid_entries,rule->next);	
+						"acl_table_pure_ip_lookup: Should never come to here file%s, line %d, rule=0x%p, num=0x%d,next=0x%p.\r\n",__FILE__, __LINE__,rule,rule->valid_entries,rule->next);	
 				cvmx_spinlock_unlock(head_lock);
 				return NULL;
 			}
@@ -93,16 +101,16 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 	/*aging the current rule first then compare the rule with the key,loop*/			 
 	while(1)
 	{
-		if(rule == NULL)
+		if(rule == NULL || aging_pre_rule == NULL)
 		{
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
-					"acl_table_lookup: Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
+					"acl_table_pure_ip_lookup: Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
 			cvmx_spinlock_unlock(head_lock);
 			return NULL;
 		}
 
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
-				"acl_table_lookup: current Rule info: dip=%d.%d.%d.%d, sip=%d.%d.%d.%d \r\n",
+				"acl_table_pure_ip_lookup: current Rule info: dip=%d.%d.%d.%d, sip=%d.%d.%d.%d \r\n",
 				IP_FMT(rule->rules.dip),IP_FMT(rule->rules.sip));
 
 		/************************aging first*****************************/
@@ -115,60 +123,51 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 				{
 					free_rule = head_rule;
 				}
-				if(aging_pre_rule !=NULL)
+
+				rule=aging_pre_rule->next;
+				aging_cur_rule=aging_pre_rule->next;
+
+				if(rule==NULL)/*after age, there is no more bucket*/
 				{
-					rule=aging_pre_rule->next;
-					aging_cur_rule=aging_pre_rule->next;
-
-					if(rule==NULL)/*after age, there is no more bucket*/
+					if(free_rule == NULL)
 					{
-						if(free_rule == NULL)
+						aging_pre_rule->next = (rule_item_t *)cvmx_malloc(rule_arena, sizeof(rule_item_t));
+						if(aging_pre_rule->next == NULL)
 						{
-							aging_pre_rule->next = (rule_item_t *)cvmx_malloc(rule_arena, sizeof(rule_item_t));
-							if(aging_pre_rule->next == NULL)
-							{
-								FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, 
-										FASTFWD_COMMON_DBG_LVL_ERROR,
-										"InsertFastRule: Memory not available for adding rules line=%d\n",__LINE__);
-								cvmx_fau_atomic_add64(CVM_FAU_ALLOC_RULE_FAIL, 1);			
-								cvmx_spinlock_unlock(head_lock);
-								return NULL;
-							}	
-							memset(aging_pre_rule->next, 0, sizeof(rule_item_t));
-							free_rule = aging_pre_rule->next;
-							atomic_add64_nosync(&(rule_cnt_info.dynamic_rule_cnt));  /* add by zhaohan */
-						}
+							FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, 
+									FASTFWD_COMMON_DBG_LVL_ERROR,
+									"InsertFastRule: Memory not available for adding rules line=%d\n",__LINE__);
+							cvmx_fau_atomic_add64(CVM_FAU_ALLOC_RULE_FAIL, 1);			
+							cvmx_spinlock_unlock(head_lock);
+							return NULL;
+						}	
+						memset(aging_pre_rule->next, 0, sizeof(rule_item_t));
+						free_rule = aging_pre_rule->next;
+						atomic_add64_nosync(&(rule_cnt_info.dynamic_rule_cnt));  /* add by zhaohan */
+					}
 
-						free_rule->rules.time_stamp = get_sec(); 
-						free_rule->rules.dip = ip->ip_dst;
-						free_rule->rules.sip = ip->ip_src;
-						free_rule->rules.rule_state = RULE_IS_LEARNING;
-						free_rule->rules.action_type = FLOW_ACTION_TOLINUX;
-						head_rule->valid_entries++; /* ---------- modify by zhaohan ----------- */
-						cvmx_fau_atomic_add64(CVM_FAU_ACL_REG, 1);
-						cvmx_spinlock_unlock(head_lock);
+					free_rule->rules.time_stamp = get_sec(); 
+					free_rule->rules.dip = ip->ip_dst;
+					free_rule->rules.sip = ip->ip_src;
+					free_rule->rules.rule_state = RULE_IS_LEARNING;
+					free_rule->rules.action_type = FLOW_ACTION_TOLINUX;
+					head_rule->valid_entries++; /* ---------- modify by zhaohan ----------- */
+					cvmx_fau_atomic_add64(CVM_FAU_ACL_REG, 1);
+					cvmx_spinlock_unlock(head_lock);
 
 #ifdef USER_TABLE_FUNCTION	
-            			set_acl_mask(head_rule);
+        			set_acl_mask(head_rule);
 #endif
 
-						return free_rule;
-					}
-					else
-						continue;
+					return free_rule;
 				}
 				else
-				{
-					FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
-							"acl_table_lookup: Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
-					cvmx_spinlock_unlock(head_lock);
-					return NULL;
-				}
+					continue;
 			}
 			else
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
-						"acl_table_lookup: Should never come to here file%s, line %d.\r\n",__FILE__, __LINE__);
+						"acl_table_pure_ip_lookup: Should never come to here file%s, line %d.\r\n",__FILE__, __LINE__);
 				cvmx_spinlock_unlock(head_lock);
 				return NULL;
 			}
@@ -177,7 +176,7 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 		if((rule->rules.dip == ip->ip_dst) && (rule->rules.sip == ip->ip_src)) 
 		{		
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
-					"acl_table_lookup: Find the rule=0x%p\n",rule);
+					"acl_table_pure_ip_lookup: Find the rule=0x%p\n",rule);
 
 			if(rule->rules.rule_state== RULE_IS_STATIC) 
 			{
@@ -205,7 +204,7 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 			else
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
-						"acl_table_lookup: Should never come to here file%s, line %d, rule_state=%d.\r\n",__FILE__, __LINE__,rule->rules.rule_state);	
+						"acl_table_pure_ip_lookup: Should never come to here file%s, line %d, rule_state=%d.\r\n",__FILE__, __LINE__,rule->rules.rule_state);	
 				cvmx_spinlock_unlock(head_lock);
 				return NULL;
 			}

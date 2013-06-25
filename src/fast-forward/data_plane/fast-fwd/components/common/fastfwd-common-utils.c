@@ -529,7 +529,7 @@ void cvm_common_analyze_fpa(uint32_t pool)
     int invalid_buffers = 0;
     int unaligned_buffers = 0;
 
-    if(pool > CVMX_FPA_NUM_POOLS)
+    if(pool >= CVMX_FPA_NUM_POOLS)
     {
         printf("Invalid pool number [%d]\n", pool);
         return;
@@ -723,7 +723,7 @@ void cvm_common_dump_fpa(uint32_t pool)
     int invalid_buffers = 0;
     int unaligned_buffers = 0;
 
-    if(pool > CVMX_FPA_NUM_POOLS)
+    if(pool >= CVMX_FPA_NUM_POOLS)
     {
         printf("Invalid pool number [%d]\n", pool);
         return;

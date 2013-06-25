@@ -70,6 +70,12 @@ cvmcs_nic_get_port_default_speed(int port)
     int interface = cvmx_helper_get_interface_num(port);
     int index = cvmx_helper_get_interface_index_num(port);
 
+	/*add for coverity by wangjian*/
+	if (interface < 0)
+	{
+		return speed;
+	}
+	
    if (index >= cvmx_helper_ports_on_interface(interface))
        return speed;
 
