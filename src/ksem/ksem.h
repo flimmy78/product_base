@@ -56,6 +56,7 @@
 #define PRODUCT_AX8606  0x5
 #define PRODUCT_AX8603	0X6
 #define AX81_CRSMU      0x0
+#define AX81_CRSMUE      0x7
 #define AX81_AC12C		0x1
 #define AX81_AC8C		0x2
 #define AX81_1X12G12S   0X5

@@ -926,7 +926,7 @@ void cvm_oct_set_carrier(struct octeon_ethernet *priv, cvmx_helper_link_info_t l
 	
     if (priv->imode == CVMX_HELPER_INTERFACE_MODE_SGMII){
     	
-        	if (autelan_product_info.board_type== AUTELAN_BOARD_AX81_SMU)
+        	if (autelan_product_info.board_type== AUTELAN_BOARD_AX81_SMU ||autelan_product_info.board_type== AUTELAN_BOARD_AX81_SMUE)
             {
                 if(priv->ipd_port == 2)
                 {

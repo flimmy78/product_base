@@ -738,7 +738,7 @@ void init_board(void)
 			}		
 			break;
 		case PRODUCT_AX8610:
-			if(board_id == AX81_CRSMU)
+			if(board_id == AX81_CRSMU || board_id == AX81_CRSMUE)
 			{
 				#if 0
             	read_lock_irqsave(&octeon_gpio_cfg_rwlock, flags);
@@ -767,7 +767,7 @@ void init_board(void)
 			}
 			break;
 		case PRODUCT_AX8606:
-			if(board_id == AX81_CRSMU)
+			if(board_id == AX81_CRSMU || board_id == AX81_CRSMUE)
 			{
 				#if 0
             	read_lock_irqsave(&octeon_gpio_cfg_rwlock, flags);
@@ -796,7 +796,7 @@ void init_board(void)
 			}
 			break;
 		case PRODUCT_AX8800:
-			if(board_id == AX81_CRSMU)
+			if(board_id == AX81_CRSMU || board_id == AX81_CRSMUE)
 			{
 				#if 0
             	read_lock_irqsave(&octeon_gpio_cfg_rwlock, flags);
@@ -855,7 +855,7 @@ void release_board(void)
         case PRODUCT_AX7605I:
 			break;
 		case PRODUCT_AX8610:
-			if(board_id == AX81_CRSMU)
+			if(board_id == AX81_CRSMU || board_id == AX81_CRSMUE)
 			{
                 read_lock_irqsave(&cpld_int_mask_rwlock, flags);	
                 cvmx_write64_uint8(CPLD_BASE_ADDR + CPLD_INT_MASK_REG1, 0x0);
@@ -865,7 +865,7 @@ void release_board(void)
 	        }
 			break;
 		case PRODUCT_AX8800:
-			if(board_id == AX81_CRSMU)
+			if(board_id == AX81_CRSMU || board_id == AX81_CRSMUE)
 			{
                 read_lock_irqsave(&cpld_int_mask_rwlock, flags);	
                 cvmx_write64_uint8(CPLD_BASE_ADDR + CPLD_INT_MASK_REG1, 0x0);

@@ -28,6 +28,7 @@ extern board_fix_param_t ax81_ac8c;
 extern board_fix_param_t ax81_1x12g12s;
 extern board_fix_param_t ax81_12x;
 extern board_fix_param_t ax81_ac4x;
+extern board_fix_param_t ax81_smue;
 
 extern board_info_syn_t board_info_to_syn;
 extern product_info_syn_t product_info_syn;
@@ -74,6 +75,7 @@ enum
 	BOARD_TYPE_AX81_1X12G12S,
 	BOARD_TYPE_AX81_12X,
 	BOARD_TYPE_AX81_AC4X,
+	BOARD_TYPE_AX81_SMUE,
 	BOARD_TYPE_AX81_MAX
 };
 
@@ -87,6 +89,7 @@ board_fix_param_t *ax8606_support_board_arr[] =
 	[BOARD_TYPE_AX81_1X12G12S] = &ax81_1x12g12s,
 	[BOARD_TYPE_AX81_12X] = &ax81_12x,
 	[BOARD_TYPE_AX81_AC4X] = &ax81_ac4x,
+	[BOARD_TYPE_AX81_SMUE] = &ax81_smue,
 	[BOARD_TYPE_AX81_MAX] = NULL
 };
 
@@ -345,7 +348,7 @@ int ax8606_tipc_init(board_fix_param_t *board)
 	sprintf(sbuff, "tipc-config -be=eth:%s", "obc0");
 	system(sbuff);
 
-	if (board->board_type != BOARD_TYPE_AX81_SMU)
+	if (board->board_type != BOARD_TYPE_AX81_SMU && board->board_type != BOARD_TYPE_AX81_SMUE)
 	{
 		#if 1
 		memset(sbuff, 0, 64);

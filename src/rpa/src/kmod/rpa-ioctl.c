@@ -404,6 +404,7 @@ int rpa_tx_dev_index_init_ax86xx(product_type_t product_type, board_type_t board
 			}
 			break;
 		case AUTELAN_BOARD_AX81_SMU:
+		case AUTELAN_BOARD_AX81_SMUE:
 			dev = dev_get_by_name(&init_net, "obc0");
 			if (dev) {
 				for (d_slot = 0; d_slot < effective_slot_num; d_slot++) {

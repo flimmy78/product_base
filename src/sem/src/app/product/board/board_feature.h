@@ -53,6 +53,20 @@ typedef struct ams_info_s
     unsigned short rev_id;
 } ams_info_t;
 
+/* Mavell 88E6185 register definations */
+typedef union
+{
+    unsigned short int u16;
+    struct smi_cmd_s
+    {
+		unsigned int smi_busy	: 1;
+		unsigned int reserved	: 2;
+        unsigned int smi_mode   : 1;
+        unsigned int smi_op     : 2;       /* SMI Opcode 1=write 2=read */
+		unsigned int dev_addr	: 5;       /* Device Address */
+		unsigned int reg_addr	: 5;	   /* PHY Register Offset */
+    } s;
+} smi_cmd_88e6185_reg_t;
 
 typedef struct ams_fix_param_s
 {

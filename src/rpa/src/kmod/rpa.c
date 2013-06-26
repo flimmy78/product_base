@@ -137,6 +137,7 @@ int rpa_unavailable_board_check(board_type_t board_type)
 		/* Rpa function available on these boards */
 		case AUTELAN_BOARD_AX71_CRSMU:
 		case AUTELAN_BOARD_AX81_SMU:
+		case AUTELAN_BOARD_AX81_SMUE:
 		case AUTELAN_BOARD_AX81_AC8C:
 		case AUTELAN_BOARD_AX81_AC12C:
 		case AUTELAN_BOARD_AX81_1X12G12S:

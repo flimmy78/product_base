@@ -8,7 +8,7 @@
 	{ETH_ATTR_ENABLE,1518,PORT_FULL_DUPLEX_E,PORT_SPEED_1000_E,	\
 	ETH_ATTR_DISABLE,ETH_ATTR_DISABLE,ETH_ATTR_ON,ETH_ATTR_ON,	\
 	ETH_ATTR_ON,ETH_ATTR_OFF,COMBO_PHY_MEDIA_PREFER_COPPER}
-
+#if 0
 /* Mavell 88E6185 register definations */
 typedef union
 {
@@ -23,7 +23,7 @@ typedef union
 		unsigned int reg_addr	: 5;	   /* PHY Register Offset */
     } s;
 } smi_cmd_88e6185_reg_t;
-
+#endif
 
 #define MV_88E6185_SMI_COMMAND_REG           0x00
 #define MV_88E6185_SMI_DATA_REG              0x01

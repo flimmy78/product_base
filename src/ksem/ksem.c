@@ -202,7 +202,7 @@ static void sem_poll_timer(unsigned long arg)
 			}
 			break;
 		case PRODUCT_AX8610:
-			if(board_id == AX81_CRSMU)
+			if(board_id == AX81_CRSMU || board_id == AX81_CRSMUE)
 			{
 			    check_on_power_down_for_ax86xx();
 				check_on_hwState_for_ax86xx();
@@ -210,7 +210,7 @@ static void sem_poll_timer(unsigned long arg)
 			}
 			break;
 		case PRODUCT_AX8606:
-			if(board_id == AX81_CRSMU)
+			if(board_id == AX81_CRSMU || board_id == AX81_CRSMUE)
 			{
 			    check_on_power_down_for_ax86xx();
 				check_on_hwState_for_ax86xx();
@@ -225,7 +225,7 @@ static void sem_poll_timer(unsigned long arg)
 			}
 			break;
 		case PRODUCT_AX8800:
-			if(board_id == AX81_CRSMU)
+			if(board_id == AX81_CRSMU || board_id == AX81_CRSMUE)
 			{
 			    check_on_power_down_for_ax86xx();
 				check_on_hwState_for_ax86xx();

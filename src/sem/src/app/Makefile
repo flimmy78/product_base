@@ -1,4 +1,4 @@
-OBJS = sem_netlink.o tipc/sem_tipc.o product/board/board_common.o product/board/ax71_crsmu.o product/board/ax81_smu.o \
+OBJS = sem_netlink.o tipc/sem_tipc.o product/board/board_common.o product/board/ax71_crsmu.o product/board/ax81_smu.o product/board/ax81_smue.o\
 	   product/board/ax71_2x12g12s.o product/board/ax81_ac12c.o product/board/ax81_ac8c.o product/board/ax81_2x12g12s.o \
 	   product/board/ax81_12x.o product/board/ax81_ac4x.o\
 	   product/board/ax81_1x12g12s.o product/board/ax71_1x12g12s.o product/product_ax7605i.o product/product_ax8610.o product/product_ax8606.o  \

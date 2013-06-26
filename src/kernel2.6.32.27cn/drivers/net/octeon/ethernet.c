@@ -50,6 +50,7 @@
 
 #include <asm/octeon/cvmx-gmxx-defs.h>
 #include <asm/octeon/cvmx-smix-defs.h>
+#include <asm/octeon/cvmx-pcsx-defs.h>
 #include <asm/octeon/cvmx-csr.h>   /* for cvmx_pip_port_cfg_t */
 
 #include "ethernet-defines.h"
@@ -1118,6 +1119,12 @@ static int __init cvm_oct_init_module(void)
 		}
 	}
 
+	if(autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMUE){
+    	cvmx_pcsx_miscx_ctl_reg_t pcsx_miscx_ctl_reg;
+    	pcsx_miscx_ctl_reg.u64 = cvmx_read_csr(0x80011800B0001078);
+    	pcsx_miscx_ctl_reg.s.mac_phy=1;
+    	cvmx_write_csr(0x80011800B0001078, pcsx_miscx_ctl_reg.u64);
+	}
 	cvmx_helper_ipd_and_packet_input_enable();
 	if(se_coexist_flag == SE_COEXIST)
 	{
@@ -1142,7 +1149,7 @@ static int __init cvm_oct_init_module(void)
 	 */
 	cvmx_fau_atomic_write32(FAU_NUM_PACKET_BUFFERS_TO_FREE, 0);
 
-	if (autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMU)
+	if (autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMU||autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMUE)
 	{
 		num_interfaces = 1;
 		for (interface = 0; interface < num_interfaces; interface++) {

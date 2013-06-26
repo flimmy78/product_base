@@ -279,7 +279,7 @@ static int sem_oct_mii_write(int port, int location, uint16_t value)
 	return 0;
 }
 
-int miisw_read(unsigned int devaddr, unsigned int regaddr)
+static int miisw_read(unsigned int devaddr, unsigned int regaddr,unsigned int phyaddr)
 {
 	smi_cmd_88e6185_reg_t smi_cmd;
 	int return_value;
@@ -289,14 +289,14 @@ int miisw_read(unsigned int devaddr, unsigned int regaddr)
 	smi_cmd.s.smi_op = 2;   /* 0 = read */
 	smi_cmd.s.dev_addr = devaddr;
 	smi_cmd.s.reg_addr = regaddr;
-
-	if (sem_oct_mii_write(MV_88E6185_AX52XX_SGMII_ADDR, MV_88E6185_SMI_COMMAND_REG, smi_cmd.u16))
+    sem_syslog_dbg("miisw_read:devaddr = 0x%x,regaddr = 0x%x\n", devaddr,regaddr);
+	if (sem_oct_mii_write(phyaddr, MV_88E6185_SMI_COMMAND_REG, smi_cmd.u16))
  	{
 		return 1;
  	}
 	usleep(1000);
 	
-    if (!(return_value = sem_oct_mii_read(MV_88E6185_AX52XX_SGMII_ADDR, MV_88E6185_SMI_DATA_REG)))
+    if (!(return_value = sem_oct_mii_read(phyaddr, MV_88E6185_SMI_DATA_REG)))
     {
 		return 1;
     }
@@ -307,7 +307,7 @@ int miisw_read(unsigned int devaddr, unsigned int regaddr)
 }
 
 
-int miisw_write(unsigned int devaddr, unsigned int regaddr, unsigned short value)
+static int miisw_write(unsigned int devaddr, unsigned int regaddr, unsigned short value,unsigned int phyaddr)
 {
 	smi_cmd_88e6185_reg_t smi_cmd;
 	
@@ -317,14 +317,15 @@ int miisw_write(unsigned int devaddr, unsigned int regaddr, unsigned short value
 	smi_cmd.s.smi_op = 1;   /* 1 = write */
 	smi_cmd.s.dev_addr = devaddr;
 	smi_cmd.s.reg_addr = regaddr;
+	sem_syslog_dbg("miisw_write:devaddr = 0x%x,regaddr = 0x%x,value = 0x%x\n", devaddr,regaddr,value);
 	
-    if (sem_oct_mii_write(MV_88E6185_AX52XX_SGMII_ADDR, MV_88E6185_SMI_DATA_REG, value))
+    if (sem_oct_mii_write(phyaddr, MV_88E6185_SMI_DATA_REG, value))
     {
 		return 1;
     }
 	usleep(1000);
 	
- 	if (sem_oct_mii_write(MV_88E6185_AX52XX_SGMII_ADDR, MV_88E6185_SMI_COMMAND_REG, smi_cmd.u16))
+ 	if (sem_oct_mii_write(phyaddr, MV_88E6185_SMI_COMMAND_REG, smi_cmd.u16))
  	{
 		return 1;
  	}
@@ -343,11 +344,12 @@ int ax81_smu_init(void)
 	int port = 0;
 	unsigned short data = 0;
 	int value;
-
+	unsigned int phyaddr1 = 0x14;
+    sem_syslog_warning("###############vlan map###########\n");
 	data = 0x200;
 	for (port = 0x10; port < 0x19; port++)
 	{
-		miisw_write(port, MV_88E6185_PORT_BASED_VLAN_MAP, data);
+		miisw_write(port, MV_88E6185_PORT_BASED_VLAN_MAP, data,phyaddr1);
 	}
 #if 0
     data = 0x2FE;
@@ -370,15 +372,22 @@ int ax81_smu_init(void)
 	miisw_write(0x18, MV_88E6185_PORT_BASED_VLAN_MAP, data);
 #endif
 	data = 0x1ff;
-	miisw_write(0x19, MV_88E6185_PORT_BASED_VLAN_MAP, data);
+	miisw_write(0x19, MV_88E6185_PORT_BASED_VLAN_MAP, data,phyaddr1);
+	value = miisw_read(0x19, MV_88E6185_PORT_BASED_VLAN_MAP,phyaddr1);
+	sem_syslog_warning("value = %x\n", value);
+	sem_syslog_warning("###############vlan map end###########\n");
 
+	
+	sem_syslog_warning("###############change mtu###########\n");
 	//change 88e6185 mtu
-	value = miisw_read(0x1b, 0x4);
-	sem_syslog_dbg("value = %x\n", value);
-	miisw_write(0x1b, 0x4, value | (1 << 10));
-	value = miisw_read(0x1b, 0x4);
-	sem_syslog_dbg("value = %x\n", value);
-
+	value = miisw_read(0x1b, 0x4,phyaddr1);
+	sem_syslog_warning("value = %x\n", value,phyaddr1);
+	miisw_write(0x1b, 0x4, value | (1 << 10),phyaddr1);
+	value = miisw_read(0x1b, 0x4,phyaddr1);
+	sem_syslog_warning("value = %x\n", value);
+	value = miisw_read(0x19, MV_88E6185_PORT_BASED_VLAN_MAP,phyaddr1);
+	sem_syslog_warning("value = %x\n", value);
+    sem_syslog_warning("##############change mtu end##########\n");
 	return 0;
 }
 

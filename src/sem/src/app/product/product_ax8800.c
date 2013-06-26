@@ -28,6 +28,7 @@ extern board_fix_param_t ax81_ac8c;
 extern board_fix_param_t ax81_1x12g12s;
 extern board_fix_param_t ax81_12x;
 extern board_fix_param_t ax81_ac4x;
+extern board_fix_param_t ax81_smue;
 
 extern board_info_syn_t board_info_to_syn;
 extern product_info_syn_t product_info_syn;
@@ -74,6 +75,7 @@ board_fix_param_t *ax8800_support_board_arr[] =
 	[BOARD_TYPE_AX81_1X12G12S] = &ax81_1x12g12s,
 	[BOARD_TYPE_AX81_12X] = &ax81_12x,
 	[BOARD_TYPE_AX81_AC4X] = &ax81_ac4x,
+	[BOARD_TYPE_AX81_SMUE] = &ax81_smue,
 	[BOARD_TYPE_AX81_MAX] = NULL
 };
 
@@ -110,18 +112,31 @@ static int get_slot_id(bool is_master, int *slot_id)
 int ax8800_get_board_on_mask(unsigned int *mask, int slot_id, int default_slot_id)
 {
 	int ret;
-	int reg_data;
+	int reg_data=0;
+    unsigned int mask1 =0;
+    unsigned int mask1_6 =0;
+    unsigned int mask9_10 =0;
+    unsigned int mask11_14 =0;
+
 
 	ret = sem_read_cpld(CPLD_INTERRUPT_SOURCE_STATE_REG1, &reg_data);
 	if (ret)
 	{
 		return ret;
 	}
+    mask1 = (reg_data ^0xff);
+    mask9_10 = (mask1 & 0xc0) >>6;
+    mask1_6 = (mask1&0x3f);
 
-	//sem_syslog_dbg("reg_data = 0x%x\n", reg_data);
-	//reg_data |= ((reg_data & 0xf0) << 2);
-	reg_data = ((reg_data & 0xc0) << 2 | (reg_data & 0x3f));
-	*mask = reg_data ^ 0x3FF;
+    reg_data=0;
+	ret = sem_read_cpld(CPLD_INTERRUPT_SOURCE_STATE_REG4, &reg_data);
+	if (ret)
+	{
+		return ret;
+	}
+    mask11_14 = reg_data ^ 0xf;
+	*mask=mask1_6 |mask9_10 << 8|mask11_14 <<10;
+	sem_syslog_dbg("boad mask = 0x%x\n", *mask);
 	
 	ret = sem_read_cpld(CPLD_REMOTE_ON_STATE_REG, &reg_data);
 	if (ret)
@@ -149,7 +164,7 @@ int ax8800_get_board_on_mask(unsigned int *mask, int slot_id, int default_slot_i
 		*mask |= (1 << DISTRIBUTE_AX8800_SECOND_MASTER_SLOT);
 		*mask |= (1 << DISTRIBUTE_AX8800_FIRST_MASTER_SLOT);
 	}
-	sem_syslog_dbg("mask = 0x%x\n", *mask);
+	sem_syslog_dbg("board mask = 0x%x\n", *mask);
 
 	return 0;
 }
@@ -332,7 +347,7 @@ int ax8800_tipc_init(board_fix_param_t *board)
 	sprintf(sbuff, "tipc-config -be=eth:%s", "obc0");
 	system(sbuff);
 
-	if (board->board_type != BOARD_TYPE_AX81_SMU)
+	if (board->board_type != BOARD_TYPE_AX81_SMU && board->board_type != BOARD_TYPE_AX81_SMUE)
 	{
 		#if 1
 		memset(sbuff, 0, 64);

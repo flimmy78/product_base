@@ -1269,6 +1269,10 @@ void octeon_autelan_product_init(void)
 		{
 			autelan_product_info.board_type = AUTELAN_BOARD_AX81_AC_4X;
 		}
+		else if (board_type_num == 0x7)
+		{
+			autelan_product_info.board_type = AUTELAN_BOARD_AX81_SMUE;
+		}
 		else
 		{
 			autelan_product_info.board_type = AUTELAN_UNKNOWN_BOARD;
@@ -1306,6 +1310,10 @@ void octeon_autelan_product_init(void)
 		else if (board_type_num == 0x6)
 		{
 			autelan_product_info.board_type = AUTELAN_BOARD_AX81_AC_4X;
+		}
+		else if (board_type_num == 0x7)
+		{
+			autelan_product_info.board_type = AUTELAN_BOARD_AX81_SMUE;
 		}
 		else
 		{
@@ -1381,6 +1389,10 @@ void octeon_autelan_product_init(void)
 		else if (board_type_num == 0x6)
 		{
 			autelan_product_info.board_type = AUTELAN_BOARD_AX81_AC_4X;
+		}
+		else if (board_type_num == 0x7)
+		{
+			autelan_product_info.board_type = AUTELAN_BOARD_AX81_SMUE;
 		}
 		else
 		{

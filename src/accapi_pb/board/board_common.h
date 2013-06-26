@@ -335,6 +335,7 @@ typedef struct
 #define CPLD_REMOTE_MASTER_STATE_REG		0x37
 #define CPLD_LOCAL_MASTER_STATE_REG			0x38
 #define CPLD_FAN_RPM                        0x3a
+#define CPLD_INTERRUPT_SOURCE_STATE_REG4    0x43
 
 #define CPLD_TEMPERATURE_ALARM				0x3f
 

@@ -137,6 +137,11 @@ int get_board_index(int product_serial, int product_type, int board_type, int *i
 				*index = BOARD_TYPE_AX81_AC4X;
 				return 0;
 			}
+			else if (board_type == 0x7)
+			{
+				*index = BOARD_TYPE_AX81_SMUE;
+				return 0;
+			}
 			else
 			{
 				*index = -1;
@@ -203,6 +208,11 @@ int get_board_index(int product_serial, int product_type, int board_type, int *i
 				*index = BOARD_TYPE_AX81_AC4X;
 				return 0;
 			}
+			else if (board_type == 0x7)
+			{
+				*index = BOARD_TYPE_AX81_SMUE;
+				return 0;
+			}
 			else
 			{
 				*index = -1;
@@ -243,6 +253,11 @@ int get_board_index(int product_serial, int product_type, int board_type, int *i
 			else if (board_type == 0x3)
 			{
 				*index = BOARD_TYPE_AX81_12X;
+				return 0;
+			}
+			else if (board_type == 0x7)
+			{
+				*index = BOARD_TYPE_AX81_SMUE;
 				return 0;
 			}
 			else

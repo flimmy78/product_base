@@ -265,7 +265,7 @@ static int CVM_OCT_NAPI_POLL(struct napi_struct *napi, int budget)
 		prefetch(cvm_oct_by_pkind[port]);
 
 		if (port == 0 && (autelan_product_info.board_type==AUTELAN_BOARD_AX81_SMU ||
-			autelan_product_info.board_type==AUTELAN_BOARD_AX71_CRSMU))
+			autelan_product_info.board_type==AUTELAN_BOARD_AX71_CRSMU || autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMUE))
 		{
 			/*do nothing for obc0 recieve packets from other boards*/
 		}

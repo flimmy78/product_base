@@ -419,7 +419,7 @@ int cvmx_helper_board_get_mii_address(int ipd_port)
                 ports MII0 = 0, MII1 = 1, SGMII = 2-5 */
             if ((ipd_port >= 0) && (ipd_port < 4))
             {
-				if(autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMU && ipd_port == 2)
+				if((autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMU ||autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMUE)&& ipd_port == 2)
 					return 0;
 	            else
 					return ipd_port;

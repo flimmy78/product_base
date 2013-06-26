@@ -164,6 +164,7 @@ static int __cvmx_helper_sgmii_hardware_init_one_time(int interface, int index)
 	/* caojia@autelan.com , 12/19/2011*/
 	/* Force the the port at interface to be 1000M and full duplex mode and disable AN function */
 	if((autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMU && index == 0) || \
+	   (autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMUE && index == 0) || \
 		(autelan_product_info.board_type == AUTELAN_BOARD_AX81_2X12G12S && (index == 0 || index == 1)) || \
 		(autelan_product_info.board_type == AUTELAN_BOARD_AX71_2X12G12S && (index == 0 || index == 1)) || \
 		(autelan_product_info.board_type == AUTELAN_BOARD_AX81_AC_12X && (index == 0 || index == 1)) || \
@@ -249,6 +250,7 @@ static int __cvmx_helper_sgmii_hardware_init_link(int interface, int index)
 
 	/* Disable AN, set full duplex and 1000Mb/s link speed for port to ensure connection normal*/
 	if((autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMU && index == 0) || \
+		(autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMUE && index == 0) || \
 		(autelan_product_info.board_type == AUTELAN_BOARD_AX81_2X12G12S && (index == 0 || index == 1)) || \
 		(autelan_product_info.board_type == AUTELAN_BOARD_AX71_2X12G12S && (index == 0 || index == 1)) || \
 		(autelan_product_info.board_type == AUTELAN_BOARD_AX81_AC_12X && (index == 0 || index == 1)) || \
@@ -497,6 +499,7 @@ int __cvmx_helper_sgmii_enable(int interface)
     int index;
 
 	if((autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMU) || \
+	   (autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMUE) || \
 		(autelan_product_info.board_type == AUTELAN_BOARD_AX81_2X12G12S) || \
 		(autelan_product_info.board_type == AUTELAN_BOARD_AX71_2X12G12S) || \
 		(autelan_product_info.board_type == AUTELAN_BOARD_AX81_AC_12X))
