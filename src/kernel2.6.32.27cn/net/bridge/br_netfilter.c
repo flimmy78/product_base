@@ -520,9 +520,18 @@ br_nf_pre_routing_pppoe(unsigned int hook, struct sk_buff *skb,
 
 	indev = skb->dev;
 	skb->dev = brdev;
-	
+
+	/*
+	  * Bugfix AXSSZFI-1551, replace with netif_rx() for spinlock lockup on CPU.
+	  * lixiang@autelan.com 20130625
+	  */
+#if 0	
 	NF_HOOK(PF_BRIDGE, NF_BR_LOCAL_IN, skb, indev, NULL,
 			netif_receive_skb);
+#else
+	NF_HOOK(PF_BRIDGE, NF_BR_LOCAL_IN, skb, indev, NULL,
+			netif_rx);
+#endif
 	return NF_STOLEN;	
 }
 
