@@ -4027,6 +4027,7 @@ scheme_execute:
 		true_th = NULL;
 		in_ip = NULL;
 		in_th = NULL;
+		input_rpa = 0;
 	}
 }
 
