@@ -277,7 +277,7 @@ void se_agent_show_rule_sum(char *buf,struct sockaddr_tipc *client_addr,unsigned
 	}
 	se_buf=(se_interative_t *)buf;
 	
-	if(se_buf->cpu_tag == 1)
+	if(CPU_TAG_SLAVE == se_buf->cpu_tag)
     {
         se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
 	    se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
@@ -431,10 +431,10 @@ void se_agent_clear_rule_all(char *buf,struct sockaddr_tipc *client_addr,unsigne
 
     switch(se_buf->cpu_tag)
     {
-        case 0:
+        case CPU_TAG_MASTER:
             se_agent_fccp_process(buf, len, 1);
             break;
-        case 1:
+        case CPU_TAG_SLAVE:
             se_agent_fccp_process_pcie(buf, len, 1);
             break;
         default:

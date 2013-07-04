@@ -85,6 +85,9 @@ enum
 /*fast-fwd module aging time*/
 CVMX_SHARED  unsigned int aging_time = DEFAULT_AGENT_TIME;
 CVMX_SHARED cvmx_pow_tag_type_t tag_type = -1;
+CVMX_SHARED  unsigned int slave_aging_time = DEFAULT_AGENT_TIME;
+CVMX_SHARED cvmx_pow_tag_type_t slave_tag_type = -1;
+
 
 /*invalid socket fd*/
 #define INVALID_FD   (-1)
@@ -689,10 +692,10 @@ int se_agent_config_aging_time(char *buf,struct sockaddr_tipc *client_addr,unsig
 	
     switch(se_buf->cpu_tag)
     {
-        case 0:
+        case CPU_TAG_MASTER:
             ret = se_agent_fccp_process(buf, len, 1);
             break;
-        case 1:
+        case CPU_TAG_SLAVE:
             ret = se_agent_fccp_process_pcie(buf, len, 1);
             break;
         default:
@@ -700,9 +703,16 @@ int se_agent_config_aging_time(char *buf,struct sockaddr_tipc *client_addr,unsig
 		    return SE_AGENT_RETURN_FAIL;
     }
     
-	if(ret == SE_AGENT_RETURN_OK)
+	if(SE_AGENT_RETURN_OK == ret)
 	{
-		aging_time=tmp_time;
+		if (CPU_TAG_SLAVE == se_buf->cpu_tag)
+		{
+			slave_aging_time = tmp_time;
+		}
+		else if (CPU_TAG_MASTER == se_buf->cpu_tag)
+		{
+			aging_time = tmp_time;
+		}
 	}
 
 	if(sendto(se_socket,buf, sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len) < 0)
@@ -750,10 +760,10 @@ int se_agent_show_aging_time(char *buf,struct sockaddr_tipc *client_addr,unsigne
 
     switch(se_buf->cpu_tag)
     {
-        case 0:
+        case CPU_TAG_MASTER:
             se_agent_fccp_process(buf, len, 1);
             break;
-        case 1:
+        case CPU_TAG_SLAVE:
             se_agent_fccp_process_pcie(buf, len, 1);
             break;
         default:
@@ -849,44 +859,57 @@ void se_agent_config_tag_type(char *buf,struct sockaddr_tipc *client_addr,unsign
 		return ;
 	}
 	se_buf=(se_interative_t *)buf;
+	tmp_type=se_buf->fccp_cmd.fccp_data.tag_type;	
 
-	if(se_buf->cpu_tag == 1)
+	if (se_buf->cpu_tag == CPU_TAG_SLAVE)
     {
         se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
 	    se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
 	    se_buf->fccp_cmd.cmd_opcode = FCCP_CMD_CONFIG_TAG_TYPE;
-
+		
+		
         se_agent_fccp_process_pcie(buf, len, 1);
         if(se_buf->fccp_cmd.ret_val == FCCP_RETURN_ERROR)
     	{
-    	    strncpy(se_buf->err_info,READ_RULE_ERROR,sizeof(READ_RULE_ERROR));
 		    se_buf->cmd_result = AGENT_RETURN_FAIL;
+
+			goto SENDTO_DCLI;
     	}
-        goto SENDTO_DCLI;
+		
+        slave_tag_type = tmp_type;
     }
-    
-	if(FASTFWD_NOT_LOADED == (fast_forward_module_load_check()))
+	else if (se_buf->cpu_tag == CPU_TAG_MASTER)
 	{
-		strncpy((se_buf->err_info),FASTFWD_NOT_LOADED_STR,strlen(FASTFWD_NOT_LOADED_STR));
+		if(FASTFWD_NOT_LOADED == (fast_forward_module_load_check()))
+		{
+			strncpy((se_buf->err_info),FASTFWD_NOT_LOADED_STR,strlen(FASTFWD_NOT_LOADED_STR));
+			se_buf->cmd_result = AGENT_RETURN_FAIL;
+			goto SENDTO_DCLI;
+		}
+		for (port_index = 0; port_index < CVMX_PIP_NUM_INPUT_PORTS; port_index++)
+		{
+			if(AVAILABLE_PORT != check_pip_offset(port_index))
+			{
+				continue;
+			}
+			tag_config.u64 = cvmx_read_csr(CVMX_PIP_PRT_TAGX(port_index));
+			tag_config.s.tcp6_tag_type = tmp_type; 
+			tag_config.s.tcp4_tag_type = tmp_type;
+			tag_config.s.ip6_tag_type = tmp_type;
+			tag_config.s.ip4_tag_type = tmp_type;
+			tag_config.s.non_tag_type = tmp_type;
+			cvmx_write_csr(CVMX_PIP_PRT_TAGX(port_index), tag_config.u64);
+		}
+
+		tag_type = tmp_type;
+	}
+	else
+	{
+		se_agent_syslog_err("se_agent_config_tag_type cpu_tag error\n");
 		se_buf->cmd_result = AGENT_RETURN_FAIL;
 		goto SENDTO_DCLI;
 	}
-	tmp_type=se_buf->fccp_cmd.fccp_data.tag_type;	
-	for (port_index = 0; port_index < CVMX_PIP_NUM_INPUT_PORTS; port_index++)
-	{
-		if(AVAILABLE_PORT != check_pip_offset(port_index))
-		{
-			continue;
-		}
-		tag_config.u64 = cvmx_read_csr(CVMX_PIP_PRT_TAGX(port_index));
-		tag_config.s.tcp6_tag_type = tmp_type; 
-		tag_config.s.tcp4_tag_type = tmp_type;
-		tag_config.s.ip6_tag_type = tmp_type;
-		tag_config.s.ip4_tag_type = tmp_type;
-		tag_config.s.non_tag_type = tmp_type;
-		cvmx_write_csr(CVMX_PIP_PRT_TAGX(port_index), tag_config.u64);
-	}
-	tag_type = tmp_type;
+	
 	se_buf->cmd_result=AGENT_RETURN_OK;
 	
 SENDTO_DCLI:
@@ -931,7 +954,7 @@ void se_agent_show_tag_type(char *buf,struct sockaddr_tipc *client_addr,unsigned
 	}
 	se_buf=(se_interative_t *)buf;
 
-	if(se_buf->cpu_tag == 1)
+	if (CPU_TAG_SLAVE == se_buf->cpu_tag)
     {
         se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
 	    se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
@@ -940,26 +963,31 @@ void se_agent_show_tag_type(char *buf,struct sockaddr_tipc *client_addr,unsigned
         se_agent_fccp_process_pcie(buf, len, 1);
         if(se_buf->fccp_cmd.ret_val == FCCP_RETURN_ERROR)
     	{
-    	    strncpy(se_buf->err_info,READ_RULE_ERROR,sizeof(READ_RULE_ERROR));
 		    se_buf->cmd_result = AGENT_RETURN_FAIL;
     	}
-        goto SENDTO_DCLI;
     }
-    
-	while(AVAILABLE_PORT != check_pip_offset(port_index))
+	else if (CPU_TAG_MASTER== se_buf->cpu_tag)
 	{
-		port_index++;
-		if(port_index > CVMX_PIP_NUM_INPUT_PORTS)
+		while(AVAILABLE_PORT != check_pip_offset(port_index))
 		{
-			se_buf->cmd_result = AGENT_RETURN_FAIL;
-			strcpy(se_buf->err_info,"read tag type failed\n");
-			goto SENDTO_DCLI;
-		}	
+			port_index++;
+			if(port_index > CVMX_PIP_NUM_INPUT_PORTS)
+			{
+				se_buf->cmd_result = AGENT_RETURN_FAIL;
+				strcpy(se_buf->err_info,"read tag type failed\n");
+				goto SENDTO_DCLI;
+			}	
+		}
+		tag_config.u64 = cvmx_read_csr(CVMX_PIP_PRT_TAGX(port_index));
+		tag_type = tag_config.s.ip4_tag_type;
+		se_buf->fccp_cmd.fccp_data.tag_type=tag_type;
+		se_buf->cmd_result = AGENT_RETURN_OK;
 	}
-	tag_config.u64 = cvmx_read_csr(CVMX_PIP_PRT_TAGX(port_index));
-	tag_type = tag_config.s.ip4_tag_type;
-	se_buf->fccp_cmd.fccp_data.tag_type=tag_type;
-	se_buf->cmd_result = AGENT_RETURN_OK;
+	else 
+	{
+		se_agent_syslog_err("se_agent_show_tag_type cpu_tag error\n");
+		se_buf->cmd_result = AGENT_RETURN_FAIL;
+	}
 	
 SENDTO_DCLI:
 	ret=sendto(se_socket,buf, sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
@@ -981,6 +1009,7 @@ SENDTO_DCLI:
  *	INPUT:
  *		buf			 ->       pointer of store data buffer
  *		len 			 ->       the size of buffer
+ *          cpu_tag         ->        is slave cpu ?
  *	
  *	OUTPUT:
  *		NULL
@@ -989,7 +1018,7 @@ SENDTO_DCLI:
  *		
  *		NULL		
  **********************************************************************************/
-void se_agent_save_cfg(unsigned char *buf,unsigned int bufLen)
+void se_agent_save_cfg(unsigned char *buf,int cpu_tag, unsigned int bufLen)
 {
 	unsigned int ret = -1 ;
 	unsigned int length = 0;
@@ -1017,81 +1046,136 @@ void se_agent_save_cfg(unsigned char *buf,unsigned int bufLen)
 	
 	showStr = (char *)buf;
 	current = showStr;
-	if ((length + 30) < bufLen) 
-	{
-		length += sprintf(current, "config fast-forward\n");
-		current = showStr + length;
-	}
-	
-	sprintf(file_path,"/sys/module/%s/parameters/icmp_enable",ipfwd_learn_name);
-	file_icmp = fopen(file_path,"r");
-	if(file_icmp !=NULL)
-	{
-		ret=fread(stricmp,sizeof(int),sizeof(stricmp),file_icmp);
-		fclose(file_icmp);
-		icmp_enable=atoi((char*)stricmp);
-	}
-	if((length +30)<bufLen)
-	{
-		if(icmp_enable==1)
-		{
-			length +=sprintf(current," config fast-icmp enable\n");
-			current =showStr + length;
-		}
-	}
 
-	memset(file_path, 0, sizeof(file_path));
-	sprintf(file_path,"/sys/module/%s/parameters/learn_enable",ipfwd_learn_name);
-	file_fastfwd=fopen(file_path,"r");
-	if(file_fastfwd !=NULL)
+	if ((CPU_TAG_MASTER == cpu_tag) || (CPU_TAG_ALL == cpu_tag))
 	{
-		ret=fread(strfastfwd,sizeof(int),sizeof(strfastfwd),file_fastfwd);
-		fclose(file_fastfwd);
-		fastfwd_enable=atoi((char*)strfastfwd);
-	}
-	#if 0
-	if((length +30)<bufLen)
-	{
-		if(fastfwd_enable==0)
-		{
-			length +=sprintf(current,"config fastfwd disable\n");
-			current =showStr + length;
-		}
-	}
-	#endif
-	if((aging_time > 0) && (aging_time != DEFAULT_AGENT_TIME))
-	{
+	
 		if ((length + 30) < bufLen) 
 		{
-			length += sprintf(current, " config aging-time %d\n",aging_time);
+			length += sprintf(current, "config fast-forward\n");
+			current = showStr + length;
+		}
+
+		sprintf(file_path,"/sys/module/%s/parameters/icmp_enable",ipfwd_learn_name);
+		file_icmp = fopen(file_path,"r");
+		if(file_icmp !=NULL)
+		{
+			ret=fread(stricmp,sizeof(int),sizeof(stricmp),file_icmp);
+			fclose(file_icmp);
+			icmp_enable=atoi((char*)stricmp);
+		}
+		if((length +30)<bufLen)
+		{
+			if(icmp_enable==1)
+			{
+				length +=sprintf(current," config fast-icmp enable\n");
+				current =showStr + length;
+			}
+		}
+
+		memset(file_path, 0, sizeof(file_path));
+		sprintf(file_path,"/sys/module/%s/parameters/learn_enable",ipfwd_learn_name);
+		file_fastfwd=fopen(file_path,"r");
+		if(file_fastfwd !=NULL)
+		{
+			ret=fread(strfastfwd,sizeof(int),sizeof(strfastfwd),file_fastfwd);
+			fclose(file_fastfwd);
+			fastfwd_enable=atoi((char*)strfastfwd);
+		}
+#if 0
+		if((length +30)<bufLen)
+		{
+			if(fastfwd_enable==0)
+			{
+				length +=sprintf(current,"config fastfwd disable\n");
+				current =showStr + length;
+			}
+		}
+#endif
+		if((aging_time > 0) && (aging_time != DEFAULT_AGENT_TIME))
+		{
+			if ((length + 30) < bufLen) 
+			{
+				length += sprintf(current, " config aging-time %d\n",aging_time);
+
+
+
+				current = showStr + length;
+			}
+		}
+
+		if((length +30 ) <bufLen)
+		{
+			switch (tag_type)
+			{
+				case CVMX_POW_TAG_TYPE_ORDERED :
+					length += sprintf(current, " config fast-forward tag type %s\n","ordered");
+					current = showStr + length;
+					break;
+				case CVMX_POW_TAG_TYPE_ATOMIC :
+					length += sprintf(current, " config fast-forward tag type %s\n","atomic");
+					current = showStr + length;
+					break;
+				case CVMX_POW_TAG_TYPE_NULL :
+					length += sprintf(current, " config fast-forward tag type %s\n","null");
+					current = showStr + length;
+					break;
+				default:
+					break;
+			}
+		}
+		if ((length + 30) < bufLen) 
+		{
+			length += sprintf(current, " exit\n");
 			current = showStr + length;
 		}
 	}
-	if((length +30 ) <bufLen)
+	
+	if ((CPU_TAG_SLAVE == cpu_tag) || (CPU_TAG_ALL == cpu_tag))   /*slave cpu fastfwd config*/
 	{
-		switch (tag_type)
+		if ((length + 30) < bufLen) 
 		{
-			case CVMX_POW_TAG_TYPE_ORDERED :
-				length += sprintf(current, " config fast-forward tag type %s\n","ordered");
+			length += sprintf(current, "config slave_fast-forward\n");
+			current = showStr + length;
+		}
+
+		if((slave_aging_time > 0) && (slave_aging_time != DEFAULT_AGENT_TIME))
+		{
+			if ((length + 30) < bufLen) 
+			{
+				length += sprintf(current, " config aging-time %d\n",slave_aging_time);
 				current = showStr + length;
-				break;
-			case CVMX_POW_TAG_TYPE_ATOMIC :
-				length += sprintf(current, " config fast-forward tag type %s\n","atomic");
-				current = showStr + length;
-				break;
-			case CVMX_POW_TAG_TYPE_NULL :
-				length += sprintf(current, " config fast-forward tag type %s\n","null");
-				current = showStr + length;
-				break;
-			default:
-				break;
+			}
+		}
+			
+		if((length +30 ) <bufLen)
+		{
+			switch (slave_tag_type)
+			{
+				case CVMX_POW_TAG_TYPE_ORDERED :
+					length += sprintf(current, " config fast-forward tag type %s\n","ordered");
+					current = showStr + length;
+					break;
+				case CVMX_POW_TAG_TYPE_ATOMIC :
+					length += sprintf(current, " config fast-forward tag type %s\n","atomic");
+					current = showStr + length;
+					break;
+				case CVMX_POW_TAG_TYPE_NULL :
+					length += sprintf(current, " config fast-forward tag type %s\n","null");
+					current = showStr + length;
+					break;
+				default:
+					break;
+			}
+		}
+
+		if ((length + 30) < bufLen) 
+		{
+			length += sprintf(current, " exit\n");
+			current = showStr + length;
 		}
 	}
-	if ((length + 30) < bufLen) 
-	{
-		length += sprintf(current, " exit\n");
-		current = showStr + length;
-	}
+	
 } 
 
 
@@ -1117,7 +1201,9 @@ void se_agent_show_running_config(char *buf,struct sockaddr_tipc *client_addr,un
 	unsigned char *showStr = NULL;
 	unsigned char en_dis = 0;
 	int ret=-1;
+	se_interative_t *se_buf = NULL;
 
+	se_buf=(se_interative_t *)buf;
 	showStr = (unsigned char*)malloc(SE_AGENT_RUNNING_CFG_MEM);
 	if (NULL == showStr) 
 	{
@@ -1126,7 +1212,7 @@ void se_agent_show_running_config(char *buf,struct sockaddr_tipc *client_addr,un
 	}
 	memset(showStr, 0, SE_AGENT_RUNNING_CFG_MEM);
 
-	se_agent_save_cfg(showStr, SE_AGENT_RUNNING_CFG_MEM);
+	se_agent_save_cfg(showStr, se_buf->cpu_tag, SE_AGENT_RUNNING_CFG_MEM);
 
 	ret=sendto(se_socket,showStr, SE_AGENT_RUNNING_CFG_MEM,0,(struct sockaddr*)client_addr,len);
 	if(ret<0)
@@ -1167,26 +1253,27 @@ void se_agent_show_fpa_buff_count(char *buf,struct sockaddr_tipc *client_addr,un
 	}  
 
 	se_buf=(se_interative_t *)buf;
-	if(se_buf->cpu_tag == 1)
+	if(CPU_TAG_SLAVE == se_buf->cpu_tag)
 	{
     	se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
     	se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
     	se_buf->fccp_cmd.cmd_opcode = FCCP_CMD_SHOW_FPA_BUFF;
     	se_agent_fccp_process_pcie(buf, len, 1);
-    	if(se_buf->fccp_cmd.ret_val == FCCP_RETURN_ERROR)
-    	{
-    	    strncpy(se_buf->err_info,READ_RULE_ERROR,sizeof(READ_RULE_ERROR));
-		    se_buf->cmd_result = AGENT_RETURN_FAIL;
-    	}
-    	goto SEND_TODCLI;
     }
-	
-	for(i=0;i<8;i++)
+	else if (CPU_TAG_MASTER == se_buf->cpu_tag)
 	{
-		se_buf->fccp_cmd.fccp_data.pool_buff_count[i] = cvmx_read_csr(CVMX_FPA_QUEX_AVAILABLE(i));
-	}
+		for(i=0;i<8;i++)
+		{
+			se_buf->fccp_cmd.fccp_data.pool_buff_count[i] = cvmx_read_csr(CVMX_FPA_QUEX_AVAILABLE(i));
+		}
 
-    se_buf->cmd_result = AGENT_RETURN_OK;
+	    se_buf->cmd_result = AGENT_RETURN_OK;
+	}
+	else 
+	{
+		se_buf->cmd_result = AGENT_RETURN_FAIL;
+		se_agent_syslog_err("se_agent_show_aging_time cpu_tag error\n");
+	}
 SEND_TODCLI:
 	ret = sendto(se_socket,buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
 	if(ret<0)
@@ -1308,70 +1395,80 @@ void se_agent_show_fau_dump_64(char *buf,struct sockaddr_tipc *client_addr,unsig
 
 	se_buf=(se_interative_t *)buf;
 	
-    if(se_buf->cpu_tag == 1)
+    if (CPU_TAG_SLAVE == se_buf->cpu_tag)
     {
         se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
     	se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
     	se_buf->fccp_cmd.cmd_opcode = FCCP_CMD_SHOW_FAU64;
         se_agent_fccp_process_pcie(buf, len, 1);
-        goto SEND_DCLI;
+		if(se_buf->fccp_cmd.ret_val == FCCP_RETURN_ERROR)
+    	{
+		    se_buf->cmd_result = AGENT_RETURN_FAIL;
+    	}
     }
-   
-	//fau64_info.fau_reg_oq_addr_index= cvmx_fau_fetch_and_add64(CVMX_FAU_REG_OQ_ADDR_INDEX, 0);
-	fau64_info.fau_pko_errors=cvmx_fau_fetch_and_add64(CVM_FAU_PKO_ERRORS, 0);
-	fau64_info.fau_enet_input_bytes=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_BYTES, 0);
-	fau64_info.fau_enet_input_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_PACKETS, 0);
-	fau64_info.fau_enet_output_bytes=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_BYTES, 0);
-	fau64_info.fau_enet_output_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS, 0);
-	fau64_info.fau_enet_drop_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_DROP_PACKETS, 0);
-	fau64_info.fau_enet_to_linux_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_TO_LINUX_PACKETS, 0);
-	fau64_info.fau_enet_nonip_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_NONIP_PACKETS, 0);
-	fau64_info.fau_enet_eth_pppoe_nonip_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_ETH_PPPOE_NONIP_PACKETS, 0);   			/* add by wangjian 2013-3-18*/
-	fau64_info.fau_enet_capwap_pppoe_nonip_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_CAPWAP_PPPOE_NONIP_PACKETS, 0); 	/* add by wangjian 2013-3-18*/
-	fau64_info.fau_enet_error_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_ERROR_PACKETS, 0);
-	fau64_info.fau_enet_fragip_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_FRAGIP_PACKETS, 0);
-	fau64_info.fau_ip_short_packets=cvmx_fau_fetch_and_add64(CVM_FAU_IP_SHORT_PACKETS, 0);
-	fau64_info.fau_ip_bad_hdr_len=cvmx_fau_fetch_and_add64(CVM_FAU_IP_BAD_HDR_LEN, 0);
-	fau64_info.fau_ip_bad_len=cvmx_fau_fetch_and_add64(CVM_FAU_IP_BAD_LEN, 0);
-	fau64_info.fau_ip_bad_version=cvmx_fau_fetch_and_add64(CVM_FAU_IP_BAD_VERSION, 0);
-	fau64_info.fau_ip_skip_addr=cvmx_fau_fetch_and_add64(CVM_FAU_IP_SKIP_ADDR, 0);
-	fau64_info.fau_ip_icmp=cvmx_fau_fetch_and_add64(CVM_FAU_IP_ICMP, 0);
-	fau64_info.fau_capwap_icmp=cvmx_fau_fetch_and_add64(CVM_FAU_CAPWAP_ICMP, 0);
-	fau64_info.fau_ip_proto_error=cvmx_fau_fetch_and_add64(CVM_FAU_IP_PROTO_ERROR, 0);
-	fau64_info.fau_udp_bad_dropt=cvmx_fau_fetch_and_add64(CVM_FAU_UDP_BAD_DPORT, 0);
-	fau64_info.fau_udp_bad_len=cvmx_fau_fetch_and_add64(CVM_FAU_UDP_BAD_LEN, 0);
-	fau64_info.fau_udp_to_linux=cvmx_fau_fetch_and_add64(CVM_FAU_UDP_TO_LINUX, 0);
-	fau64_info.fau_flowtable_hit_packets=cvmx_fau_fetch_and_add64(CVM_FAU_FLOWTABLE_HIT_PACKETS, 0);
-	fau64_info.fau_enet_output_packets_8021q=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_8021Q, 0);
-	fau64_info.fau_enet_output_packets_qinq=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_QINQ, 0);
-	fau64_info.fau_enet_output_packets_eth_pppoe=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH_PPPOE, 0); 			/* add by wangjian 2013-3-18*/
-	fau64_info.fau_enet_output_packets_capwap_pppoe=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP_PPPOE, 0); 	/* add by wangjian 2013-3-18*/
-	fau64_info.fau_flow_lookup_error=cvmx_fau_fetch_and_add64(CVM_FAU_FLOW_LOOKUP_ERROR, 0);
-	fau64_info.fau_recv_fccp=cvmx_fau_fetch_and_add64(CVM_FAU_RECV_FCCP_PACKETS,0);
-	fau64_info.fau_recv_works=cvmx_fau_fetch_and_add64(CVM_FAU_RECV_TOTAL_WORKS,0);
-	fau64_info.fau_acl_lookup=cvmx_fau_fetch_and_add64(CVM_FAU_TOTAL_ACL_LOOKUP,0);
-	fau64_info.fau_acl_reg=cvmx_fau_fetch_and_add64(CVM_FAU_ACL_REG,0);
-	fau64_info.fau_cw802_11_decap_err=cvmx_fau_fetch_and_add64(CVM_FAU_CW802_11_DECAP_ERROR,0);
-	fau64_info.fau_cw802_3_decap_err=cvmx_fau_fetch_and_add64(CVM_FAU_CW802_3_DECAP_ERROR,0);
-	fau64_info.fau_enet_to_linux_bytes=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_TO_LINUX_BYTES,0);
-	fau64_info.fau_alloc_rule_fail=cvmx_fau_fetch_and_add64(CVM_FAU_ALLOC_RULE_FAIL,0);
-	fau64_info.fau_max_rule_entries=cvmx_fau_fetch_and_add64(CVM_FAU_MAX_RULE_ENTRIES,0);
-	fau64_info.fau_cw_80211_err = cvmx_fau_fetch_and_add64(CVM_FAU_CW_80211_ERR,0);
-	fau64_info.fau_cw_noip_packets = cvmx_fau_fetch_and_add64(CVM_FAU_CW_NOIP_PACKETS,0);
-	fau64_info.fau_cw_spe_packets = cvmx_fau_fetch_and_add64(CVM_FAU_CW_SPE_PACKETS,0);
-	fau64_info.fau_cw_frag_packets = cvmx_fau_fetch_and_add64(CVM_FAU_CW_FRAG_PACKETS,0);
-    fau64_info.fau_mcast_packets = cvmx_fau_fetch_and_add64(CVM_FAU_MCAST_PACKETS,0);
-    fau64_info.fau_rpa_packets = cvmx_fau_fetch_and_add64(CVM_FAU_RPA_PACKETS,0);
-    fau64_info.fau_rpa_tolinux_packets = cvmx_fau_fetch_and_add64(CVM_FAU_RPA_TOLINUX_PACKETS,0);
-    fau64_info.fau_tipc_packets = cvmx_fau_fetch_and_add64(CVM_FAU_TIPC_PACKETS,0);
-    fau64_info.fau_large_eth2cw_packets = cvmx_fau_fetch_and_add64(CVM_FAU_LARGE_ETH2CW_PACKET,0);
-    fau64_info.fau_large_cw_rpa_fwd_packets = cvmx_fau_fetch_and_add64(CVM_FAU_LARGE_CW_RPA_FWD_PACKET,0);
-    fau64_info.fau_large_cw8023_rpa_fwd_packets = cvmx_fau_fetch_and_add64(CVM_FAU_LARGE_CW8023_RPA_FWD_PACKET,0);
-    fau64_info.fau_spe_tcp_hdr = cvmx_fau_fetch_and_add64(CVM_FAU_SPE_TCP_HDR,0);
-    fau64_info.fau_cw_spe_tcp_hdr = cvmx_fau_fetch_and_add64(CVM_FAU_CW_SPE_TCP_HDR,0);
+	else if (CPU_TAG_MASTER == se_buf->cpu_tag)
+	{   
+		//fau64_info.fau_reg_oq_addr_index= cvmx_fau_fetch_and_add64(CVMX_FAU_REG_OQ_ADDR_INDEX, 0);
+		fau64_info.fau_pko_errors=cvmx_fau_fetch_and_add64(CVM_FAU_PKO_ERRORS, 0);
+		fau64_info.fau_enet_input_bytes=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_BYTES, 0);
+		fau64_info.fau_enet_input_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_PACKETS, 0);
+		fau64_info.fau_enet_output_bytes=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_BYTES, 0);
+		fau64_info.fau_enet_output_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS, 0);
+		fau64_info.fau_enet_drop_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_DROP_PACKETS, 0);
+		fau64_info.fau_enet_to_linux_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_TO_LINUX_PACKETS, 0);
+		fau64_info.fau_enet_nonip_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_NONIP_PACKETS, 0);
+		fau64_info.fau_enet_eth_pppoe_nonip_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_ETH_PPPOE_NONIP_PACKETS, 0);   			/* add by wangjian 2013-3-18*/
+		fau64_info.fau_enet_capwap_pppoe_nonip_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_CAPWAP_PPPOE_NONIP_PACKETS, 0); 	/* add by wangjian 2013-3-18*/
+		fau64_info.fau_enet_error_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_ERROR_PACKETS, 0);
+		fau64_info.fau_enet_fragip_packets=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_FRAGIP_PACKETS, 0);
+		fau64_info.fau_ip_short_packets=cvmx_fau_fetch_and_add64(CVM_FAU_IP_SHORT_PACKETS, 0);
+		fau64_info.fau_ip_bad_hdr_len=cvmx_fau_fetch_and_add64(CVM_FAU_IP_BAD_HDR_LEN, 0);
+		fau64_info.fau_ip_bad_len=cvmx_fau_fetch_and_add64(CVM_FAU_IP_BAD_LEN, 0);
+		fau64_info.fau_ip_bad_version=cvmx_fau_fetch_and_add64(CVM_FAU_IP_BAD_VERSION, 0);
+		fau64_info.fau_ip_skip_addr=cvmx_fau_fetch_and_add64(CVM_FAU_IP_SKIP_ADDR, 0);
+		fau64_info.fau_ip_icmp=cvmx_fau_fetch_and_add64(CVM_FAU_IP_ICMP, 0);
+		fau64_info.fau_capwap_icmp=cvmx_fau_fetch_and_add64(CVM_FAU_CAPWAP_ICMP, 0);
+		fau64_info.fau_ip_proto_error=cvmx_fau_fetch_and_add64(CVM_FAU_IP_PROTO_ERROR, 0);
+		fau64_info.fau_udp_bad_dropt=cvmx_fau_fetch_and_add64(CVM_FAU_UDP_BAD_DPORT, 0);
+		fau64_info.fau_udp_bad_len=cvmx_fau_fetch_and_add64(CVM_FAU_UDP_BAD_LEN, 0);
+		fau64_info.fau_udp_to_linux=cvmx_fau_fetch_and_add64(CVM_FAU_UDP_TO_LINUX, 0);
+		fau64_info.fau_flowtable_hit_packets=cvmx_fau_fetch_and_add64(CVM_FAU_FLOWTABLE_HIT_PACKETS, 0);
+		fau64_info.fau_enet_output_packets_8021q=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_8021Q, 0);
+		fau64_info.fau_enet_output_packets_qinq=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_QINQ, 0);
+		fau64_info.fau_enet_output_packets_eth_pppoe=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH_PPPOE, 0); 			/* add by wangjian 2013-3-18*/
+		fau64_info.fau_enet_output_packets_capwap_pppoe=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP_PPPOE, 0); 	/* add by wangjian 2013-3-18*/
+		fau64_info.fau_flow_lookup_error=cvmx_fau_fetch_and_add64(CVM_FAU_FLOW_LOOKUP_ERROR, 0);
+		fau64_info.fau_recv_fccp=cvmx_fau_fetch_and_add64(CVM_FAU_RECV_FCCP_PACKETS,0);
+		fau64_info.fau_recv_works=cvmx_fau_fetch_and_add64(CVM_FAU_RECV_TOTAL_WORKS,0);
+		fau64_info.fau_acl_lookup=cvmx_fau_fetch_and_add64(CVM_FAU_TOTAL_ACL_LOOKUP,0);
+		fau64_info.fau_acl_reg=cvmx_fau_fetch_and_add64(CVM_FAU_ACL_REG,0);
+		fau64_info.fau_cw802_11_decap_err=cvmx_fau_fetch_and_add64(CVM_FAU_CW802_11_DECAP_ERROR,0);
+		fau64_info.fau_cw802_3_decap_err=cvmx_fau_fetch_and_add64(CVM_FAU_CW802_3_DECAP_ERROR,0);
+		fau64_info.fau_enet_to_linux_bytes=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_TO_LINUX_BYTES,0);
+		fau64_info.fau_alloc_rule_fail=cvmx_fau_fetch_and_add64(CVM_FAU_ALLOC_RULE_FAIL,0);
+		fau64_info.fau_max_rule_entries=cvmx_fau_fetch_and_add64(CVM_FAU_MAX_RULE_ENTRIES,0);
+		fau64_info.fau_cw_80211_err = cvmx_fau_fetch_and_add64(CVM_FAU_CW_80211_ERR,0);
+		fau64_info.fau_cw_noip_packets = cvmx_fau_fetch_and_add64(CVM_FAU_CW_NOIP_PACKETS,0);
+		fau64_info.fau_cw_spe_packets = cvmx_fau_fetch_and_add64(CVM_FAU_CW_SPE_PACKETS,0);
+		fau64_info.fau_cw_frag_packets = cvmx_fau_fetch_and_add64(CVM_FAU_CW_FRAG_PACKETS,0);
+	    fau64_info.fau_mcast_packets = cvmx_fau_fetch_and_add64(CVM_FAU_MCAST_PACKETS,0);
+	    fau64_info.fau_rpa_packets = cvmx_fau_fetch_and_add64(CVM_FAU_RPA_PACKETS,0);
+	    fau64_info.fau_rpa_tolinux_packets = cvmx_fau_fetch_and_add64(CVM_FAU_RPA_TOLINUX_PACKETS,0);
+	    fau64_info.fau_tipc_packets = cvmx_fau_fetch_and_add64(CVM_FAU_TIPC_PACKETS,0);
+	    fau64_info.fau_large_eth2cw_packets = cvmx_fau_fetch_and_add64(CVM_FAU_LARGE_ETH2CW_PACKET,0);
+	    fau64_info.fau_large_cw_rpa_fwd_packets = cvmx_fau_fetch_and_add64(CVM_FAU_LARGE_CW_RPA_FWD_PACKET,0);
+	    fau64_info.fau_large_cw8023_rpa_fwd_packets = cvmx_fau_fetch_and_add64(CVM_FAU_LARGE_CW8023_RPA_FWD_PACKET,0);
+	    fau64_info.fau_spe_tcp_hdr = cvmx_fau_fetch_and_add64(CVM_FAU_SPE_TCP_HDR,0);
+	    fau64_info.fau_cw_spe_tcp_hdr = cvmx_fau_fetch_and_add64(CVM_FAU_CW_SPE_TCP_HDR,0);
 
-	memcpy(&se_buf->fccp_cmd.fccp_data.fau64_info, &fau64_info, sizeof(fau64_info_t));
-	se_buf->cmd_result = AGENT_RETURN_OK;
+		memcpy(&se_buf->fccp_cmd.fccp_data.fau64_info, &fau64_info, sizeof(fau64_info_t));
+		se_buf->cmd_result = AGENT_RETURN_OK;
+	}
+	else
+	{
+		se_buf->cmd_result = AGENT_RETURN_FAIL;
+		se_agent_syslog_err("se_agent_show_fau_dump_64 cpu_tag error\n");
+	}
 SEND_DCLI:
 	ret=sendto(se_socket,buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
 	if(ret<0)
@@ -1413,32 +1510,40 @@ void se_agent_show_part_fau_dump_64(char *buf,struct sockaddr_tipc *client_addr,
 
 	se_buf=(se_interative_t *)buf;
 	
-    if(se_buf->cpu_tag == 1)
+    if (CPU_TAG_SLAVE == se_buf->cpu_tag)
     {
         se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
     	se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
     	se_buf->fccp_cmd.cmd_opcode = FCCP_CMD_SHOW_PART_FAU64;
         se_agent_fccp_process_pcie(buf, len, 1);
-        goto SEND_DCLI;
+		if(se_buf->fccp_cmd.ret_val == FCCP_RETURN_ERROR)
+    	{
+		    se_buf->cmd_result = AGENT_RETURN_FAIL;
+    	}
     }
-   
-	fau64_part_info.fau_enet_output_packets_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH, 0); 	
-	fau64_part_info.fau_enet_output_packets_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 0); 	
-	fau64_part_info.fau_enet_output_packets_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_RPA, 0); 
-	fau64_part_info.fau_enet_input_packets_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_PACKETS_ETH, 0); 	
-	fau64_part_info.fau_enet_input_packets_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_PACKETS_CAPWAP, 0); 	
-	fau64_part_info.fau_enet_input_packets_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 0); 
-	fau64_part_info.fau_enet_output_bytes_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_BYTES_ETH, 0); 	
-	fau64_part_info.fau_enet_output_bytes_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, 0); 	
-	fau64_part_info.fau_enet_output_bytes_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_BYTES_RPA, 0); 
-	fau64_part_info.fau_enet_input_bytes_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_BYTES_ETH, 0); 	
-	fau64_part_info.fau_enet_input_bytes_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_BYTES_CAPWAP, 0); 	
-	fau64_part_info.fau_enet_input_bytes_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, 0); 
+	else if (CPU_TAG_MASTER == se_buf->cpu_tag)
+	{
+		fau64_part_info.fau_enet_output_packets_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH, 0); 	
+		fau64_part_info.fau_enet_output_packets_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 0); 	
+		fau64_part_info.fau_enet_output_packets_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_RPA, 0); 
+		fau64_part_info.fau_enet_input_packets_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_PACKETS_ETH, 0); 	
+		fau64_part_info.fau_enet_input_packets_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_PACKETS_CAPWAP, 0); 	
+		fau64_part_info.fau_enet_input_packets_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 0); 
+		fau64_part_info.fau_enet_output_bytes_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_BYTES_ETH, 0); 	
+		fau64_part_info.fau_enet_output_bytes_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, 0); 	
+		fau64_part_info.fau_enet_output_bytes_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_BYTES_RPA, 0); 
+		fau64_part_info.fau_enet_input_bytes_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_BYTES_ETH, 0); 	
+		fau64_part_info.fau_enet_input_bytes_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_BYTES_CAPWAP, 0); 	
+		fau64_part_info.fau_enet_input_bytes_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, 0); 
 
-
-
-	memcpy(&se_buf->fccp_cmd.fccp_data.fau64_part_info, &fau64_part_info, sizeof(fau64_part_info_t));
-	se_buf->cmd_result = AGENT_RETURN_OK;
+		memcpy(&se_buf->fccp_cmd.fccp_data.fau64_part_info, &fau64_part_info, sizeof(fau64_part_info_t));
+		se_buf->cmd_result = AGENT_RETURN_OK;
+	}
+	else 
+	{
+		se_buf->cmd_result = AGENT_RETURN_FAIL;
+		se_agent_syslog_err("se_agent_show_part_fau_dump_64 cpu_tag error\n");
+	}
 SEND_DCLI:
 	ret=sendto(se_socket,buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
 	if(ret<0)
@@ -1463,23 +1568,32 @@ void se_agent_show_eth_fau_dump_64(char *buf,struct sockaddr_tipc *client_addr,u
 
 	se_buf=(se_interative_t *)buf;
 	
-    if(se_buf->cpu_tag == 1)
+    if (CPU_TAG_SLAVE == se_buf->cpu_tag)
     {
         se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
     	se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
     	se_buf->fccp_cmd.cmd_opcode = FCCP_CMD_SHOW_ETH_FAU64;
         se_agent_fccp_process_pcie(buf, len, 1);
-        goto SEND_DCLI;
+		if(se_buf->fccp_cmd.ret_val == FCCP_RETURN_ERROR)
+    	{
+		    se_buf->cmd_result = AGENT_RETURN_FAIL;
+    	}
     }
-   
-	fau64_eth_info.fau_enet_output_packets_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH, 0); 	
-	fau64_eth_info.fau_enet_input_packets_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_PACKETS_ETH, 0); 
-	fau64_eth_info.fau_enet_output_bytes_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_BYTES_ETH, 0); 	
-	fau64_eth_info.fau_enet_input_bytes_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_BYTES_ETH, 0);
+	else if (CPU_TAG_MASTER == se_buf->cpu_tag)
+	{
+		fau64_eth_info.fau_enet_output_packets_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH, 0); 	
+		fau64_eth_info.fau_enet_input_packets_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_PACKETS_ETH, 0); 
+		fau64_eth_info.fau_enet_output_bytes_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_BYTES_ETH, 0); 	
+		fau64_eth_info.fau_enet_input_bytes_eth=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_BYTES_ETH, 0);
 
-	
-	memcpy(&se_buf->fccp_cmd.fccp_data.fau64_eth_info, &fau64_eth_info, sizeof(fau64_eth_info_t));
-	se_buf->cmd_result = AGENT_RETURN_OK;
+		memcpy(&se_buf->fccp_cmd.fccp_data.fau64_eth_info, &fau64_eth_info, sizeof(fau64_eth_info_t));
+		se_buf->cmd_result = AGENT_RETURN_OK;
+	}
+	else 
+	{
+		se_buf->cmd_result = AGENT_RETURN_FAIL;
+		se_agent_syslog_err("se_agent_show_out_eth_fau_dump_64 cpu_tag error\n");
+	}
 SEND_DCLI:
 	ret=sendto(se_socket,buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
 	if(ret<0)
@@ -1504,22 +1618,32 @@ void se_agent_show_capwap_fau_dump_64(char *buf,struct sockaddr_tipc *client_add
 
 	se_buf=(se_interative_t *)buf;
 	
-    if(se_buf->cpu_tag == 1)
+    if(CPU_TAG_SLAVE == se_buf->cpu_tag)
     {
         se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
     	se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
     	se_buf->fccp_cmd.cmd_opcode = FCCP_CMD_SHOW_CAPWAP_FAU64;
         se_agent_fccp_process_pcie(buf, len, 1);
-        goto SEND_DCLI;
+		if(se_buf->fccp_cmd.ret_val == FCCP_RETURN_ERROR)
+    	{
+		    se_buf->cmd_result = AGENT_RETURN_FAIL;
+    	}
     }
-   
-	fau64_capwap_info.fau_enet_output_packets_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 0); 	
-	fau64_capwap_info.fau_enet_input_packets_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_PACKETS_CAPWAP, 0); 
-	fau64_capwap_info.fau_enet_output_bytes_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, 0); 	
-	fau64_capwap_info.fau_enet_input_bytes_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_BYTES_CAPWAP, 0); 
-	
-	memcpy(&se_buf->fccp_cmd.fccp_data.fau64_capwap_info, &fau64_capwap_info, sizeof(fau64_capwap_info_t));
-	se_buf->cmd_result = AGENT_RETURN_OK;
+	else if (CPU_TAG_MASTER == se_buf->cpu_tag)
+	{
+		fau64_capwap_info.fau_enet_output_packets_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 0); 	
+		fau64_capwap_info.fau_enet_input_packets_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_PACKETS_CAPWAP, 0); 
+		fau64_capwap_info.fau_enet_output_bytes_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, 0); 	
+		fau64_capwap_info.fau_enet_input_bytes_capwap=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_BYTES_CAPWAP, 0); 
+		
+		memcpy(&se_buf->fccp_cmd.fccp_data.fau64_capwap_info, &fau64_capwap_info, sizeof(fau64_capwap_info_t));
+		se_buf->cmd_result = AGENT_RETURN_OK;
+	}
+	else 
+	{
+		se_buf->cmd_result = AGENT_RETURN_FAIL;
+		se_agent_syslog_err("se_agent_show_capwap_fau_dump_64 cpu_tag error\n");
+	}
 SEND_DCLI:
 	ret=sendto(se_socket,buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
 	if(ret<0)
@@ -1544,22 +1668,33 @@ void se_agent_show_rpa_fau_dump_64(char *buf,struct sockaddr_tipc *client_addr,u
 
 	se_buf=(se_interative_t *)buf;
 	
-    if(se_buf->cpu_tag == 1)
+    if (CPU_TAG_SLAVE == se_buf->cpu_tag)
     {
         se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
     	se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
     	se_buf->fccp_cmd.cmd_opcode = FCCP_CMD_SHOW_RPA_FAU64;
         se_agent_fccp_process_pcie(buf, len, 1);
-        goto SEND_DCLI;
+        if(se_buf->fccp_cmd.ret_val == FCCP_RETURN_ERROR)
+    	{
+		    se_buf->cmd_result = AGENT_RETURN_FAIL;
+    	}
     }
-   
-	fau64_rpa_info.fau_enet_output_packets_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_RPA, 0); 	
-	fau64_rpa_info.fau_enet_input_packets_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 0); 
-	fau64_rpa_info.fau_enet_output_bytes_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_BYTES_RPA, 0); 
-	fau64_rpa_info.fau_enet_input_bytes_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, 0); 
+    else if (CPU_TAG_MASTER == se_buf->cpu_tag)
+    {
+		fau64_rpa_info.fau_enet_output_packets_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_PACKETS_RPA, 0); 	
+		fau64_rpa_info.fau_enet_input_packets_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_PACKETS_RPA, 0); 
+		fau64_rpa_info.fau_enet_output_bytes_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_OUTPUT_BYTES_RPA, 0); 
+		fau64_rpa_info.fau_enet_input_bytes_rpa=cvmx_fau_fetch_and_add64(CVM_FAU_ENET_INPUT_BYTES_RPA, 0); 
 
-	memcpy(&se_buf->fccp_cmd.fccp_data.fau64_rpa_info, &fau64_rpa_info, sizeof(fau64_rpa_info_t));
-	se_buf->cmd_result = AGENT_RETURN_OK;
+		memcpy(&se_buf->fccp_cmd.fccp_data.fau64_rpa_info, &fau64_rpa_info, sizeof(fau64_rpa_info_t));
+		se_buf->cmd_result = AGENT_RETURN_OK;
+    }
+	else 
+	{
+		se_buf->cmd_result = AGENT_RETURN_FAIL;
+		se_agent_syslog_err("se_agent_show_out_rpa_fau_dump_64 cpu_tag error\n");
+	}
+	
 SEND_DCLI:
 	ret=sendto(se_socket,buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
 	if(ret<0)
@@ -1584,22 +1719,28 @@ void se_agent_clear_fau64(char *buf,struct sockaddr_tipc *client_addr,unsigned i
 		}
 		se_buf=(se_interative_t *)buf;
 
-		if(se_buf->cpu_tag == 1)
+		if (CPU_TAG_SLAVE == se_buf->cpu_tag)
         {
             se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
         	se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
         	se_buf->fccp_cmd.cmd_opcode = FCCP_CMD_CLEAR_FAU64;
             se_agent_fccp_process_pcie(buf, len, 1);
-            goto SEND_DCLI;
         }
-    
-		i = (CVM_FAU_PKO_ERRORS - CVMX_FAU_REG_64_START) >> 3;
-		for(;fau_addr < CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP_PPPOE; i++)
+		else if (CPU_TAG_MASTER == se_buf->cpu_tag)
 		{
-				fau_addr = CVMX_FAU_REG_64_ADDR(i);
-				cvmx_fau_atomic_write64(fau_addr, 0);
+			i = (CVM_FAU_PKO_ERRORS - CVMX_FAU_REG_64_START) >> 3;
+			for(;fau_addr < CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP_PPPOE; i++)
+			{
+					fau_addr = CVMX_FAU_REG_64_ADDR(i);
+					cvmx_fau_atomic_write64(fau_addr, 0);
+			}
+			se_buf->cmd_result=AGENT_RETURN_OK;
 		}
-		se_buf->cmd_result=AGENT_RETURN_OK;
+		else 
+		{
+			se_buf->cmd_result=AGENT_RETURN_FAIL;
+			se_agent_syslog_err("se_agent_clear_fau64 cpu_tag error\n");
+		}
 SEND_DCLI:
 		ret=sendto(se_socket,(char*)buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
 		if(ret<0)
@@ -1622,27 +1763,33 @@ void se_agent_clear_part_fau64(char *buf,struct sockaddr_tipc *client_addr,unsig
 		}
 		se_buf=(se_interative_t *)buf;
 
-		if(se_buf->cpu_tag == 1)
+		if (CPU_TAG_SLAVE == se_buf->cpu_tag)
         {
             se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
         	se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
         	se_buf->fccp_cmd.cmd_opcode = FCCP_CMD_CLEAR_PART_FAU64;
             se_agent_fccp_process_pcie(buf, len, 1);
-            goto SEND_DCLI;
         }
-    
-		i = (CVM_FAU_ENET_OUTPUT_PACKETS_ETH - CVMX_FAU_REG_64_START) >> 3;
-		for(;fau_addr < CVM_FAU_ENET_INPUT_BYTES_RPA; i++)
+		else if (CPU_TAG_MASTER == se_buf->cpu_tag)
 		{
-				fau_addr = CVMX_FAU_REG_64_ADDR(i);
-				cvmx_fau_atomic_write64(fau_addr, 0);
+			i = (CVM_FAU_ENET_OUTPUT_PACKETS_ETH - CVMX_FAU_REG_64_START) >> 3;
+			for(;fau_addr < CVM_FAU_ENET_INPUT_BYTES_RPA; i++)
+			{
+					fau_addr = CVMX_FAU_REG_64_ADDR(i);
+					cvmx_fau_atomic_write64(fau_addr, 0);
+			}
+			se_buf->cmd_result=AGENT_RETURN_OK;
 		}
-		se_buf->cmd_result=AGENT_RETURN_OK;
+		else 
+		{
+			se_buf->cmd_result=AGENT_RETURN_FAIL;
+			se_agent_syslog_err("se_agent_clear_part_fau64 cpu_tag error\n");
+		}
 SEND_DCLI:
 		ret=sendto(se_socket,(char*)buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
 		if(ret<0)
 		{
-				se_agent_syslog_err("se_agent_clear_fau64 send to dcli failed:%s\n",strerror(errno));
+				se_agent_syslog_err("se_agent_clear_part_fau64 send to dcli failed:%s\n",strerror(errno));
 				return ;
 		}
 }
