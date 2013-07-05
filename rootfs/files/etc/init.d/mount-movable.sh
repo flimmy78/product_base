@@ -43,11 +43,13 @@ mount_all_movable() {
 		elif [ -e /dev/sda1 ]; then
 			echo "/dev/sda1	$mountpoint		vfat	umask=000	0	0" >> /etc/fstab
 			mount $mountpoint 
+			log_maxsize=$log_maxsize_sd
 			mounted=1
 			break;
 		elif [ -e /dev/sda ]; then
 			echo "/dev/sda	$mountpoint		vfat	umask=000	0	0" >> /etc/fstab
 			mount $mountpoint
+			log_maxsize=$log_maxsize_sd
 			mounted=1
 			break
 		elif [ -e /dev/cfa1 ]; then
