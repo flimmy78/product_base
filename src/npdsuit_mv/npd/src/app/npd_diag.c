@@ -41,6 +41,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <dirent.h>
 
 #include "util/npd_list.h"
 #include "sysdef/npd_sysdef.h"
@@ -2577,7 +2578,57 @@ DBusMessage * npd_dbus_diagnosis_board_test_mode_set
 
 	return reply;
 }
+DBusMessage * npd_dbus_diagnosis_set_ap_fake_singal_strength
+(
+	DBusConnection *conn,
+	DBusMessage *msg,
+	void *user_data
+)
+{
+	DBusMessage* reply;
+	unsigned int ret = DIAG_RETURN_CODE_SUCCESS;
+	unsigned int fake_singal_strengh;
+	char command[128] = {0};
+	char tmpdir[] = "/var/run/fake_singal_strengh";
+	int fd = 0;
+	
+	DBusError err;
+	dbus_error_init(&err);
+	if (!(dbus_message_get_args(msg, &err,
+								DBUS_TYPE_UINT32,&fake_singal_strengh,								
+							 	DBUS_TYPE_INVALID)))
+	{
+		syslog_ax_board_err("Unable to get input args ");
+		if (dbus_error_is_set(&err)) 
+		{
+			syslog_ax_board_err("%s raised: %s", err.name, err.message);
+			dbus_error_free(&err);
+		}
+		return NULL;
+	}
 
+	fd = open(tmpdir,O_RDONLY | O_CREAT,0644);
+    if(fd<0)
+    {
+    	syslog_ax_board_err("open or create fail !\n");
+		ret = DIAG_RETURN_CODE_ERROR;
+ 	}
+ 	else
+  	{
+		syslog_ax_board_dbg("fake_singal_strengh = %d\n",fake_singal_strengh);
+		close(fd);
+		sprintf(command,"echo %d > %s",fake_singal_strengh,tmpdir);
+		system(command);
+   	}
+	
+	
+	reply = dbus_message_new_method_return(msg);
+	
+	dbus_message_append_args(reply,
+							 DBUS_TYPE_UINT32, &ret,
+							 DBUS_TYPE_INVALID);
+	return reply;
+}	
 #ifdef __cplusplus
 }
 #endif

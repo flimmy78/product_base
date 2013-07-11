@@ -6970,6 +6970,9 @@ enum npd_dbus_result_no_e {
 #define NPD_DBUS_SYSTEM_DIAGNOSIS_XAUI_PHY_HW_RW_REG	"Diagnosis_xaui_phy_hw_rw_reg"
 
 
+#define NPD_DBUS_SYSTEM_DIAGNOSIS_SET_AP_FAKE_SINGAL_STRENGTH	"Diagnosis_set_ap_fake_singal_strength"
+
+
 /*****************************************************************
  * DESCRIPTION:
  * 	arg lists for method NPD_DBUS_SYSTEM_SHOW_MIB_GE_XG_PORT

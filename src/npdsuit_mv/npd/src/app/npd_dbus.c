@@ -212,6 +212,9 @@ static DBusHandlerResult npd_dbus_message_handler (DBusConnection *connection, D
 		else if (dbus_message_is_method_call(message,NPD_DBUS_INTERFACE,NPD_DBUS_SYSTEM_DIAG_VLAN_ADD_DEL_PORT)){
             reply = npd_dbus_diagnosis_vlan_add_del_port(connection,message,user_data);
 		}
+		else if (dbus_message_is_method_call(message,NPD_DBUS_INTERFACE,NPD_DBUS_SYSTEM_DIAGNOSIS_SET_AP_FAKE_SINGAL_STRENGTH)){
+            reply = npd_dbus_diagnosis_set_ap_fake_singal_strength(connection,message,user_data);
+		}
 		else if (dbus_message_is_method_call(message,NPD_DBUS_INTERFACE,NPD_DBUS_SYSTEM_DIAG_READ_ASIC_MIB)){
             reply = npd_dbus_diagnosis_show_port_mib(connection,message,user_data);
 		}				
