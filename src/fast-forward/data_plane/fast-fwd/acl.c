@@ -1216,11 +1216,12 @@ int acl_clear_aging_rule()
 	for(i = 0; i < acl_static_tbl_size; i++)
 	{
 		head_rule = &acl_bucket_tbl[i];
+		
+		cvmx_spinlock_lock(&head_rule->lock);		
 		del_rule_cur = head_rule->next;
 		del_rule_pre = head_rule;
 
 		/* delete aging rules from list */
-		cvmx_spinlock_lock(&head_rule->lock);
 		while(del_rule_cur)
 		{
 			if((acl_aging_check(&(del_rule_cur->rules)) > 0) && (del_rule_cur->rules.rule_state != RULE_IS_STATIC))
