@@ -712,7 +712,10 @@ sem:
 	@echo "Building sem ..."
 	$(MAKE) -C ${SEM_MOD}/src/app/
 #	cp ${BIN_EXPORT_DIR}/sem ${AUTEWAREFS_DIR}/files/opt/bin/
-	
+
+dcli_sem:
+	@echo "Building dcli_sem..."
+	@$(checkquagga) && $(MAKE) -C ${SEM_MOD}/src/dcli/
 npd: bm nam nbm 
 	@echo "Building npd..."
 	$(MAKE) DRV_LIB_FLAG=${CPSS_FLAG} -C ${NPDSUIT_MV_MOD}/npd/src/app
@@ -1333,6 +1336,8 @@ x7x5img: pubapps
 	@echo "Making sem"
 	make sem
 	@echo "Making pfm_kern module"
+	make dcli_sem
+	@echo "Making dcli_sem"
 	make pfm_kern	
 	@echo "Making e1000e module"
 	make sfd_kern
@@ -1415,6 +1420,8 @@ cleandcli:cleandclipub_ac
 cleandclipub_ac:
 	$(MAKE) -C ${DCLI_MOD}/src/pub clean
 
+cleandcli_sem:
+	$(MAKE) -C ${SEM_MOD}/src/dcli clean
 
 cleannpdsuit_mv:
 	#$(MAKE) -C ${BM_KMOD}/src/kmod clean
