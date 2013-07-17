@@ -292,16 +292,16 @@ int miisw_read(unsigned int devaddr, unsigned int regaddr,unsigned int phyaddr)
     sem_syslog_event("miisw_read:devaddr = 0x%x,regaddr = 0x%x\n", devaddr,regaddr);
 	if (sem_oct_mii_write(phyaddr, MV_88E6185_SMI_COMMAND_REG, smi_cmd.u16))
  	{
-		return 1;
+		return -1;
  	}
 	usleep(1000);
 	
     if (!(return_value = sem_oct_mii_read(phyaddr, MV_88E6185_SMI_DATA_REG)))
     {
-		return 1;
+		return -1;
     }
 	usleep(1000);
-	
+	sem_syslog_event("end miisw_read\n");
  
 	return return_value;
 }
@@ -321,16 +321,16 @@ int miisw_write(unsigned int devaddr, unsigned int regaddr, unsigned short value
 	
     if (sem_oct_mii_write(phyaddr, MV_88E6185_SMI_DATA_REG, value))
     {
-		return 1;
+		return -1;
     }
 	usleep(1000);
 	
  	if (sem_oct_mii_write(phyaddr, MV_88E6185_SMI_COMMAND_REG, smi_cmd.u16))
  	{
-		return 1;
+		return -1;
  	}
 	usleep(1000);
- 
+    sem_syslog_event("end miisw_write\n");
 	return 0;
 }
 
@@ -344,9 +344,10 @@ int ax81_smue_init(void)
 	int port = 0;
 	unsigned short data = 0;
 	unsigned short data2 = 0;
-	unsigned int phyaddr1 = 0x14;
-	unsigned int phyaddr2 = 0x15;
+	unsigned int phyaddr1 = AX81_CRSMUE_MV_88E6185_1_AX52XX_SGMII_ADDR;
+	unsigned int phyaddr2 = AX81_CRSMUE_MV_88E6185_2_AX52XX_SGMII_ADDR;
 	int value;
+	int i=0;
     
 	data = 0x200;
 	data2 = 0xc13e;
@@ -372,10 +373,63 @@ int ax81_smue_init(void)
 		miisw_write(port, MV_88E6185_PORT_BASED_VLAN_MAP, data,phyaddr2);
 		miisw_write(port, MV_88E6185_PSC_CONCTRL_REG, data2,phyaddr2);
 	}
+	#if 1
+    data = 0x80;
+    miisw_write(0x15, MV_88E6185_PORT_BASED_VLAN_MAP, data,phyaddr2);
+    //miisw_write(0x15, MV_88E6185_PSC_CONCTRL_REG, data2,phyaddr2);	
+
+    data = 0x100;
+    miisw_write(0x16, MV_88E6185_PORT_BASED_VLAN_MAP, data,phyaddr2);
+    //miisw_write(0x16, MV_88E6185_PSC_CONCTRL_REG, data2,phyaddr2);
+    #endif
+    data = 0x20;
+    miisw_write(0x17, MV_88E6185_PORT_BASED_VLAN_MAP, data,phyaddr2);
+    miisw_write(0x17, MV_88E6185_PSC_CONCTRL_REG, data2,phyaddr2);	
+
+    data = 0x40;
+    miisw_write(0x18, MV_88E6185_PORT_BASED_VLAN_MAP, data,phyaddr2);
+    miisw_write(0x18, MV_88E6185_PSC_CONCTRL_REG, data2,phyaddr2);
+	
 	data = 0x1f;
 	miisw_write(0x19, MV_88E6185_PORT_BASED_VLAN_MAP, data,phyaddr2);
 	miisw_write(0x19, MV_88E6185_PSC_CONCTRL_REG, data2,phyaddr2);
-	
+    #if 1
+	for (i = 5; i <= 6; i++)
+	{
+		//printf("port%d 88E1145_CONCTRL_REG: %#x\n", i, val);
+
+		miisw_write(i, MV_88E1145_EXT_ADDRESS_REG, SELECT_FIBER,phyaddr2);          /* modify by niehy  set register page */
+
+		value=miisw_read(i, MV_88E1145_EXT_SPE_CTRL_REG,phyaddr2);	    /* set 20 register 20.*_13 ->0  set power up  */
+		value &= ~(1 << 13);
+		miisw_write(i, MV_88E1145_EXT_SPE_CTRL_REG, value,phyaddr2); 
+
+
+		value=miisw_read(i, MV_88E1145_EXT_SPE_CTRL2_REG,phyaddr2);		/*set 26 register 26.*_6:5 -> 0*/
+		value &= ~(3 << 5);
+		miisw_write(i, MV_88E1145_EXT_SPE_CTRL2_REG, value,phyaddr2);
+
+
+		miisw_write(i,MV_88E1145_EXT_SPE_CTRL2_REG, 1 << 10 | 1 << 2,phyaddr2); 	/*set 26 register 26.*_7 -> 0   phy link up ,need softreset*/
+
+		miisw_write(i, MV_88E1145_EXT_ADDRESS_REG, SELECT_COPPER,phyaddr2);			/* set register page */
+		miisw_write(i, MV_88E1145_CONCTRL_REG, 1 << 15 | 1 << 12 | 1 << 8 | 1 << 6,phyaddr2);
+		value=miisw_read(i, MV_88E1145_EXT_SPE_CTRL2_REG,phyaddr2);	
+		//printf("port%d 88E1145_CONCTRL_REG: %#x\n", i, val);
+		miisw_write(i, MV_88E1145_EXT_ADDRESS_REG, SELECT_FIBER,phyaddr2);			/* set register page */
+		miisw_write(i, MV_88E1145_CONCTRL_REG, 1 << 15 | 1 << 12 | 1 << 6,phyaddr2); 		/*soft reset*/		/*Auto-Negotiation Enable*/ 
+
+		miisw_write(i, MV_88E1145_EXT_ADDRESS_REG, SELECT_COPPER,phyaddr2);		  /* set register page */
+	}
+    #endif
+	data = 0xc081;
+	miisw_write(0x1b, 0x04, data,phyaddr2);
+	//disable ppu to read 1145 reg
+	#if 0
+    usleep(1000);
+	data = 0x81;
+	miisw_write(0x1b, 0x04, data,phyaddr2);
+	#endif
 	return 0;
 }
 
@@ -481,8 +535,9 @@ static int read_eth_port_info(int slot, int port, struct eth_port_s *port_info)
 {
 	int retval = 0;
 	int fd = 0;
+	unsigned int devaddr = port+5;
 	unsigned short reg_value = 0;
-	unsigned short ctl_value = 0;
+	//unsigned short ctl_value = 0;
 	unsigned long tmp = 0;
 	int type = 0;
 	int ret = 0, media = 0;
@@ -524,22 +579,9 @@ static int read_eth_port_info(int slot, int port, struct eth_port_s *port_info)
 	preferred_fiber = 0;
 	
 	/* get copper state of duplex ,speed and link */
-	copper_stat.u16 = sem_oct_mdio_read(port, MV_88E1145_PHY_SPEC_STATUS);
-
+	copper_stat.u16=miisw_read(devaddr, MV_88E1145_PHY_SPEC_STATUS,AX81_CRSMUE_MV_88E6185_2_AX52XX_SGMII_ADDR);
 	sem_syslog_dbg("\tcopper_stat.u16 = %#x\n", copper_stat.u16);
-	/* get control state */
-	copper_ctl.u16 = sem_oct_mdio_read(port, 0);	
 	reg_value = copper_stat.u16;
-	ctl_value = copper_ctl.u16;
-	if(copper_ctl.u16 == 0xffff)
-	{
-		copper_ctl.u16 = phy_ctl_copper[port];
-	}
-	else
-	{
-		phy_ctl_copper[port] = copper_ctl.u16;
-	}
-	
 
 	tmp |= ((1 << ETH_PREFERRED_COPPER_MEDIA_BIT));
 

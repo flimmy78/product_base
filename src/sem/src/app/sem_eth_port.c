@@ -45,6 +45,8 @@ struct global_ethport_s **global_ethport = NULL;
 struct global_ethport_s *start_fp[MAX_SLOT_COUNT];
 extern thread_index_sd_t thread_id_arr[MAX_SLOT_NUM];
 
+#define AX81_CRSMUE_MV_88E6185_2_AX52XX_SGMII_ADDR         0x15
+
 /*
 	attr_bitmap-->
 		 bit 0 : admin state
@@ -126,6 +128,90 @@ void poll_QT2025_link_status()
 
 	}
 }
+
+/*
+	attr_bitmap-->
+		 bit 0 : admin state
+	     bit 1 : link state   //only this is available.;
+	     bit 2 : autoneg state
+	     bit 3 : duplex mode
+	     bit 4 : flow control
+	     bit 5 : backpressure
+	     bit 6 : autoneg-speed
+	     bit 7 : autoneg-duplex
+	     bit 8 : autoneg-fc 
+	     bit 9 : autoneg ctrl
+	     bit 12-15 : speed
+	     bit 16-19 : pluggable port status
+	     bit 24-27 : basic functions
+	     bit 28-29 : preferred media
+*/
+void ax81_smue_panel_port_check_fc(void)
+{
+	int value1=0,value2=0;
+	char file_path[64];
+	int active_master_slot_id = product->active_master_slot_id;
+	unsigned int phyaddr = AX81_CRSMUE_MV_88E6185_2_AX52XX_SGMII_ADDR;
+	int port1=miisw_read(0x15, 0x00,phyaddr);//0x15 interface:mng(slot_id)-1
+	int port2=miisw_read(0x16, 0x00,phyaddr);//x016 interface:mng(slot_id)-2
+	
+	if(port1 == 0x1e86){
+	    start_fp[local_board->slot_id][0].attr_bitmap = 0x100022c7;
+	}else if(port2 == 0x1086){
+        start_fp[local_board->slot_id][0].attr_bitmap = 0x100002cd;
+	}else{
+        sem_syslog_dbg("ax81_smue_panel_port1 = 0x%x\n",port1);
+	}
+	
+	if(port2 == 0x1e86){
+	    start_fp[local_board->slot_id][1].attr_bitmap = 0x100022c7;
+	}else if(port2 == 0x1086){
+        start_fp[local_board->slot_id][1].attr_bitmap = 0x100002cd;
+	}else{
+        sem_syslog_dbg("ax81_smue_panel_port2 = 0x%x\n",port2);
+	}
+	
+	sem_syslog_dbg("thread %s, thread id is %d\n", __FUNCTION__, getpid());
+	while (1)
+	{
+		sleep(2);
+        value1 = miisw_read(0x15, 0x00,phyaddr);
+		value2 = miisw_read(0x16, 0x00,phyaddr);
+		if((value1 == port1) && (value2 == port2))
+		{
+            continue;
+		}
+		else
+		{
+            port1=value1;
+			port2=value2;
+			if(port1 == 0x1e86){
+        	    start_fp[local_board->slot_id][0].attr_bitmap = 0x100022c7;
+        	}else if(port2 == 0x1086){
+                start_fp[local_board->slot_id][0].attr_bitmap = 0x100002cd;
+        	}else{
+                sem_syslog_dbg("port1 = 0x%x\n",port1);
+        	}
+			
+        	if(port2 == 0x1e86){
+        	    start_fp[local_board->slot_id][1].attr_bitmap = 0x100022c7;
+        	}else if(port2 == 0x1086){
+                start_fp[local_board->slot_id][1].attr_bitmap = 0x100002cd;
+        	}else{
+                sem_syslog_dbg("port2 = 0x%x\n",port2);
+        	}
+			
+        	msync(start_fp[local_board->slot_id], sizeof(struct global_ethport_s)*BOARD_GLOBAL_ETHPORTS_MAXNUM, MS_SYNC);
+            if(local_board->slot_id != active_master_slot_id)
+            {
+                sprintf(file_path, "/dbm/shm/ethport/shm%d", local_board->slot_id+1);
+                product->sync_send_file(active_master_slot_id, file_path, 0);
+            }
+		}
+	}
+}
+
+
 
 int sem_read_eth_port_info(int slot , int port, struct eth_port_s *port_info)
 {

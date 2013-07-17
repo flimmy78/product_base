@@ -1393,6 +1393,7 @@ void octeon_autelan_product_init(void)
 		else if (board_type_num == 0x7)
 		{
 			autelan_product_info.board_type = AUTELAN_BOARD_AX81_SMUE;
+			autelan_product_info.board_slot_id += 2;
 		}
 		else
 		{

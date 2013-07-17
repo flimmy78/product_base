@@ -23,8 +23,8 @@ extern "C"
 #include <linux/rtnetlink.h>
 #include <errno.h>
 #include <sys/mman.h> 
-#include <linux/if.h>//huangjing
-#include <linux/if_arp.h>//huangjing
+#include <linux/if.h>
+#include <linux/if_arp.h>
 #include <string.h>
 #include <sys/ioctl.h>
 
@@ -35,7 +35,7 @@ extern "C"
 #include <sys/syslog.h>
 #include <linux/tipc.h>
 #include <netdb.h>
-#include <stdlib.h>//huangjing
+#include <stdlib.h>
 
 #include "sysdef/returncode.h"
 #include "sysdef/sem_sysdef.h"
@@ -1093,7 +1093,7 @@ DBusMessage *sem_dbus_reset_all(DBusConnection *conn, DBusMessage *msg, void *us
 
 	if (slot_id == -1)
 	{
-		reset_bitmask = 0x3ff;
+		reset_bitmask = 0x3fff;
 	}
 	else
 	{

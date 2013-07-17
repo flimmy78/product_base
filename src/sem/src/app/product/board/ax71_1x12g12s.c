@@ -10,7 +10,7 @@ extern "C"
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include <stdlib.h> //huangjing
+#include <stdlib.h>
 //#include <linux/in.h>
 #include <sys/socket.h>
 #include <linux/if_vlan.h>

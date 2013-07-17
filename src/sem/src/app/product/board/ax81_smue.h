@@ -16,6 +16,7 @@
 #define MV_88E6185_SMI_DATA_REG              0x01
 
 #define AX81_CRSMUE_MV_88E6185_1_AX52XX_SGMII_ADDR         0x14
+#define AX81_CRSMUE_MV_88E6185_2_AX52XX_SGMII_ADDR         0x15
 
 #define MV_88E6185_PORT_STATUS_REG           0x00
 #define MV_88E6185_PSC_CONCTRL_REG           0x01
@@ -27,6 +28,16 @@
 #define MV_88E6185_CTRL_FORCE_LINKUP         0x0020
 #define MV_88E6185_CTRL_AUTONEG_EN           0x0400
 #define MV_88E6185_CTRL_ANBYPASS_EN          0x0800
+
+
+/* Mavell 88E1145 register definations */
+#define MV_88E1145_CONCTRL_REG           0x00
+#define MV_88E1145_STATUS_REG            0x01
+#define MV_88E1145_EXT_SPE_CTRL_REG      0x14
+#define MV_88E1145_EXT_ADDRESS_REG       0x16
+#define MV_88E1145_EXT_SPE_CTRL2_REG     0x1a
+#define SELECT_COPPER                    0x00
+#define SELECT_FIBER                     0x01
 
 #define AX81_CRSMUE_AP_MAX 1024
 

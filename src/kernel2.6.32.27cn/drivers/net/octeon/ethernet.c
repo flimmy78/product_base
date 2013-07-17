@@ -1014,6 +1014,8 @@ static int __init cvm_oct_init_module(void)
 	struct device_node *pip;
 	int i;
 	int rv = 0;
+	cvmx_pcsx_miscx_ctl_reg_t pcsx_miscx_ctl_reg;
+	
 	if(cvmx_fau_fetch_and_add64(CVM_FAU_SE_COEXIST_FLAG, 0) == SE_MAGIC_MUN)
 	{
 		se_coexist_flag = SE_COEXIST;
@@ -1119,12 +1121,6 @@ static int __init cvm_oct_init_module(void)
 		}
 	}
 
-	if(autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMUE){
-    	cvmx_pcsx_miscx_ctl_reg_t pcsx_miscx_ctl_reg;
-    	pcsx_miscx_ctl_reg.u64 = cvmx_read_csr(0x80011800B0001078);
-    	pcsx_miscx_ctl_reg.s.mac_phy=1;
-    	cvmx_write_csr(0x80011800B0001078, pcsx_miscx_ctl_reg.u64);
-	}
 	cvmx_helper_ipd_and_packet_input_enable();
 	if(se_coexist_flag == SE_COEXIST)
 	{
@@ -1149,7 +1145,7 @@ static int __init cvm_oct_init_module(void)
 	 */
 	cvmx_fau_atomic_write32(FAU_NUM_PACKET_BUFFERS_TO_FREE, 0);
 
-	if (autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMU||autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMUE)
+	if (autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMU)
 	{
 		num_interfaces = 1;
 		for (interface = 0; interface < num_interfaces; interface++) {
@@ -1324,6 +1320,186 @@ static int __init cvm_oct_init_module(void)
 				}
 			}
 		}
+	}
+	else if(autelan_product_info.board_type == AUTELAN_BOARD_AX81_SMUE)
+	{
+		num_interfaces = 1;
+		#if 1
+    	pcsx_miscx_ctl_reg.u64 = cvmx_read_csr(0x80011800B0001078);
+    	pcsx_miscx_ctl_reg.s.mac_phy=1;
+    	cvmx_write_csr(0x80011800B0001078, pcsx_miscx_ctl_reg.u64);
+
+    	pcsx_miscx_ctl_reg.u64 = cvmx_read_csr(0x80011800B0001478);
+    	pcsx_miscx_ctl_reg.s.mac_phy=1;
+    	cvmx_write_csr(0x80011800B0001478, pcsx_miscx_ctl_reg.u64);
+
+    	pcsx_miscx_ctl_reg.u64 = cvmx_read_csr(0x80011800B0001878);
+    	pcsx_miscx_ctl_reg.s.mac_phy=1;
+    	cvmx_write_csr(0x80011800B0001878, pcsx_miscx_ctl_reg.u64);
+		#endif
+		for (interface = 0; interface < num_interfaces; interface++) {
+			cvmx_helper_interface_mode_t imode = cvmx_helper_interface_get_mode(interface);
+			int num_ports = cvmx_helper_ports_on_interface(interface);
+			int interface_port;
+
+			/* Only 3 sgmii ports are available on AX_81_SMUE */
+			num_ports = (num_ports > 3) ? 3 : num_ports;
+
+			for (interface_port = 0; num_ports > 0;
+			     interface_port++, num_ports--) {
+				struct octeon_ethernet *priv;
+				int base_queue;
+				struct net_device *dev = alloc_etherdev(sizeof(struct octeon_ethernet));
+				if (!dev) {
+					pr_err("Failed to allocate ethernet device for port %d:%d\n", interface, interface_port);
+					continue;
+				}
+
+				if (disable_core_queueing)
+					dev->tx_queue_len = 0;
+
+				/* Initialize the device private structure. */
+				priv = netdev_priv(dev);
+				dev->priv = priv;
+				priv->of_node = cvm_oct_node_for_port(pip, interface, interface_port);
+				RB_CLEAR_NODE(&priv->ipd_tree);
+				priv->netdev = dev;
+				priv->interface = interface;
+				priv->interface_port = interface_port;
+
+				INIT_DELAYED_WORK(&priv->port_periodic_work,
+						  cvm_oct_periodic_worker);
+				priv->imode = imode;
+
+				priv->ipd_port = cvmx_helper_get_ipd_port(interface, interface_port);
+				priv->key = priv->ipd_port;
+				priv->pko_port = cvmx_helper_get_pko_port(interface, interface_port);
+				base_queue = cvmx_pko_get_base_queue(priv->ipd_port);
+				priv->num_tx_queues = cvmx_pko_get_num_queues(priv->ipd_port);
+				
+				if (octeon_has_feature(OCTEON_FEATURE_PKND))
+					priv->ipd_pkind = cvmx_helper_get_pknd(interface, interface_port);
+				else
+					priv->ipd_pkind = priv->ipd_port;
+
+				for (qos = 0; qos < priv->num_tx_queues; qos++) {
+					priv->tx_queue[qos].queue = base_queue + qos;
+					fau = fau - sizeof(u32);
+					priv->tx_queue[qos].fau = fau;
+					cvmx_fau_atomic_write32(priv->tx_queue[qos].fau, 0);
+				}
+				switch (priv->imode) {
+
+				/* These types don't support ports to IPD/PKO */
+				case CVMX_HELPER_INTERFACE_MODE_DISABLED:
+				case CVMX_HELPER_INTERFACE_MODE_PCIE:
+				case CVMX_HELPER_INTERFACE_MODE_PICMG:
+					break;
+
+				case CVMX_HELPER_INTERFACE_MODE_NPI:
+					dev->netdev_ops = &cvm_oct_npi_netdev_ops;
+					strcpy(dev->name, "npi%d");
+					break;
+
+				case CVMX_HELPER_INTERFACE_MODE_XAUI:
+				case CVMX_HELPER_INTERFACE_MODE_RXAUI:
+#ifdef CONFIG_OCTEON_ETHERNET_LOCKLESS_IF_SUPPORTED
+					if (octeon_pko_lockless()) {
+						dev->netdev_ops = &cvm_oct_xaui_lockless_netdev_ops;
+						priv->tx_lockless = 1;
+					} else
+#endif
+						dev->netdev_ops = &cvm_oct_xaui_netdev_ops;
+					priv->has_gmx_regs = 1;
+					strcpy(dev->name, "xaui%d");
+					break;
+
+				case CVMX_HELPER_INTERFACE_MODE_LOOP:
+					dev->netdev_ops = &cvm_oct_npi_netdev_ops;
+					strcpy(dev->name, "loop%d");
+					break;
+
+				case CVMX_HELPER_INTERFACE_MODE_SGMII:
+#ifdef CONFIG_OCTEON_ETHERNET_LOCKLESS_IF_SUPPORTED
+					if (octeon_pko_lockless()) {
+						dev->netdev_ops = &cvm_oct_sgmii_lockless_netdev_ops;
+						priv->tx_lockless = 1;
+					} else
+#endif
+						dev->netdev_ops = &cvm_oct_sgmii_netdev_ops;
+					priv->has_gmx_regs = 1;
+					if (priv->ipd_port == 0){
+						sprintf(dev->name, "obc%d", priv->ipd_port);
+					}else{
+						if (autelan_product_info.board_slot_id > 0)
+						{
+							sprintf(dev->name, "mng%d-%d", autelan_product_info.board_slot_id, priv->ipd_port);
+						}
+						else
+						{
+							sprintf(dev->name, "mng%d", priv->ipd_port - 1);
+						}
+					} 
+					break;
+
+				case CVMX_HELPER_INTERFACE_MODE_SPI:
+#ifdef CONFIG_OCTEON_ETHERNET_LOCKLESS_IF_SUPPORTED
+					if (octeon_pko_lockless()) {
+						dev->netdev_ops = &cvm_oct_spi_lockless_netdev_ops;
+						priv->tx_lockless = 1;
+					} else
+#endif
+						dev->netdev_ops = &cvm_oct_spi_netdev_ops;
+					strcpy(dev->name, "spi%d");
+					break;
+
+				case CVMX_HELPER_INTERFACE_MODE_RGMII:
+				case CVMX_HELPER_INTERFACE_MODE_GMII:
+#ifdef CONFIG_OCTEON_ETHERNET_LOCKLESS_IF_SUPPORTED
+					if (octeon_pko_lockless()) {
+						dev->netdev_ops = &cvm_oct_rgmii_lockless_netdev_ops;
+						priv->tx_lockless = 1;
+					} else
+#endif
+						dev->netdev_ops = &cvm_oct_rgmii_netdev_ops;
+					priv->has_gmx_regs = 1;
+					strcpy(dev->name, "eth%d");
+					break;
+#ifdef CONFIG_RAPIDIO
+				case CVMX_HELPER_INTERFACE_MODE_SRIO:
+					dev->netdev_ops = &cvm_oct_srio_netdev_ops;
+					strcpy(dev->name, "rio%d");
+					break;
+#endif
+				}
+
+				if (!dev->netdev_ops) {
+					free_netdev(dev);
+				} else if (register_netdev(dev) < 0) {
+					pr_err("Failed to register ethernet device for interface %d, port %d\n",
+						 interface, priv->ipd_port);
+					free_netdev(dev);
+				} else {
+					list_add_tail(&priv->list, &cvm_oct_list);
+					if (cvm_oct_by_pkind[priv->ipd_pkind] == NULL)
+						cvm_oct_by_pkind[priv->ipd_pkind] = priv;
+					else
+						cvm_oct_by_pkind[priv->ipd_pkind] = (void *)-1L;
+
+					cvm_oct_add_ipd_port(priv);
+					/*
+					 * Each transmit queue will need its
+					 * own MAX_OUT_QUEUE_DEPTH worth of
+					 * WQE to track the transmit skbs.
+					 */
+					cvm_oct_mem_fill_fpa(CVMX_FPA_TX_WQE_POOL, CVMX_FPA_TX_WQE_POOL_SIZE, PER_DEVICE_EXTRA_WQE);
+					num_devices_extra_wqe++;
+
+					queue_delayed_work(cvm_oct_poll_queue, &priv->port_periodic_work, HZ);
+				}
+			}
+		}
+
 	}
 	else if (autelan_product_info.board_type == AUTELAN_BOARD_AX71_CRSMU)
 	{

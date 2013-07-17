@@ -27,7 +27,7 @@ extern "C"
 #include <sys/time.h>
 #include <ctype.h>
 #include <pthread.h>
-#include <linux/if.h>//huangjing
+#include <linux/if.h>
 #endif
 
 #include "sem_dbus.h"
@@ -87,6 +87,7 @@ extern struct global_ethport_s **global_ethport;
 extern struct global_ethport_s *start_fp[MAX_SLOT_COUNT];
 extern void poll_QT2025_link_status();
 extern void ax81_1x12g12s_download_fpga_QT();
+extern void ax81_smue_panel_port_check_fc();
 
 pthread_t stby_keep_alive_thread;
 pthread_t slave_server_thread;
@@ -101,6 +102,7 @@ pthread_t sem_compatible_thread;
 pthread_t QT2025_link_thread;
 pthread_t FPGA_keep_alive_thread;
 pthread_t slave_cpu_port_check;
+pthread_t ax81_smue_panel_port_check;
 
 int sem_compatible_send_flag[MAX_SLOT_COUNT];
 
@@ -1924,6 +1926,62 @@ void slave_cpu_port_check_fc(void)
 	}
 }
 
+/*AX81_1X12G12S Board's unique needs*/
+void AX81_1X12G12S_board_special_init(int *reboot_flag)
+{
+	/*huangjing@autelan.com.Init for FPGA*/
+	#if 1
+	if(local_board->board_code == AX81_1X12G12S_BOARD_CODE)
+	{
+		car_head = creat_car_linklist();
+		if(car_head == NULL)
+		{
+            sem_syslog_warning("creat car table linklist failed.System need to reboot\n");
+			*reboot_flag = 1;
+		}
+		car_white_head = creat_car_white_list();
+		if(car_white_head == NULL)
+		{
+            sem_syslog_warning("creat car white table linklist failed.System need to reboot\n");
+			*reboot_flag = 1;
+		}
+
+        if (sem_thread_create(&QT2025_link_thread, (void *)poll_QT2025_link_status, NULL, IS_DETACHED) != SEM_THREAD_CREATE_SUCCESS)
+    	{
+    		sem_syslog_warning("create poll_QT2025_link_status failed.System need to reboot\n");
+    		*reboot_flag = 1;
+    	}
+	}
+    #if 0
+	if(local_board->board_code == AX81_1X12G12S_BOARD_CODE)
+	{
+        if (sem_thread_create(&FPGA_keep_alive_thread, (void *)ax81_1x12g12s_download_fpga_QT, NULL, IS_DETACHED) != SEM_THREAD_CREATE_SUCCESS)
+    	{
+    		sem_syslog_warning("create FPGA_keep_alive_thread failed.\n");
+			reboot_flag = 1;
+    	}
+	}
+    #endif
+}
+
+/*AX81_CRSMUE Board's unique needs*/
+void AX81_CRSMUE_board_special_init(int *reboot_flag)
+{
+	if (local_board->board_type == BOARD_TYPE_AX81_SMUE && local_board->board_code == AX81_CRSMUE_BOARD_CODE)
+	{
+		if (sem_thread_create(&ax81_smue_panel_port_check, (void *)ax81_smue_panel_port_check_fc, NULL, IS_DETACHED) != SEM_THREAD_CREATE_SUCCESS)
+	    {
+	    	sem_syslog_warning("create thread ax81_smue_panel_port_check_fc failed.\n");
+			*reboot_flag =1;
+	    }
+		else
+		{
+			sem_syslog_warning("create thread ax81_smue_panel_port_check_fc success.\n");
+		}
+	}
+}
+
+
 int main(int argc,char **argv)
 {
 	int ret;
@@ -1990,17 +2048,7 @@ int main(int argc,char **argv)
 	}
 	else
 		sem_syslog_dbg("SEM_MAIN:board init done\n");
-    #if 0
-	if(local_board->board_code == AX81_1X12G12S_BOARD_CODE)
-	{
-        if (sem_thread_create(&FPGA_keep_alive_thread, (void *)ax81_1x12g12s_download_fpga_QT, NULL, IS_DETACHED) != SEM_THREAD_CREATE_SUCCESS)
-    	{
-    		sem_syslog_warning("create FPGA_keep_alive_thread failed.\n");
-			reboot_flag = 1;
-    	}
-	}
-    #endif
-
+	
 	if (check_board_insert_slot()) {
 		sem_syslog_warning("slot %d:%s board insert the %s board slot\n", local_board->slot_id+1,
 			local_board->is_master ? "master" : "business", local_board->is_master ? "business" : "master");
@@ -2057,29 +2105,10 @@ int main(int argc,char **argv)
 		sem_syslog_warning("create sem_netlink_recv_thread failed.System need to reboot\n");
 		reboot_flag = 1;	
 	}
-	/*huangjing@autelan.com.Init for FPGA*/
-	#if 1
-	if(local_board->board_code == AX81_1X12G12S_BOARD_CODE)
-	{
-		car_head = creat_car_linklist();
-		if(car_head == NULL)
-		{
-            sem_syslog_warning("creat car table linklist failed.System need to reboot\n");
-			reboot_flag = 1;
-		}
-		car_white_head = creat_car_white_list();
-		if(car_white_head == NULL)
-		{
-            sem_syslog_warning("creat car white table linklist failed.System need to reboot\n");
-			reboot_flag = 1;
-		}
-
-        if (sem_thread_create(&QT2025_link_thread, (void *)poll_QT2025_link_status, NULL, IS_DETACHED) != SEM_THREAD_CREATE_SUCCESS)
-    	{
-    		sem_syslog_warning("create poll_QT2025_link_status failed.System need to reboot\n");
-    		reboot_flag = 1;
-    	}
-	}
+	
+	AX81_1X12G12S_board_special_init(&reboot_flag);
+	AX81_CRSMUE_board_special_init(&reboot_flag);
+	
 	if (local_board->is_master)
 	{
     	wan_if_head = creat_wan_if_linklist();

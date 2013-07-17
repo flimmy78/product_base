@@ -926,14 +926,20 @@ void cvm_oct_set_carrier(struct octeon_ethernet *priv, cvmx_helper_link_info_t l
 	
     if (priv->imode == CVMX_HELPER_INTERFACE_MODE_SGMII){
     	
-        	if (autelan_product_info.board_type== AUTELAN_BOARD_AX81_SMU ||autelan_product_info.board_type== AUTELAN_BOARD_AX81_SMUE)
+        	if (autelan_product_info.board_type== AUTELAN_BOARD_AX81_SMU)
             {
                 if(priv->ipd_port == 2)
                 {
         			port = 0;
                 }
         	}
-        
+        	if (autelan_product_info.board_type== AUTELAN_BOARD_AX81_SMUE)
+            {
+                if(priv->ipd_port == 1)
+        			port = 0;
+				if(priv->ipd_port == 2)
+					port = 1;
+        	}
             if(autelan_product_info.board_type == AUTELAN_BOARD_AX81_AC12C)
             {
         		port = priv->ipd_port + 2;        /* master cpu: ipprt 2 -> index 4 on panel */

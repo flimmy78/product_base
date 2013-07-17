@@ -153,7 +153,7 @@ extern int snapshot_before_reset(void);
 #define IS_DETACHED		1
 
 
-#define MAX_SD_NUM	10
+#define MAX_SD_NUM	20
 
 
 
