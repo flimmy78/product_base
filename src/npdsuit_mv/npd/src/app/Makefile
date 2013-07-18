@@ -53,7 +53,7 @@ NPD_OBJS = npd_main.o npd_dbus.o npd_log.o npd_product.o npd_c_slot.o npd_e_slot
 			npd_intf.o npd_hash.o npd_fdb.o npd_arpsnooping.o npd_route.o npd_igmp_snp_com.o npd_pvlan.o npd_mirror.o npd_diag.o npd_tunnel.o \
 			npd_dldp_common.o npd_vrrp.o npd_dhcp_snp_com.o npd_dhcp_snp_if.o npd_dhcp_snp_options.o npd_dhcp_snp_pkt.o npd_dhcp_snp_tbl.o \
 			npd_dhcp_snp_sqlite.o npd_mld_snp_com.o npd_prot_vlan.o npd_board.o npd_board_ax71_2x12g12s.o npd_board_ax81_ac12c.o \
-			npd_board_ax81_1x12g12s.o npd_board_ax81_ac8c.o npd_board_ax81_smu.o npd_hw_diag.o npd_board_ax81_12x.o \
+			npd_board_ax81_1x12g12s.o npd_board_ax81_ac8c.o npd_board_ax81_smu.o npd_hw_diag.o npd_board_ax81_12x.o npd_board_ax81_smue.o \
 			npd_board_ax81_ac4x.o npd_board_axxx_virtualboard.o
 #do not nedd npd_dbm.o(not dir dccnetlink)
 NPD_OBJS_EX = npd_tipc.o npd_communication.o npd_netlink.o

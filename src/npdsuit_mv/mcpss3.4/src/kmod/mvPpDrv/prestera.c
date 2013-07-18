@@ -1429,7 +1429,7 @@ static int pp_find_all_devices(void)
     }
 
 	/* Swap 2 lion on AX81-SMU for L3 vlan. lion1-bus:3 4 5 6, lion0-bus: 9 10 11 12 */
-	if(board_type_mvpp==BOARD_TYPE_AX81_SMU)
+	if((board_type_mvpp==BOARD_TYPE_AX81_SMU)||(board_type_mvpp==BOARD_TYPE_AX81_SMUE))
 	{
         struct PP_Dev *ppdevs_swap[4];
         static struct pci_dev *pcidevs_swap[4];

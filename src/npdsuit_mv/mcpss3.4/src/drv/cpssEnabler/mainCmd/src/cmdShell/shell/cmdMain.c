@@ -560,6 +560,15 @@ GT_STATUS cmdInit
 		}
 		printf("cmdInit::cpssInitSystem(20,1,0) ok\n");
     }
+	else if(BOARD_TYPE == BOARD_TYPE_AX81_SMUE)
+    {
+        if((retVal=cpssInitSystem(20,1,0))!=GT_OK)
+        {
+			printf("cpssInitSystem(20,1,0) failed %d\n",retVal);
+			return retVal;
+		}
+		printf("cmdInit::cpssInitSystem(20,1,0) ok\n");
+    }	
     else
     {
 		if((retVal=cpssInitSystem(19,1,0))!=GT_OK)

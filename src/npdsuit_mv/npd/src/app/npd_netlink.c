@@ -228,7 +228,7 @@ void npd_netlink_recv_thread(void)
                                             syslog_ax_board_err("npd_init_second_stage on MCB error !\n");
                                         }																					
 										/* Add for check port status in trunk of AX81-SMU */
-										if(BOARD_TYPE == BOARD_TYPE_AX81_SMU)
+										if(BOARD_TYPE == BOARD_TYPE_AX81_SMU || BOARD_TYPE == BOARD_TYPE_AX81_SMUE)
 										{
 											ret = npd_update_smu_trunk_info();
 											if (0 != ret)

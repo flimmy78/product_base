@@ -44,6 +44,7 @@ extern "C"
 
 /* for asic board */
 #include "npd_board_ax81_smu.h"
+#include "npd_board_ax81_smue.h"
 #include "npd_board_ax81_ac12c.h"
 #include "npd_board_ax81_12x.h"
 #include "npd_board_ax81_ac8c.h"
@@ -73,6 +74,7 @@ asic_board_t* g_asic_board[]=
 	[BOARD_TYPE_AX71_2X12G12S] = &ax71_2x12g12s_board_t,
 	[BOARD_TYPE_AX81_1X12G12S] = &ax81_1x12g12s_board_t,	
 	[BOARD_TYPE_AX81_AC4X] = &ax81_ac4x_board_t,
+	[BOARD_TYPE_AX81_SMUE] = &ax81_smue_board_t,
 	[BOARD_TYPE_AXXX_VIRTUALBOARD] = &axxx_virtualboard_board_t,
 	[BOARD_TYPE_MAX] = NULL
 };
@@ -316,6 +318,7 @@ static void npd_get_boardinfo(BoardInfo *p_boardinfo)
 void npd_get_virtual_boardinfo(BoardInfo *p_boardinfo)
 {
     if (p_boardinfo->board_type == BOARD_TYPE_AX81_SMU || \
+		p_boardinfo->board_type == BOARD_TYPE_AX81_SMUE || \
 		p_boardinfo->board_type == BOARD_TYPE_AX81_AC12C || \
 		p_boardinfo->board_type == BOARD_TYPE_AX81_AC8C || \
 		p_boardinfo->board_type == BOARD_TYPE_AX81_12X || \
@@ -661,6 +664,10 @@ void npd_init_board(void)
 		    npd_init_ax81_ac4x();
 		    syslog_ax_board_dbg("AX81_AC4X init finished.\n");
 			break;
+		case BOARD_TYPE_AX81_SMUE:
+		    npd_init_ax81_smue();
+		    syslog_ax_board_dbg("AX81_SMUE init finished.\n");
+			break;			
 		case BOARD_TYPE_AXXX_VIRTUALBOARD:
 		    npd_init_axxx_virtualboard();
 		    syslog_ax_board_dbg("AXXX_VIRTUALBOARD init finished.\n");
