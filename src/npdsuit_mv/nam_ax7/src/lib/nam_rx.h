@@ -65,6 +65,7 @@
 #define KAPGETMACADDR _IOWR('T',223,struct if_cfg_struct)
 #define KAPDELIFF _IOWR('T',224,struct if_cfg_struct)
 #define KAPGETIPADDRS _IOWR('T',226,struct if_cfg_struct)
+#define KAPRESETMAC _IOWR('T',229,struct if_cfg_struct)
 
 #define MAX_IP_COUNT 8
 #define KAP_MAXNR	255
