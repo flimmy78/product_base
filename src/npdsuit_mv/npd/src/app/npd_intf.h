@@ -51,6 +51,8 @@ typedef struct{
 #define KAPGETIPADDRS _IOWR('T',226,struct if_cfg_struct)
 #define KAPSETADVDIS     _IOW('T',227,struct if_cfg_struct)
 #define KAPSETADVEN     _IOW('T',228,struct if_cfg_struct)
+#define KAPRESETMAC _IOWR('T',229,struct if_cfg_struct)
+
 
 #define KAP_MAXNR	255
 /* KAPSETIFF if flags */

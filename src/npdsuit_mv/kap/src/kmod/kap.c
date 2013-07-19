@@ -1653,6 +1653,29 @@ static __inline__ int kap_set_dev_mac(struct kap_struct* kap,struct if_cfg_struc
 	return 0;
 }
 
+static __inline__ int kap_reset_mac(struct kap_struct* kap,struct if_cfg_struct* pif)
+{
+	struct user_netdevice* udev;
+	int i;
+	/* add to avoid Unhandled kernel error */
+	if((pif->l3_index)>=MAX_DEV_NO)
+	{
+		DBG(KERN_INFO"ifindex %d >= max:%d, %s failed !\n", pif->l3_index,MAX_DEV_NO,__func__);
+		return -EFAULT;		
+	}
+
+
+	DBG(KERN_INFO"kap_set_dev_mac :: get mac\n");
+	for(i = 0; i < 6 ; i++)
+	{
+		kap->if_mac_addr[i] = pif->mac_addr[i];
+		DBG(KERN_INFO"%02x%s",kap->if_mac_addr[i],(5 == i) ? "" : ":");
+	}
+
+	return 0;
+}
+
+
 static __inline__ int kap_del_iff(struct kap_struct* kap,struct if_cfg_struct* pif)
 {
 	struct user_netdevice *udev,*nxt;
@@ -1834,6 +1857,8 @@ kap_chr_iocmd_map
 			return "KAPSETADVDIS";
 		case KAPSETADVEN:
 			return "KAPSETADVEN";
+		case KAPRESETMAC:
+			return "KAPRESETMAC";			
 	}
 }
 
@@ -1937,6 +1962,9 @@ static int kap_chr_ioctl(struct inode *inode, struct file *file,
 
 		case KAPSETMACADDR:
 			return kap_set_dev_mac(kap, &if_cfg);
+			
+		case KAPRESETMAC:
+			return kap_reset_mac(kap, &if_cfg);
 			
 		default:
 			return -EINVAL;

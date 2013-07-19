@@ -13463,7 +13463,7 @@ unsigned int npd_vlan_cscd_add(unsigned short vlanId)
        		syslog_ax_vlan_dbg("nam add cscd port (%d,%d) to vlan %d OK !\n",devnum, portnum,vlanId);
 
 			/* when rx packet, npd_vlan_check_contain_port() need this */
-			if(BOARD_TYPE == BOARD_TYPE_AX81_SMU)    /* just for L3-vlan on AX81-SMU */
+			if(BOARD_TYPE == BOARD_TYPE_AX81_SMU ||BOARD_TYPE == BOARD_TYPE_AX81_SMUE)    /* just for L3-vlan on AX81-SMU */
 			{
         		/* update g_vlan[]->tag for L3-vlan */
         		/* TODO:add port to vlan tagged port list*/

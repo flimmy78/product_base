@@ -15,9 +15,11 @@ extern "C"
 #include "npd_board.h"
 #include "npd_vlan.h"
 #include "npd_trunk.h"
+#include "npd_intf.h"
 #include "npd_dynamic_trunk.h"
 #include "sysdef/returncode.h"
 #include <cvm/autelan_product.h>   /* for product_info */
+#include <fcntl.h>
 
 int sock_n_fd = 0;
 struct msghdr n_msg;
@@ -983,6 +985,59 @@ int npd_asic_vlan_sync(unsigned int act,unsigned int slot)
 	}	
 	return ret;
 }
+extern int adptVirRxFd;
+
+int npd_reset_intf_mac(void)
+{
+	struct if_cfg_struct pif;
+    int i = 0;
+	int fd = -1;
+	unsigned char temp_buffer[3] = {0x00, 0x00, 0x00};
+	unsigned char mac_addr[6];	
+	char tmp_mac_buffer[13];
+	int ret = -1;
+	
+    memset(&pif, 0, sizeof(struct if_cfg_struct));
+
+	fd = open("/devinfo/local_mac", O_RDONLY);
+	
+    if (fd < 0) {
+        syslog_ax_netlink_info("open /devinfo/local_mac fail\n");
+        return -1;
+    }
+
+	memset(tmp_mac_buffer, 0x00, 13);
+	ret = read(fd, tmp_mac_buffer, 12);
+	syslog_ax_netlink_info("npd_set_intf_mac read length %d\n",ret);
+	for (i=0; i<12; i+=2)
+	{
+		memcpy(temp_buffer, tmp_mac_buffer+i, 2);
+		mac_addr[i/2] = (unsigned char)strtoul((char *)temp_buffer, 0, 16);
+		syslog_ax_netlink_info("npd_get_intf_mac %x", mac_addr[i/2]);
+	}
+
+	close(fd);
+	
+    memcpy(pif.mac_addr , mac_addr, 6);
+    if (!adptVirRxFd || adptVirRxFd < 0) {
+        syslog_ax_intf_err("npd_intf_get_intf_mac::KAP fd %d invalided\n", adptVirRxFd);
+        return INTERFACE_RETURN_CODE_FD_ERROR;
+    }
+    else {
+        if (0 > ioctl(adptVirRxFd, KAPRESETMAC, &pif)) {
+            if (ENODEV != errno) {
+                syslog_ax_intf_err("KAP ioctl %#x get L3 mac fail,errno %d\n", KAPRESETMAC, errno);
+                return INTERFACE_RETURN_CODE_IOCTL_ERROR;
+            }
+            else {
+                return INTERFACE_RETURN_CODE_SUCCESS;
+            }
+        }
+        else {
+            return INTERFACE_RETURN_CODE_SUCCESS;
+        }
+    }
+}
 /**********************************************************************
  *  npd_init_second_stage
  *
@@ -1001,7 +1056,15 @@ int npd_asic_vlan_sync(unsigned int act,unsigned int slot)
 int npd_init_second_stage(void)
 {
 	int ret = -1;
-
+	ret = npd_reset_intf_mac();	
+	if(0 != ret)
+	{
+		syslog_ax_netlink_info("npd_get_intf_mac error!\n");
+	}
+	else
+	{
+		syslog_ax_netlink_info("npd_get_intf_mac OK!\n");
+	}
     /* Reinit the local board MAC, generate from local board sn. zhangdi@autelan.com 2012-05-22 */
 	ret = get_board_mac_from_sn(init_mac);
     if (ret==NPD_FAIL)
