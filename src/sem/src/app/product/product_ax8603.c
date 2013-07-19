@@ -1205,7 +1205,7 @@ int ax8603_master_active_or_stby_select(int *sd, board_fix_param_t *board)
 			}
 
 			//remote master is non-active state
-			if (remote_state)
+			if (!remote_state)
 			{
 				ret = product->force_active_master();
 				if (ret)
@@ -1561,7 +1561,7 @@ int ax8603_master_active_or_stby_select(int *sd, board_fix_param_t *board)
 			}
 
 			//remote master is act as non-active MCB
-			if (remote_state)
+			if (!remote_state)
 			{
 				ret = product->force_active_master();
 				if (ret)
@@ -1902,7 +1902,7 @@ int ax8603_active_stby_switch(void *arg)
 		}
 		
 		//is active master
-		if (!remote_board_state)
+		if (remote_board_state)
 		{
 			sem_syslog_dbg("remote is active MCB,wait for 3 seconds\n");
 			sleep(1);
