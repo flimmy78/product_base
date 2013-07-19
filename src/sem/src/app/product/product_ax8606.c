@@ -855,6 +855,7 @@ int	ax8606_synchronise_software_version(int sd, board_fix_param_t *board)
 	software_version_request_t *version_buildno;
 	//software_version_request_t *version_buildno2;
 	software_version_response_t *version_syn_response;
+	int space_flag=0;
 	int buf_len;
 	char new_version_name[SOFTWARE_VERSION_NAME_LEN];
 	char *recv_version_buf;
@@ -869,6 +870,8 @@ int	ax8606_synchronise_software_version(int sd, board_fix_param_t *board)
 	int addr_len = sizeof(struct sockaddr_tipc);
 	
 	sem_syslog_dbg("synchronise_software_version local_board->slot_id = %d\n", board->slot_id+1);
+	
+	test_CF_space(&space_flag);
 	
 	if (get_software_version(version, buildno))
 	{
@@ -894,7 +897,7 @@ int	ax8606_synchronise_software_version(int sd, board_fix_param_t *board)
 	version_buildno = (software_version_request_t *)(send_buf + sizeof(sem_pdu_head_t) + sizeof(sem_tlv_t));
 	strcpy(version_buildno->version, version);
 	strcpy(version_buildno->buildno, buildno);
-
+    version_buildno->space_flag = space_flag;
 	recv_version_buf = (char *)(malloc(MAX_SOFTWARE_VERSION_SIZE));
 	
 	if (!recv_version_buf)
@@ -2291,7 +2294,7 @@ static int is_need_to_syn_software_version(char *version, char *buildno)
  *return:1 for failed, 0 for success
  *
  */
-static int get_remote_software_version(sem_tlv_t *tlv_head, char *version, char *buildno)
+static int get_remote_software_version(sem_tlv_t *tlv_head, char *version, char *buildno,int *space_flag)
 {
 	software_version_request_t *head;
 	if (!tlv_head || !version || !buildno)
@@ -2329,6 +2332,7 @@ int ax8606_syn_software_version_response(int sd, sem_tlv_t *temp_tlv_head, board
 	struct sockaddr_tipc sock_addr;
 	software_version_response_t *response_head;
 	software_version_text_t *version_text_head;
+	int space_flag=0;
 	int counter = 0, byte_counter = 0;
 	int send_soft_ware_version_try_count = SOFTWARE_VERSION_SEND_TRY_COUNT;
 	
@@ -2336,7 +2340,7 @@ int ax8606_syn_software_version_response(int sd, sem_tlv_t *temp_tlv_head, board
 	
 	FILE *fp = NULL;
 	
-	if (get_remote_software_version(temp_tlv_head, remote_version, remote_buildno))
+	if (get_remote_software_version(temp_tlv_head, remote_version, remote_buildno, &space_flag))
 	{
 		sem_syslog_dbg("get reomte software version failed\n");
 		return SOFTWARE_SYN_FAILED;
@@ -2345,101 +2349,130 @@ int ax8606_syn_software_version_response(int sd, sem_tlv_t *temp_tlv_head, board
 	/*need to syn software version*/
 	if (is_need_to_syn_software_version(remote_version, remote_buildno))
 	{
-		sem_syslog_warning("need to syn software version to slot %d.\n", slot_id+1);
-		pdu_head = (char *)(malloc(sizeof(sem_pdu_head_t) + sizeof(sem_tlv_t) + sizeof(software_version_text_t)));
-		
-		head = (sem_pdu_head_t *)pdu_head;
-		head->slot_id = board->slot_id;
-		
-		tlv_head = (sem_tlv_t *)(pdu_head + sizeof(sem_pdu_head_t));
-		tlv_head->type = SEM_SOFTWARE_VERSION_SYN_RESPONSE;
-
-		response_head = (software_version_response_t *)(pdu_head + sizeof(sem_pdu_head_t) + sizeof(sem_tlv_t));
-		response_head->is_need = 1;
-		strcpy(response_head->version, active_mcb_version);
-		strcpy(response_head->buildno, active_mcb_buildno);
-		
-		if (g_send_sd_arr[slot_id].sd < 0)			
+		if(space_flag == 0)
 		{
-			sem_syslog_warning("error send sd to slot %d\n", slot_id+1);
-			free(pdu_head);
-			return SOFTWARE_SYN_FAILED;
+        	sem_syslog_warning("Slot %d have enough space,need to syn software version to slot %d.\n", slot_id+1,slot_id+1);
+    		pdu_head = (char *)(malloc(sizeof(sem_pdu_head_t) + sizeof(sem_tlv_t) + sizeof(software_version_text_t)));
+    		
+    		head = (sem_pdu_head_t *)pdu_head;
+    		head->slot_id = board->slot_id;
+    		
+    		tlv_head = (sem_tlv_t *)(pdu_head + sizeof(sem_pdu_head_t));
+    		tlv_head->type = SEM_SOFTWARE_VERSION_SYN_RESPONSE;
+
+    		response_head = (software_version_response_t *)(pdu_head + sizeof(sem_pdu_head_t) + sizeof(sem_tlv_t));
+    		response_head->is_need = 1;
+    		strcpy(response_head->version, active_mcb_version);
+    		strcpy(response_head->buildno, active_mcb_buildno);
+    		
+    		if (g_send_sd_arr[slot_id].sd < 0)			
+    		{
+    			sem_syslog_warning("error send sd to slot %d\n", slot_id+1);
+    			free(pdu_head);
+    			return SOFTWARE_SYN_FAILED;
+    		}
+    		
+    		if (sendto(g_send_sd_arr[slot_id].sd, pdu_head, sizeof(sem_pdu_head_t)+sizeof(sem_tlv_t)+ sizeof(software_version_response_t), 0, (struct sockaddr*)&g_send_sd_arr[slot_id].sock_addr, sizeof(struct sockaddr_tipc)) < 0)
+    		{
+    			sem_syslog_dbg("need:server response failed\n");
+    			free(pdu_head);
+    			return SOFTWARE_SYN_FAILED;
+    		}
+    		
+    		head = (sem_pdu_head_t *)pdu_head;
+    		head->slot_id = board->slot_id;
+    		tlv_head = (sem_tlv_t *)(pdu_head + sizeof(sem_pdu_head_t));
+    		tlv_head->type = SEM_SOFTWARE_VERSION_SYNING;
+
+    		version_text_head = (software_version_text_t *)(pdu_head + sizeof(sem_pdu_head_t) + sizeof(sem_tlv_t));
+    		//send_buf = version_text_head->buf;
+
+    		sprintf(version_name, "AW%s.%s.X7X5.IMG", active_mcb_version, active_mcb_buildno);
+    		system("sudo mount /blk");
+    		fp = fopen(strcat(strcat(version_path, NEW_SOFTWARE_VERSION_PATH), version_name), "r");
+    		
+    		if (!fp)
+    		{
+    			sem_syslog_dbg("version file %s open failed\n", version_path);
+    			free(pdu_head);
+    			// TODO:huxuefeng  It should send a message to notice the slave board
+    			return SOFTWARE_SYN_FAILED;
+    		}
+
+    		sem_syslog_dbg("open file %s success\n", version_path);
+    		//head->version = 0;
+    		
+    		while (!feof(fp))
+    		{
+    			//sem_syslog_dbg("send version file:%d\n", counter++);
+    			version_text_head->len = fread(version_text_head->buf, sizeof(char), MAX_SOFTWARE_TEXT_LEN, fp);
+    			byte_counter += version_text_head->len;
+    					
+    			while ((sendto(g_send_sd_arr[slot_id].sd, pdu_head, sizeof(sem_pdu_head_t)+sizeof(sem_tlv_t)+ sizeof(software_version_text_t), 0, (struct sockaddr*)&g_send_sd_arr[slot_id].sock_addr, sizeof(struct sockaddr_tipc))  < 0) &&
+    				send_soft_ware_version_try_count-- >= 0)
+    			{
+    				sem_syslog_dbg("send failed,retry %d\n", send_soft_ware_version_try_count);
+    				if (send_soft_ware_version_try_count < 0)
+    				{
+    					fclose(fp);
+    					return SOFTWARE_SYN_FAILED;
+    				}
+    			}
+    			usleep(100);
+    		}
+
+    		sem_syslog_dbg("send file done.send bytes:%d\n", byte_counter);
+
+    		sprintf(str, "sudo /usr/bin/sor.sh imgmd5 /blk/%s 120 > /mnt/md5", version_name);
+    		system(str);
+    		fd_md5= open("/mnt/md5", O_RDONLY);
+    		if(fd_md5 < 0)
+    		{
+    			sem_syslog_dbg("file %s open failed.%s\n", "/mnt/md5", __FUNCTION__);
+    			free(pdu_head);
+    			fclose(fp);
+    			return SOFTWARE_SYN_FAILED;
+    		}
+    		read(fd_md5, md5_buf, 128);
+    		close(fd_md5);
+    		sem_tipc_send(slot_id, SEM_SEND_MD5_STR, md5_buf, sizeof(md5_buf));
+
+    		tlv_head->type = SEM_SOFTWARE_VERSION_SYN_FINISH;
+    		
+    		if (sendto(g_send_sd_arr[slot_id].sd, pdu_head, sizeof(sem_pdu_head_t)+sizeof(sem_tlv_t), 0, (struct sockaddr*)&g_send_sd_arr[slot_id].sock_addr, sizeof(struct sockaddr_tipc))  < 0)
+    		{
+    			sem_syslog_dbg("send finish command failed.\n");
+    		}
+    		free(pdu_head);
+    		fclose(fp);
+    		return  SOFTWARE_SYN_SUCCESS;
 		}
-		
-		if (sendto(g_send_sd_arr[slot_id].sd, pdu_head, sizeof(sem_pdu_head_t)+sizeof(sem_tlv_t)+ sizeof(software_version_response_t), 0, (struct sockaddr*)&g_send_sd_arr[slot_id].sock_addr, sizeof(struct sockaddr_tipc)) < 0)
+		else
 		{
-			sem_syslog_dbg("need:server response failed\n");
-			free(pdu_head);
-			return SOFTWARE_SYN_FAILED;
+        		sem_syslog_warning("Need to syn software version file to slot %d,but slot %d have no enough space.\n", slot_id+1, slot_id+1);
+				sem_syslog_warning("WARNING:please cleanup slot %d CF card,and syn version!!!\n", slot_id+1);
+        		pdu_head = (char *)(malloc(sizeof(sem_pdu_head_t) + sizeof(sem_tlv_t) + sizeof(software_version_response_t)));
+        	
+        		head = (sem_pdu_head_t *)pdu_head;
+        		head->slot_id = board->slot_id;
+        		
+        		tlv_head = (sem_tlv_t *)(pdu_head + sizeof(sem_pdu_head_t));
+        		tlv_head->type = SEM_SOFTWARE_VERSION_SYN_RESPONSE;
+
+        		response_head = (software_version_response_t *)(pdu_head + sizeof(sem_pdu_head_t) + sizeof(sem_tlv_t));
+        		response_head->is_need = 0;
+        		strcpy(response_head->version, active_mcb_version);
+        		strcpy(response_head->buildno, active_mcb_buildno);
+
+        		if (sendto(g_send_sd_arr[slot_id].sd, pdu_head, sizeof(sem_pdu_head_t)+sizeof(sem_tlv_t)+sizeof(software_version_response_t), 0, (struct sockaddr*)&g_send_sd_arr[slot_id].sock_addr, sizeof(struct sockaddr_tipc)) < 0)
+        		{
+        			sem_syslog_dbg("no need:server response failed\n");
+        			free(pdu_head);
+        			return SOFTWARE_SYN_FAILED;
+        		}
+        		free(pdu_head);
+        		return SOFTWARE_SYN_NO_NEED;
 		}
-		
-		head = (sem_pdu_head_t *)pdu_head;
-		head->slot_id = board->slot_id;
-		tlv_head = (sem_tlv_t *)(pdu_head + sizeof(sem_pdu_head_t));
-		tlv_head->type = SEM_SOFTWARE_VERSION_SYNING;
-
-		version_text_head = (software_version_text_t *)(pdu_head + sizeof(sem_pdu_head_t) + sizeof(sem_tlv_t));
-		//send_buf = version_text_head->buf;
-
-		sprintf(version_name, "AW%s.%s.X7X5.IMG", active_mcb_version, active_mcb_buildno);
-		system("sudo mount /blk");
-		fp = fopen(strcat(strcat(version_path, NEW_SOFTWARE_VERSION_PATH), version_name), "r");
-		
-		if (!fp)
-		{
-			sem_syslog_dbg("version file %s open failed\n", version_path);
-			free(pdu_head);
-			// TODO:huxuefeng  It should send a message to notice the slave board
-			return SOFTWARE_SYN_FAILED;
-		}
-
-		sem_syslog_dbg("open file %s success\n", version_path);
-		//head->version = 0;
-		
-		while (!feof(fp))
-		{
-			//sem_syslog_dbg("send version file:%d\n", counter++);
-			version_text_head->len = fread(version_text_head->buf, sizeof(char), MAX_SOFTWARE_TEXT_LEN, fp);
-			byte_counter += version_text_head->len;
-					
-			while ((sendto(g_send_sd_arr[slot_id].sd, pdu_head, sizeof(sem_pdu_head_t)+sizeof(sem_tlv_t)+ sizeof(software_version_text_t), 0, (struct sockaddr*)&g_send_sd_arr[slot_id].sock_addr, sizeof(struct sockaddr_tipc))  < 0) &&
-				send_soft_ware_version_try_count-- >= 0)
-			{
-				sem_syslog_dbg("send failed,retry %d\n", send_soft_ware_version_try_count);
-				if (send_soft_ware_version_try_count < 0)
-				{
-					fclose(fp);
-					return SOFTWARE_SYN_FAILED;
-				}
-			}
-			usleep(100);
-		}
-
-		sem_syslog_dbg("send file done.send bytes:%d\n", byte_counter);
-
-		sprintf(str, "sudo /usr/bin/sor.sh imgmd5 /blk/%s 120 > /mnt/md5", version_name);
-		system(str);
-		fd_md5= open("/mnt/md5", O_RDONLY);
-		if(fd_md5 < 0)
-		{
-			sem_syslog_dbg("file %s open failed.%s\n", "/mnt/md5", __FUNCTION__);
-			free(pdu_head);
-			fclose(fp);
-			return SOFTWARE_SYN_FAILED;
-		}
-		read(fd_md5, md5_buf, 128);
-		close(fd_md5);
-		sem_tipc_send(slot_id, SEM_SEND_MD5_STR, md5_buf, sizeof(md5_buf));
-
-		tlv_head->type = SEM_SOFTWARE_VERSION_SYN_FINISH;
-		
-		if (sendto(g_send_sd_arr[slot_id].sd, pdu_head, sizeof(sem_pdu_head_t)+sizeof(sem_tlv_t), 0, (struct sockaddr*)&g_send_sd_arr[slot_id].sock_addr, sizeof(struct sockaddr_tipc))  < 0)
-		{
-			sem_syslog_dbg("send finish command failed.\n");
-		}
-		free(pdu_head);
-		fclose(fp);
-		return  SOFTWARE_SYN_SUCCESS;
 	}
 	/*no need to syn software version*/
 	else

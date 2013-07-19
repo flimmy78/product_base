@@ -16,6 +16,8 @@ extern "C"
 #include <unistd.h>
 #include <pthread.h>
 #include <linux/tipc.h>
+#include <errno.h> 
+
 
 #include "sem/sem_tipc.h"
 #include "sem_common.h"
@@ -184,7 +186,7 @@ int sem_sor_exec(char* cmd,char* filename,int time)
 	int ret;
 	sprintf(cmdstr,"sor.sh %s %s %d ",cmd,filename,time);
 	ret = system(cmdstr);	
-	switch (WEXITSTATUS(ret)) { 	
+	switch (WEXITSTATUS(ret)) {
 		case 0:
 			return 0; 	
 		case 1: 		
@@ -207,6 +209,73 @@ int sem_sor_exec(char* cmd,char* filename,int time)
 			break;		
 			}	
 	return -1;
+}
+
+void test_CF_space(int *space_flag)
+{
+	char cf_space_buf[10] = {0};
+	int cf_space=0;
+	char *endptr=NULL;
+	int ret =0;
+	int i=0;
+	int fd;
+
+	system("sudo mount /blk");
+    system("df -lh |grep blk|awk '{print $5}' >& /mnt/cf_card_space");
+
+	fd = open("/mnt/cf_card_space", O_RDONLY);
+	if (fd < 0) {
+		sem_syslog_warning("get log failed:/mnt/cf_card_space.\n");
+		sem_syslog_warning("errno=%d\n",errno); 
+
+		/*A backup plan*/
+		#if 1
+	    system("dd if=/dev/zero of=/home/mnt/TestBlkSpace  bs=1M count=80");
+    	ret = sem_sor_exec("cp","TestBlkSpace",50);
+    	if(ret){
+    		if(ret == 5){
+    			*space_flag=1;
+                sem_syslog_warning("Warning:The space of /blk is less than 80M for IMG.Please clean the CF card!!!\n");
+    		}
+    	}
+        system("rm /home/mnt/TestBlkSpace");
+    	ret = sem_sor_exec("rm","TestBlkSpace",50);
+		#endif
+		/*end*/
+	} else {
+		read(fd, cf_space_buf, CF_SPACE_BUF_LEN);
+	    sem_syslog_dbg("the cf card Use:%s \n",cf_space_buf);
+		close(fd);
+		
+		if(cf_space_buf[0] == '\0'){
+            sem_syslog_dbg("/mnt/cf_card_space is empty file !!!\n");
+    		#if 1
+    	    system("dd if=/dev/zero of=/home/mnt/TestBlkSpace  bs=1M count=80");
+        	ret = sem_sor_exec("cp","TestBlkSpace",50);
+        	if(ret){
+        		if(ret == 5){
+        			*space_flag=1;
+                    sem_syslog_warning("Warning:The space of /blk is less than 80M for IMG.Please clean the CF card!!!\n");
+        		}
+        	}
+            system("rm /home/mnt/TestBlkSpace");
+        	ret = sem_sor_exec("rm","TestBlkSpace",50);
+    		#endif
+	    }else{
+    		for(;i<10;i++){
+                if(cf_space_buf[i] == '%'){
+    				cf_space_buf[i]='\0';
+                }
+    		}
+			//sem_syslog_dbg("the cf card Use:%s \n",cf_space_buf);
+            cf_space=strtoul(cf_space_buf, &endptr,10);
+			sem_syslog_dbg("the cf card Use:%d \n",cf_space);
+    		if(cf_space >= 85){
+                *space_flag=1;
+    		}
+	    }
+	}
+	system("rm /mnt/cf_card_space");
 }
 
 int sem_read_cpld(int reg, int *read_value)

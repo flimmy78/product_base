@@ -12,7 +12,7 @@
 #else
 #define SEM_DEBUG_PRINTF
 #endif
-
+#define CF_SPACE_BUF_LEN	1024
 
 #define MAX_SLOT_COUNT				20
 #define RE_CONNECT_TIMEOUT			60
