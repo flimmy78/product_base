@@ -98,6 +98,7 @@ typedef struct software_version_syn_response_s
 
 typedef struct software_version_syn_request_s
 {
+	int space_flag;
 	int tem;
 	char version[MAX_SOFTWARE_VERSION_LEN];
 	char buildno[MAX_SOFTWARE_VERSION_LEN];
