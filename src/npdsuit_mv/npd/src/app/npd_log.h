@@ -376,6 +376,15 @@ void npd_syslog_emit
 #define syslog_ax_vlan_pkt_send        npd_syslog_pkt_send
 #define syslog_ax_vlan_warning         npd_syslog_warning
 
+/*syslog for connect-table */
+#define syslog_ax_conntable_err             npd_syslog_err
+#define syslog_ax_conntable_dbg             npd_syslog_dbg
+#define syslog_ax_conntable_event           npd_syslog_event
+#define syslog_ax_conntable_pkt_rev         npd_syslog_pkt_rev
+#define syslog_ax_conntable_pkt_send        npd_syslog_pkt_send
+#define syslog_ax_conntable_warning         npd_syslog_warning
+
+
 
 /* syslog for igmp*/
 #define syslog_ax_igmp_err             npd_syslog_err

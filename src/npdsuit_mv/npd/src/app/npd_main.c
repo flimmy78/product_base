@@ -300,7 +300,13 @@ int main(int argc,char **argv)
 
 	npd_init_trunks();
 	npd_dynamic_trunk_init();
-	
+
+/*
+    Build connect table
+*/
+    syslog_ax_main_dbg("init connect table");
+
+    npd_init_connect_table();
 
 /*
 	Build L3 interface data

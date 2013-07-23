@@ -61,6 +61,8 @@ asic_board_t* asic_board = NULL;
 vlan_list_t* g_vlanlist = NULL;
 vlan_list_t* g_vlanback = NULL;
 dst_trunk_s* g_dst_trunk = NULL;
+asic_board_cscd_bport_t* g_bportlist = NULL;
+
 char g_dis_dev[MAX_ASIC_NUM] = {0,0}; /*global distributed dev num arry[i] i represent asic num,and the {0,0} represent devNum*/
 char init_mac[] = "001122AABBCC";
 unsigned char npd_cscd_type = 0;    /* CSCD_TYPE refer to */
@@ -692,6 +694,13 @@ void npd_init_board(void)
 	{
 		npd_syslog_err("npd_init_distributed_trunk error !!!\n");
 	}
+	/* init distributed connect_table */
+	ret = npd_init_distributed_connect_table();
+	if(ret != NPD_SUCCESS)
+	{
+		npd_syslog_err("npd_init_distributed_connect_table error !!!\n");
+	}	
+    npd_syslog_info("nam_fdb_table_agingtime_set");
 	/*set default fdb aging time to 300s*/
 	ret = nam_fdb_table_agingtime_set(300);
 	if(ret != NPD_SUCCESS)
