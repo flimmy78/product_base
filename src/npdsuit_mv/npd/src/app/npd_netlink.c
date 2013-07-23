@@ -1075,6 +1075,15 @@ int npd_init_second_stage(void)
 	{
         syslog_ax_netlink_info("get_board_mac_from_sn: %s OK.\n",productinfo.sysinfo.basemac);
 	}
+    npd_get_default_connect_table();
+	if(0 != ret)
+	{
+	npd_syslog_info("======  npd_get_default_connect_table ERROR! ====\n");	
+	}
+	else
+	{
+	npd_syslog_info("======  npd_get_default_connect_table OK! ====\n");	
+	}
 	
     /* Init the master info for macro IS_MASTER_NPD & IS_ACTIVE_MASTER_NPD */
 	board_info.is_active_master = get_num_from_file("/dbm/local_board/is_active_master");
