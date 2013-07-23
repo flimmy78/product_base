@@ -458,8 +458,6 @@ int check_software_version_md5(char *new_version_name)
 	str_new[32] = '\0';
 	if (strcmp(str_new, str_old)==0)
 	{
-	    system("sudo sync");		
-		sem_syslog_warning("sync OK\n");		
 		return 0;
 	}
 	else
