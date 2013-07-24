@@ -1478,6 +1478,20 @@ static int ax81_smue_show_system_environment(env_state_t *env_state)
 		sem_syslog_dbg("ax81_smue read cpu temperature error! \n");
 		ret = -1;	
 	}
+
+
+    if (get_num_from_file(TMP421_ENVIRONMENT_TEMP1_INPUT, &slave_temp1_input) >= 0)
+	{
+		env_state->slave_remote_temp = slave_temp1_input/1000;	
+		
+	}
+	else 
+	{
+		
+		sem_syslog_dbg("ax81_smue read environment temperature error! \n");
+		ret = -1;	
+	}
+	
 	
 	return ret;
 }

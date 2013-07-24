@@ -1029,7 +1029,7 @@ DBusMessage *sem_dbus_show_system_environment(DBusConnection *conn, DBusMessage 
 {
 	DBusMessage* reply;
 	DBusError err;
-	unsigned int ret = 0, is_active_master, cpu_num;
+	unsigned int ret = 0, is_active_master, cpu_num, board_id;
 	env_state_t envi_state;
 	
 	dbus_error_init(&err);
@@ -1046,10 +1046,12 @@ DBusMessage *sem_dbus_show_system_environment(DBusConnection *conn, DBusMessage 
 	is_active_master = local_board->is_active_master;
 
 	cpu_num = local_board->cpu_num;
+	board_id = local_board->board_id;
 	sem_syslog_dbg("local_board->cpu_num = %#x\n", local_board->cpu_num);
 	dbus_message_append_args(reply,
 		                     DBUS_TYPE_UINT32,&is_active_master,
 		                     DBUS_TYPE_UINT32,&cpu_num,
+		                     DBUS_TYPE_UINT32,&board_id,
 							 DBUS_TYPE_UINT32,&(envi_state.fan_state),
 							 DBUS_TYPE_UINT32,&(envi_state.fan_rpm),
 							 DBUS_TYPE_UINT32,&(envi_state.power_state),

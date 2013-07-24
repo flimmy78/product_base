@@ -15,6 +15,7 @@ enum port_type
 #define TMP421_MASTER_TEMP1_INPUT "/sys/bus/i2c/devices/0-004c/temp1_input"
 #define TMP421_MASTER_TEMP2_INPUT "/sys/bus/i2c/devices/0-004c/temp2_input"
 
+#define TMP421_ENVIRONMENT_TEMP1_INPUT "/sys/bus/i2c/devices/0-004d/temp1_input"
 
 #define BOARD_GLOBAL_ETHPORTS_MAXNUM 64
 #define GLOBAL_ETHPORTS_MAXNUM       (64*16)
