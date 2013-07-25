@@ -153,7 +153,6 @@ int npd_get_default_connect_table(void)
         {
 			sprintf(buf, "/dbm/product/slot/slot%d/board_code", ((slot_id<AX8610_SLOT_HALF?slot_id:slot_id+2)+1));
 			board_type =get_num_from_file(buf);
-			npd_syslog_info("wc***********slot_id%d,slot%d,board_type%d\n",slot_id,((slot_id<AX8610_SLOT_HALF?slot_id:slot_id+2)+1),board_type);
             switch(board_type)
             {
 
@@ -203,7 +202,20 @@ int npd_get_default_connect_table(void)
 					}
 					break;
 				case   	AX81_1X12G12S_BOARD_CODE:
-					
+					g_bportlist[slot_id].board_type = AUTELAN_BOARD_AX81_1X12G12S;
+				    g_bportlist[slot_id].slot_id = (slot_id<=AX8610_SLOT_HALF?slot_id:slot_id+2)+1;
+					g_bportlist[slot_id].slot_num = slotNum;
+					g_bportlist[slot_id].asic_cscd_port_cnt = 2;
+					g_bportlist[slot_id].asic_to_cpu_ports = 2;
+					for(i=0;i<(g_bportlist[slot_id].asic_cscd_port_cnt+g_bportlist[slot_id].asic_to_cpu_ports);i++)
+					{
+						g_bportlist[slot_id].asic_cscd_bports[i].cscd_port = asic_1x12g12s_8610_cscd_bports[slot_id][i].cscd_port;
+						g_bportlist[slot_id].asic_cscd_bports[i].master = asic_1x12g12s_8610_cscd_bports[slot_id][i].master;
+						g_bportlist[slot_id].asic_cscd_bports[i].asic_id = asic_1x12g12s_8610_cscd_bports[slot_id][i].asic_id;
+						g_bportlist[slot_id].asic_cscd_bports[i].bport = asic_1x12g12s_8610_cscd_bports[slot_id][i].bport;
+						g_bportlist[slot_id].asic_cscd_bports[i].trunk_id = asic_1x12g12s_8610_cscd_bports[slot_id][i].trunk_id;
+					}
+					break;                 
                 case   	AX81_12X_BOARD_CODE:
 					g_bportlist[slot_id].board_type = AUTELAN_BOARD_AX81_AC_12X;
 				    g_bportlist[slot_id].slot_id = (slot_id<=AX8610_SLOT_HALF?slot_id:slot_id+2)+1;
@@ -217,17 +229,8 @@ int npd_get_default_connect_table(void)
 						g_bportlist[slot_id].asic_cscd_bports[i].asic_id = asic_12x_8610_cscd_bports[slot_id][i].asic_id;
 						g_bportlist[slot_id].asic_cscd_bports[i].bport = asic_12x_8610_cscd_bports[slot_id][i].bport;
 						g_bportlist[slot_id].asic_cscd_bports[i].trunk_id = asic_12x_8610_cscd_bports[slot_id][i].trunk_id;
-						npd_syslog_info("wc****12x******* asic_12x_8610_cscd_bports[%d][%d].cscd_port=%d\n",slot_id,i,
-							                                        asic_12x_8610_cscd_bports[slot_id][i].cscd_port);
-						npd_syslog_info("wc********slot%d-port%d===>SUM_slot%d-lion%d_port%d,%d\n",\
-				            g_bportlist[slot_id].slot_id,\
-				            g_bportlist[slot_id].asic_cscd_bports[i].cscd_port,\
-				            g_bportlist[slot_id].asic_cscd_bports[i].master,\
-				            g_bportlist[slot_id].asic_cscd_bports[i].asic_id,\
-				            g_bportlist[slot_id].asic_cscd_bports[i].bport,\
-				            g_bportlist[slot_id].asic_cscd_bports[i].trunk_id);
+
 					}
-					npd_syslog_info("wc****12x*******g_bportlist[%d].board_type=%d\n",slot_id,g_bportlist[slot_id].board_type);
 					break;
                 case   	AX81_AC4X_BOARD_CODE:
 					g_bportlist[slot_id].board_type = AUTELAN_BOARD_AX81_AC_4X;
@@ -242,25 +245,14 @@ int npd_get_default_connect_table(void)
 						g_bportlist[slot_id].asic_cscd_bports[i].master = asic_4x_8610_cscd_bports[slot_id][i].master;
 						g_bportlist[slot_id].asic_cscd_bports[i].asic_id = asic_4x_8610_cscd_bports[slot_id][i].asic_id;
 						g_bportlist[slot_id].asic_cscd_bports[i].bport = asic_4x_8610_cscd_bports[slot_id][i].bport;
-						g_bportlist[slot_id].asic_cscd_bports[i].trunk_id = asic_4x_8610_cscd_bports[slot_id][i].trunk_id;
-						npd_syslog_info("wc****4x******* asic_4x_8610_cscd_bports[%d][%d].cscd_port=%d\n",slot_id,i,
-							                                        asic_4x_8610_cscd_bports[slot_id][i].cscd_port);
-						npd_syslog_info("wc********slot%d-port%d===>SUM_slot%d-lion%d_port%d,%d\n",\
-				            g_bportlist[slot_id].slot_id,\
-				            g_bportlist[slot_id].asic_cscd_bports[i].cscd_port,\
-				            g_bportlist[slot_id].asic_cscd_bports[i].master,\
-				            g_bportlist[slot_id].asic_cscd_bports[i].asic_id,\
-				            g_bportlist[slot_id].asic_cscd_bports[i].bport,\
-				            g_bportlist[slot_id].asic_cscd_bports[i].trunk_id);					
+						g_bportlist[slot_id].asic_cscd_bports[i].trunk_id = asic_4x_8610_cscd_bports[slot_id][i].trunk_id;			
 					}
-					npd_syslog_info("wc****4x*******g_bportlist[%d].board_type=%d\n",slot_id,g_bportlist[slot_id].board_type);
 	                break;	
 					
                 case   	AX81_CRSMU_BOARD_CODE:
                 case	AX81_CRSMUE_BOARD_CODE:					
 				default:
 						g_bportlist[slot_id].board_type = -1;
-                        npd_syslog_info("wc***********g_bportlist[%d].board_type=%d\n",slot_id,g_bportlist[slot_id].board_type);
 					break;
 			}
 				
@@ -277,7 +269,6 @@ int npd_get_default_connect_table(void)
         {
 			sprintf(buf, "/dbm/product/slot/slot%d/board_code", ((slot_id<AX8800_SLOT_HALF?slot_id:slot_id+2)+1));
 			board_type =get_num_from_file(buf);
-			npd_syslog_info("wc***********slot_id%d,slot%d,board_type%d\n",slot_id,((slot_id<AX8800_SLOT_HALF?slot_id:slot_id+2)+1),board_type);
             switch(board_type)
             {
 
@@ -289,11 +280,11 @@ int npd_get_default_connect_table(void)
 					g_bportlist[slot_id].asic_to_cpu_ports = 1;
 					for(i=0;i<(g_bportlist[slot_id].asic_cscd_port_cnt+g_bportlist[slot_id].asic_to_cpu_ports);i++)
 					{
-						g_bportlist[slot_id].asic_cscd_bports[i].cscd_port = asic_8c_8610_cscd_bports[slot_id][i].cscd_port;
-						g_bportlist[slot_id].asic_cscd_bports[i].master = asic_8c_8610_cscd_bports[slot_id][i].master;
-						g_bportlist[slot_id].asic_cscd_bports[i].asic_id = asic_8c_8610_cscd_bports[slot_id][i].asic_id;
-						g_bportlist[slot_id].asic_cscd_bports[i].bport = asic_8c_8610_cscd_bports[slot_id][i].bport;
-						g_bportlist[slot_id].asic_cscd_bports[i].trunk_id = asic_8c_8610_cscd_bports[slot_id][i].trunk_id;
+						g_bportlist[slot_id].asic_cscd_bports[i].cscd_port = asic_8c_8800_cscd_bports[slot_id][i].cscd_port;
+						g_bportlist[slot_id].asic_cscd_bports[i].master = asic_8c_8800_cscd_bports[slot_id][i].master;
+						g_bportlist[slot_id].asic_cscd_bports[i].asic_id = asic_8c_8800_cscd_bports[slot_id][i].asic_id;
+						g_bportlist[slot_id].asic_cscd_bports[i].bport = asic_8c_8800_cscd_bports[slot_id][i].bport;
+						g_bportlist[slot_id].asic_cscd_bports[i].trunk_id = asic_8c_8800_cscd_bports[slot_id][i].trunk_id;
 					}
 					break;                 
 					case   	AX81_AC12C_BOARD_CODE:
@@ -304,11 +295,11 @@ int npd_get_default_connect_table(void)
 					g_bportlist[slot_id].asic_to_cpu_ports = 2;
 					for(i=0;i<(g_bportlist[slot_id].asic_cscd_port_cnt+g_bportlist[slot_id].asic_to_cpu_ports);i++)
 					{
-						g_bportlist[slot_id].asic_cscd_bports[i].cscd_port = asic_12c_8610_cscd_bports[slot_id][i].cscd_port;
-						g_bportlist[slot_id].asic_cscd_bports[i].master = asic_12c_8610_cscd_bports[slot_id][i].master;
-						g_bportlist[slot_id].asic_cscd_bports[i].asic_id = asic_12c_8610_cscd_bports[slot_id][i].asic_id;
-						g_bportlist[slot_id].asic_cscd_bports[i].bport = asic_12c_8610_cscd_bports[slot_id][i].bport;
-						g_bportlist[slot_id].asic_cscd_bports[i].trunk_id = asic_12c_8610_cscd_bports[slot_id][i].trunk_id;
+						g_bportlist[slot_id].asic_cscd_bports[i].cscd_port = asic_12c_8800_cscd_bports[slot_id][i].cscd_port;
+						g_bportlist[slot_id].asic_cscd_bports[i].master = asic_12c_8800_cscd_bports[slot_id][i].master;
+						g_bportlist[slot_id].asic_cscd_bports[i].asic_id = asic_12c_8800_cscd_bports[slot_id][i].asic_id;
+						g_bportlist[slot_id].asic_cscd_bports[i].bport = asic_12c_8800_cscd_bports[slot_id][i].bport;
+						g_bportlist[slot_id].asic_cscd_bports[i].trunk_id = asic_12c_8800_cscd_bports[slot_id][i].trunk_id;
 					}
 					break;                
 				case   	AX81_2X12G12S_BOARD_CODE:
@@ -319,15 +310,28 @@ int npd_get_default_connect_table(void)
 					g_bportlist[slot_id].asic_to_cpu_ports = 0;
 					for(i=0;i<(g_bportlist[slot_id].asic_cscd_port_cnt+g_bportlist[slot_id].asic_to_cpu_ports);i++)
 					{
-						g_bportlist[slot_id].asic_cscd_bports[i].cscd_port = asic_2x12g12s_8610_cscd_bports[slot_id][i].cscd_port;
-						g_bportlist[slot_id].asic_cscd_bports[i].master = asic_2x12g12s_8610_cscd_bports[slot_id][i].master;
-						g_bportlist[slot_id].asic_cscd_bports[i].asic_id = asic_2x12g12s_8610_cscd_bports[slot_id][i].asic_id;
-						g_bportlist[slot_id].asic_cscd_bports[i].bport = asic_2x12g12s_8610_cscd_bports[slot_id][i].bport;
-						g_bportlist[slot_id].asic_cscd_bports[i].trunk_id = asic_2x12g12s_8610_cscd_bports[slot_id][i].trunk_id;
+						g_bportlist[slot_id].asic_cscd_bports[i].cscd_port = asic_2x12g12s_8800_cscd_bports[slot_id][i].cscd_port;
+						g_bportlist[slot_id].asic_cscd_bports[i].master = asic_2x12g12s_8800_cscd_bports[slot_id][i].master;
+						g_bportlist[slot_id].asic_cscd_bports[i].asic_id = asic_2x12g12s_8800_cscd_bports[slot_id][i].asic_id;
+						g_bportlist[slot_id].asic_cscd_bports[i].bport = asic_2x12g12s_8800_cscd_bports[slot_id][i].bport;
+						g_bportlist[slot_id].asic_cscd_bports[i].trunk_id = asic_2x12g12s_8800_cscd_bports[slot_id][i].trunk_id;
 					}
 					break;
 				case   	AX81_1X12G12S_BOARD_CODE:
-					
+					g_bportlist[slot_id].board_type = AUTELAN_BOARD_AX81_1X12G12S;
+				    g_bportlist[slot_id].slot_id = (slot_id<=AX8800_SLOT_HALF?slot_id:slot_id+2)+1;
+					g_bportlist[slot_id].slot_num = slotNum;
+					g_bportlist[slot_id].asic_cscd_port_cnt = 2;
+					g_bportlist[slot_id].asic_to_cpu_ports = 2;
+					for(i=0;i<(g_bportlist[slot_id].asic_cscd_port_cnt+g_bportlist[slot_id].asic_to_cpu_ports);i++)
+					{
+						g_bportlist[slot_id].asic_cscd_bports[i].cscd_port = asic_1x12g12s_8800_cscd_bports[slot_id][i].cscd_port;
+						g_bportlist[slot_id].asic_cscd_bports[i].master = asic_1x12g12s_8800_cscd_bports[slot_id][i].master;
+						g_bportlist[slot_id].asic_cscd_bports[i].asic_id = asic_1x12g12s_8800_cscd_bports[slot_id][i].asic_id;
+						g_bportlist[slot_id].asic_cscd_bports[i].bport = asic_1x12g12s_8800_cscd_bports[slot_id][i].bport;
+						g_bportlist[slot_id].asic_cscd_bports[i].trunk_id = asic_1x12g12s_8800_cscd_bports[slot_id][i].trunk_id;
+					}
+					break;                 
                 case   	AX81_12X_BOARD_CODE:
 					g_bportlist[slot_id].board_type = AUTELAN_BOARD_AX81_AC_12X;
 				    g_bportlist[slot_id].slot_id = (slot_id<=AX8800_SLOT_HALF?slot_id:slot_id+2)+1;
@@ -336,22 +340,12 @@ int npd_get_default_connect_table(void)
 					g_bportlist[slot_id].asic_to_cpu_ports = 0;
 					for(i=0;i<(g_bportlist[slot_id].asic_cscd_port_cnt+g_bportlist[slot_id].asic_to_cpu_ports);i++)
 					{
-						g_bportlist[slot_id].asic_cscd_bports[i].cscd_port = asic_12x_8610_cscd_bports[slot_id][i].cscd_port;
-						g_bportlist[slot_id].asic_cscd_bports[i].master = asic_12x_8610_cscd_bports[slot_id][i].master;
-						g_bportlist[slot_id].asic_cscd_bports[i].asic_id = asic_12x_8610_cscd_bports[slot_id][i].asic_id;
-						g_bportlist[slot_id].asic_cscd_bports[i].bport = asic_12x_8610_cscd_bports[slot_id][i].bport;
-						g_bportlist[slot_id].asic_cscd_bports[i].trunk_id = asic_12x_8610_cscd_bports[slot_id][i].trunk_id;
-						npd_syslog_info("wc****12x******* asic_12x_8610_cscd_bports[%d][%d].cscd_port=%d\n",slot_id,i,
-							                                        asic_12x_8610_cscd_bports[slot_id][i].cscd_port);
-						npd_syslog_info("wc********slot%d-port%d===>SUM_slot%d-lion%d_port%d,%d\n",\
-				            g_bportlist[slot_id].slot_id,\
-				            g_bportlist[slot_id].asic_cscd_bports[i].cscd_port,\
-				            g_bportlist[slot_id].asic_cscd_bports[i].master,\
-				            g_bportlist[slot_id].asic_cscd_bports[i].asic_id,\
-				            g_bportlist[slot_id].asic_cscd_bports[i].bport,\
-				            g_bportlist[slot_id].asic_cscd_bports[i].trunk_id);
+						g_bportlist[slot_id].asic_cscd_bports[i].cscd_port = asic_12x_8800_cscd_bports[slot_id][i].cscd_port;
+						g_bportlist[slot_id].asic_cscd_bports[i].master = asic_12x_8800_cscd_bports[slot_id][i].master;
+						g_bportlist[slot_id].asic_cscd_bports[i].asic_id = asic_12x_8800_cscd_bports[slot_id][i].asic_id;
+						g_bportlist[slot_id].asic_cscd_bports[i].bport = asic_12x_8800_cscd_bports[slot_id][i].bport;
+						g_bportlist[slot_id].asic_cscd_bports[i].trunk_id = asic_12x_8800_cscd_bports[slot_id][i].trunk_id;
 					}
-					npd_syslog_info("wc****12x*******g_bportlist[%d].board_type=%d\n",slot_id,g_bportlist[slot_id].board_type);
 					break;
                 case   	AX81_AC4X_BOARD_CODE:
 					g_bportlist[slot_id].board_type = AUTELAN_BOARD_AX81_AC_4X;
@@ -362,20 +356,18 @@ int npd_get_default_connect_table(void)
 
 					for(i=0;i<(g_bportlist[slot_id].asic_cscd_port_cnt+g_bportlist[slot_id].asic_to_cpu_ports);i++)
 					{
-						g_bportlist[slot_id].asic_cscd_bports[i].cscd_port = asic_4x_8610_cscd_bports[slot_id][i].cscd_port;
-						g_bportlist[slot_id].asic_cscd_bports[i].master = asic_4x_8610_cscd_bports[slot_id][i].master;
-						g_bportlist[slot_id].asic_cscd_bports[i].asic_id = asic_4x_8610_cscd_bports[slot_id][i].asic_id;
-						g_bportlist[slot_id].asic_cscd_bports[i].bport = asic_4x_8610_cscd_bports[slot_id][i].bport;
-						g_bportlist[slot_id].asic_cscd_bports[i].trunk_id = asic_4x_8610_cscd_bports[slot_id][i].trunk_id;
+						g_bportlist[slot_id].asic_cscd_bports[i].cscd_port = asic_4x_8800_cscd_bports[slot_id][i].cscd_port;
+						g_bportlist[slot_id].asic_cscd_bports[i].master = asic_4x_8800_cscd_bports[slot_id][i].master;
+						g_bportlist[slot_id].asic_cscd_bports[i].asic_id = asic_4x_8800_cscd_bports[slot_id][i].asic_id;
+						g_bportlist[slot_id].asic_cscd_bports[i].bport = asic_4x_8800_cscd_bports[slot_id][i].bport;
+						g_bportlist[slot_id].asic_cscd_bports[i].trunk_id = asic_4x_8800_cscd_bports[slot_id][i].trunk_id;
 					}
-					npd_syslog_info("wc****4x*******g_bportlist[%d].board_type=%d\n",g_bportlist[slot_id].board_type);
 	                break;	
 					
                 case   	AX81_CRSMU_BOARD_CODE:
                 case	AX81_CRSMUE_BOARD_CODE:					
 				default:
 						g_bportlist[slot_id].board_type = -1;
-                        npd_syslog_info("wc***********g_bportlist[%d].board_type=%d\n",slot_id,g_bportlist[slot_id].board_type);
 					break;
 			}
 				
