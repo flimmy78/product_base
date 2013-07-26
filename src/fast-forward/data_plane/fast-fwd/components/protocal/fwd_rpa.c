@@ -32,10 +32,11 @@
 #include "fwd_debug.h"
 
 extern CVMX_SHARED uint8_t *base_mac_table ;
-extern inline int8_t rx_l2hdr_decap( uint8_t* eth_head,cvm_common_ip_hdr_t **ip_head);
+extern inline int8_t rx_l2hdr_decap( uint8_t* eth_head,cvm_common_ip_hdr_t **ip_head, uint8_t* input_pppoe);
+
 //extern int cvmx_dump_128_packet(cvmx_wqe_t *work);
 
-inline int rpa_packet_handle(cvmx_wqe_t* work,cvm_common_ip_hdr_t **ip,uint32_t *action_type)
+inline int rpa_packet_handle(cvmx_wqe_t* work,cvm_common_ip_hdr_t **ip,uint32_t *action_type, uint8_t *input_pppoe)
 {
 	uint8_t *eth_head = NULL;
 	cvm_common_ip_hdr_t  *ip_head = NULL;
@@ -58,7 +59,7 @@ inline int rpa_packet_handle(cvmx_wqe_t* work,cvm_common_ip_hdr_t **ip,uint32_t 
         eth_head += VLAN_HLEN;
 	}
 	
-	if(RETURN_ERROR == rx_l2hdr_decap(eth_head,&ip_head))
+	if(RETURN_ERROR == rx_l2hdr_decap(eth_head,&ip_head, input_pppoe))
 	{
 		return RETURN_ERROR;
 	}

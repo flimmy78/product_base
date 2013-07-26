@@ -1027,10 +1027,12 @@ void se_agent_save_cfg(unsigned char *buf,int cpu_tag, unsigned int bufLen)
 	char *current = NULL;
 	FILE *file_icmp = NULL;
 	FILE *file_fastfwd = NULL;
+	FILE *file_pppoe = NULL;
 	char file_path[100] = {0};
 	unsigned char stricmp[64] = {0};
 	unsigned char strfastfwd[64] = {0};
 	int icmp_enable = FUNC_DISABLE;
+	int pppoe_enable = FUNC_DISABLE;
 	int fastfwd_enable = FUNC_ENABLE;
 
 	if (NULL == buf) 
@@ -1092,6 +1094,25 @@ void se_agent_save_cfg(unsigned char *buf,int cpu_tag, unsigned int bufLen)
 			}
 		}
 #endif
+
+		memset(file_path, 0, sizeof(file_path));
+		sprintf(file_path,"/sys/module/%s/parameters/pppoe_enable",ipfwd_learn_name);
+		file_pppoe = fopen(file_path,"r");
+		if(file_pppoe !=NULL)
+		{
+			ret=fread(stricmp,sizeof(int),sizeof(stricmp),file_pppoe);
+			fclose(file_pppoe);
+			pppoe_enable=atoi((char*)stricmp);
+		}
+		if((length +30)<bufLen)
+		{
+			if(pppoe_enable==1)
+			{
+				length +=sprintf(current," config fast-pppoe enable\n");
+				current =showStr + length;
+			}
+		}
+
 		if((aging_time > 0) && (aging_time != DEFAULT_AGENT_TIME))
 		{
 			if ((length + 30) < bufLen) 
@@ -2086,6 +2107,75 @@ func_end:
 	return ;
 }
 
+void se_agent_pppoe_enable(char *buf, struct sockaddr_tipc *client_addr, unsigned int len)
+{
+	uint32_t enable;
+	se_interative_t *se_buf=NULL;
+	int ret,rval,status;
+	char str[100]={0};
+	
+	if(NULL==buf || NULL==client_addr ||0==len)
+	{
+		se_agent_syslog_err("se_agent_pppoe_enable  param error\n");
+		return ;
+	}
+	if(NULL == ipfwd_learn_name)
+	{
+		se_agent_syslog_err("se_agent_pppoe_enable not find ipfwd_learn module\n");
+		return ;
+	}
+	
+	se_buf=(se_interative_t *)buf;
+	if(FASTFWD_NOT_LOADED == (fast_forward_module_load_check()))
+	{
+		strncpy((se_buf->err_info),FASTFWD_NOT_LOADED_STR,strlen(FASTFWD_NOT_LOADED_STR));
+		se_buf->cmd_result = AGENT_RETURN_FAIL;
+		goto func_end;
+	}
+	enable=se_buf->fccp_cmd.fccp_data.module_enable;
+	sprintf(str,"echo %d > /sys/module/%s/parameters/pppoe_enable",enable, ipfwd_learn_name);
+	rval=system(str);
+	status=WEXITSTATUS(rval);
+	if(status)
+	{
+		se_agent_syslog_err("set fast_forward pppoe learned error\n");
+		goto learned_pppoe_err;
+	}
+	
+	se_buf->fccp_cmd.dest_module=FCCP_MODULE_ACL;
+	se_buf->fccp_cmd.src_module=FCCP_MODULE_AGENT_ACL;
+	se_buf->fccp_cmd.cmd_opcode=FCCP_CMD_ENABLE_PPPOE;
+
+    ret = se_agent_fccp_process(buf, len, 1);
+	if(ret ==SE_AGENT_RETURN_OK)
+	{
+		se_buf->cmd_result=AGENT_RETURN_OK;
+		goto func_end;
+	}
+	else
+	{
+		goto se_pppoe_err;
+	}
+	
+learned_pppoe_err:
+	se_buf->cmd_result=AGENT_RETURN_FAIL;
+	strncpy((char*)(se_buf->err_info),"set ipfwd_learned pppoe failed\n",ERR_INFO_SIZE);
+	goto func_end;
+se_pppoe_err:
+	se_buf->cmd_result=AGENT_RETURN_FAIL;
+	strncpy(se_buf->err_info,"set fastfwd pppoe failed\n",ERR_INFO_SIZE);
+	goto func_end;
+func_end:
+	ret=sendto(se_socket,(char*)buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
+	if(ret<0)
+	{
+		se_agent_syslog_err("se_agent_pppoe_enable send to dcli failed:%s\n",strerror(errno));
+		return ;
+	}
+	return ;
+}
+
+
 void se_agent_pure_ip_enable(char *buf, struct sockaddr_tipc *client_addr, unsigned int len)
 {
 	uint32_t enable;
@@ -2779,6 +2869,7 @@ int se_agent_cmd_func_table_init()
 	se_agent_cmd_func_register(SE_AGENT_CLEAR_FAU64,(cmd_handle_func)se_agent_clear_fau64);
 	se_agent_cmd_func_register(SE_AGENT_CLEAR_PART_FAU64,(cmd_handle_func)se_agent_clear_part_fau64);
 	se_agent_cmd_func_register(SE_AGENT_ICMP_ENABLE,(cmd_handle_func)se_agent_icmp_enable);
+	se_agent_cmd_func_register(SE_AGENT_PPPOE_ENABLE,(cmd_handle_func)se_agent_pppoe_enable);
 	se_agent_cmd_func_register(SE_AGENT_PURE_IP_ENABLE,(cmd_handle_func)se_agent_pure_ip_enable);
 	se_agent_cmd_func_register(SE_AGENT_SHOW_PURE_IP_ENABLE,(cmd_handle_func)se_agent_show_pure_ip_enable);
 	se_agent_cmd_func_register(SE_AGENT_FASTFWD_ENABLE,(cmd_handle_func)se_agent_fastfwd_enable);

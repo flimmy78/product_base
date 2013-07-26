@@ -64,6 +64,7 @@ extern CVMX_SHARED uint32_t debug_tag_val;    /* for test */
 #endif
 
 CVMX_SHARED cvmx_spinlock_t gl_wait_lock;
+CVMX_SHARED int cvm_ip_pppoe_enable = FUNC_DISABLE;
 CVMX_SHARED int cvm_ip_icmp_enable = FUNC_DISABLE;
 CVMX_SHARED int cvm_car_enable = FUNC_DISABLE;
 CVMX_SHARED int cvm_ip_only_enable = FUNC_DISABLE; /*Only fot the evaluation test*/
@@ -783,7 +784,7 @@ static inline void encap_eth_packet(cvmx_wqe_t *work, rule_item_t *rule, cvm_com
 	ip->ip_sum = cvm_ip_calculate_ip_header_checksum(ip);
 
 	pkt_ptr = (uint8_t *)ip;
-	if (rule->rules.pppoe_flag)
+	if (1 == rule->rules.pppoe_flag)
 	{
 		/* different process by flag */
 		encap_pppoe(work, rule, &pkt_ptr);
@@ -924,7 +925,7 @@ static inline void encap_802_11_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, c
 
 
 	pkt_ptr_tmp = (uint8_t *)ip;
-	if (rule->rules.pppoe_flag)
+	if (1 == rule->rules.pppoe_flag)
 	{
 		encap_pppoe(work, rule, &pkt_ptr_tmp);
 		cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP_PPPOE, 1);
@@ -932,7 +933,7 @@ static inline void encap_802_11_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, c
 	/* Encap LLC */	
 
 	/*add by wangjian for support pppoe 2013-3-14*/
-	if (rule->rules.pppoe_flag)
+	if (1 == rule->rules.pppoe_flag)
 	{	
 		llc_hdr = (struct ieee80211_llc *)(pkt_ptr + offset - LLC_H_LEN - PPPOE_H_LEN); 	
 		llc_hdr->llc_ether_type[0] = 0x88;
@@ -1006,7 +1007,14 @@ static inline void encap_802_11_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, c
 	ext_uh =  (cvm_common_udp_hdr_t*)((uint8_t*)cw_hdr - UDP_H_LEN);
 	ext_uh->uh_sport = capwap_cache_bl[rule->rules.tunnel_index].sport;
 	ext_uh->uh_dport = capwap_cache_bl[rule->rules.tunnel_index].dport;
-	ext_uh->uh_ulen = in_ip_totlen +  LLC_H_LEN + ieee80211_len + CW_H_LEN + UDP_H_LEN;
+	if (1 == rule->rules.pppoe_flag)
+	{
+		ext_uh->uh_ulen = in_ip_totlen +  LLC_H_LEN + ieee80211_len + CW_H_LEN + UDP_H_LEN + PPPOE_H_LEN;
+	}
+	else
+	{
+		ext_uh->uh_ulen = in_ip_totlen +  LLC_H_LEN + ieee80211_len + CW_H_LEN + UDP_H_LEN;
+	}
 	ext_uh->uh_sum= 0;
 	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + UDP_H_LEN);
 
@@ -1149,7 +1157,7 @@ static inline void encap_802_3_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, cv
 
 	/*add by wangjian for support pppoe 2013-3-12*/
 	pkt_ptr = (uint8_t *)ip;
-	if (rule->rules.pppoe_flag)
+	if (1 == rule->rules.pppoe_flag)
 	{
 		encap_pppoe(work, rule, &pkt_ptr);
 		cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP_PPPOE, 1);
@@ -1178,7 +1186,14 @@ static inline void encap_802_3_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, cv
 	ext_uh = (cvm_common_udp_hdr_t*)((uint8_t*)cw_hdr - UDP_H_LEN);
 	ext_uh->uh_sport = capwap_cache_bl[rule->rules.tunnel_index].sport;
 	ext_uh->uh_dport = capwap_cache_bl[rule->rules.tunnel_index].dport;
-	ext_uh->uh_ulen= in_ip_totlen +  ETH_H_LEN  + CW_H_LEN + UDP_H_LEN;
+	if (1 == rule->rules.pppoe_flag)
+	{
+		ext_uh->uh_ulen= in_ip_totlen +  ETH_H_LEN  + CW_H_LEN + UDP_H_LEN + PPPOE_H_LEN;
+	}
+	else
+	{
+		ext_uh->uh_ulen= in_ip_totlen +  ETH_H_LEN  + CW_H_LEN + UDP_H_LEN;
+	}
 	ext_uh->uh_sum= 0;
 	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + UDP_H_LEN);
 
@@ -1282,7 +1297,7 @@ Parsing the L2 header
 @eth_head  the pointer of L2 header
 @in_head    the pointer of address of ip header ,return ip header address
 */
-inline int8_t rx_l2hdr_decap( uint8_t* eth_head,cvm_common_ip_hdr_t **ip_head)
+inline int8_t rx_l2hdr_decap( uint8_t* eth_head,cvm_common_ip_hdr_t **ip_head, uint8_t* input_pppoe)
 {	
 	uint16_t  protocol = 0;
 	uint8_t *tmp_eth_head = NULL;
@@ -1319,6 +1334,7 @@ inline int8_t rx_l2hdr_decap( uint8_t* eth_head,cvm_common_ip_hdr_t **ip_head)
 				if (PPPOE_IP_TYPE == *(uint16_t*)(tmp_eth_head + ETH_H_LEN + VLAN_TAG_LEN*2 + 6))
 				{
 					*ip_head = (cvm_common_ip_hdr_t*)(tmp_eth_head + ETH_H_LEN + VLAN_TAG_LEN*2 + PPPOE_H_LEN);
+					*input_pppoe = 1;
 					return RETURN_OK;
 				}
 				else
@@ -1347,6 +1363,7 @@ inline int8_t rx_l2hdr_decap( uint8_t* eth_head,cvm_common_ip_hdr_t **ip_head)
 			if (PPPOE_IP_TYPE == *(uint16_t*)(tmp_eth_head + ETH_H_LEN + VLAN_TAG_LEN + 6))
 			{
 				*ip_head = (cvm_common_ip_hdr_t*)(tmp_eth_head + ETH_H_LEN + VLAN_TAG_LEN + PPPOE_H_LEN);
+				*input_pppoe = 1;
 				return RETURN_OK;
 			}
 			else
@@ -1372,6 +1389,7 @@ inline int8_t rx_l2hdr_decap( uint8_t* eth_head,cvm_common_ip_hdr_t **ip_head)
 		if (PPPOE_IP_TYPE == *(uint16_t*)(tmp_eth_head + ETH_H_LEN + 6))
 		{
 			*ip_head = (cvm_common_ip_hdr_t*)(tmp_eth_head + ETH_H_LEN + PPPOE_H_LEN);
+			*input_pppoe = 1;
 			return RETURN_OK;
 		}
 		else
@@ -2943,6 +2961,28 @@ static inline int acl_cache_flow(cvmx_wqe_t* work, control_cmd_t * fccp_cmd)
 		fccp_cmd->fccp_data.aging_timer = acl_get_aging_timer();
 		return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
 	}
+	/* pppoe enable/disable */
+	else if(fccp_cmd->cmd_opcode == FCCP_CMD_ENABLE_PPPOE)
+	{
+		if((fccp_cmd->fccp_data.module_enable != FUNC_ENABLE) && 
+				(fccp_cmd->fccp_data.module_enable != FUNC_DISABLE))
+		{
+			printf("acl_cache_flow : set pppoe enable/disable error, module = %d\n", fccp_cmd->fccp_data.module_enable);
+			return_fccp(work, FCCP_RETURN_ERROR, fccp_cmd, product_info.to_linux_fccp_group);
+			return RETURN_ERROR;
+		}
+		printf("pppoes enable old is %d\n", cvm_ip_pppoe_enable);
+		cvm_ip_pppoe_enable = fccp_cmd->fccp_data.module_enable;
+		printf("pppoes enable new is %d\n", cvm_ip_pppoe_enable);
+		return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
+	}
+	/* show pppoe state */
+	else if(fccp_cmd->cmd_opcode == FCCP_CMD_GET_PPPOE_STATE)
+	{
+		//memset(&fccp_data, 0, sizeof(fccp_data_t));
+		fccp_cmd->fccp_data.module_enable = cvm_ip_pppoe_enable;
+		return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
+	}
 	/* icmp enable/disable */
 	else if(fccp_cmd->cmd_opcode == FCCP_CMD_ENABLE_ICMP)
 	{
@@ -3522,6 +3562,7 @@ static void application_main_loop(unsigned int coremask_data)
 	/* Build a PKO pointer to this packet */
 	pko_command.u64 = 0;
 	uint8_t input_rpa = 0;
+	uint8_t input_pppoe = 0;
 
 	if(cvmx_coremask_first_core(coremask_data)) 
 	{
@@ -3671,7 +3712,7 @@ static void application_main_loop(unsigned int coremask_data)
 		{
 		    cvmx_fau_atomic_add64(CVM_FAU_RPA_PACKETS, 1);
 			input_rpa = 1;
-			if(RETURN_ERROR == rpa_packet_handle(work,&ip,&action_type))
+			if(RETURN_ERROR == rpa_packet_handle(work,&ip,&action_type,&input_pppoe))
 			{
 			    cvmx_fau_atomic_add64(CVM_FAU_RPA_TOLINUX_PACKETS, 1);
 				action_type = FLOW_ACTION_TOLINUX;			
@@ -3694,7 +3735,7 @@ static void application_main_loop(unsigned int coremask_data)
 				pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 				work->word2.s.ip_offset = ((uint8_t*)ip - pkt_ptr);
 				/*be careful work->word2.s.ip_offset can change?*/
-
+				input_pppoe = 1;
 				if((ip->ip_off&0x3f) != 0)/*frag ip*/
 				{		
 					FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
@@ -3754,6 +3795,14 @@ static void application_main_loop(unsigned int coremask_data)
 					"Get the packet IP header, start =0x%p, ip =0x%p, offset =%d\r\n",pkt_ptr,ip,work->word2.s.ip_offset);
 		}
 
+
+		/*add by wangjian for support pppoe 2013-7-25 */
+		if ((input_pppoe == 1) && (cvm_ip_pppoe_enable == FUNC_DISABLE))
+		{
+			action_type = FLOW_ACTION_TOLINUX;			
+			goto scheme_execute; 
+		}
+		
 		if(cvmx_unlikely(CVM_WQE_GET_LEN(work) < (int)(sizeof( cvm_common_ip_hdr_t)))) {
 			cvmx_fau_atomic_add64(CVM_FAU_IP_SHORT_PACKETS, 1);
 			action_type = FLOW_ACTION_DROP;			
@@ -4028,6 +4077,7 @@ scheme_execute:
 		in_ip = NULL;
 		in_th = NULL;
 		input_rpa = 0;
+		input_pppoe = 0;
 	}
 }
 

@@ -60,7 +60,7 @@ static inline int is_zero_ether_addr(const uint8_t *addr)
 	return !(addr[0] | addr[1] | addr[2] | addr[3] | addr[4] | addr[5]);
 }
 
-extern inline int rpa_packet_handle(cvmx_wqe_t* work,cvm_common_ip_hdr_t **ip,uint32_t *action_type);
+extern inline int rpa_packet_handle(cvmx_wqe_t* work,cvm_common_ip_hdr_t **ip,uint32_t *action_type, uint8_t *input_pppoe);
 
 extern inline void add_rpa_head(cvmx_wqe_t *work, rule_item_t *rule);
 

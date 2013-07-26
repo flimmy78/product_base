@@ -72,6 +72,9 @@
 #define FCCP_CMD_SHOW_CAPWAP_FAU64 			46
 #define FCCP_CMD_SHOW_RPA_FAU64 			47
 #define FCCP_CMD_CLEAR_PART_FAU64 			48
+#define FCCP_CMD_ENABLE_PPPOE             	49
+#define FCCP_CMD_GET_PPPOE_STATE          	50
+
 
 
 

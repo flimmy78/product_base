@@ -74,6 +74,9 @@ int learn_enable = FUNC_ENABLE;
 
 int pure_ip_enable = FUNC_DISABLE;
 
+int pppoe_enable = FUNC_DISABLE;
+
+
 /* work mode */
 #define IPFWD_LEARN_MODE_NONE                  0
 #define IPFWD_LEARN_MODE_COEXIST_ENABLE       1
@@ -114,6 +117,12 @@ MODULE_PARM_DESC(pure_ip_enable,"\n"
 		"\t\t enable|disable pure_ip function\n"
 		"\t\t 0 disable pure_ip function\n"
 		"\t\t 1 enable  pure_ip function\n"
+	    );
+
+module_param(pppoe_enable,int,0644);
+MODULE_PARM_DESC(pppoe_enable,"\n"
+	    "\t\t 0 disable pppoe learned\n"
+	    "\t\t 1 enable pppoe learned\n"
 	    );
 
 
@@ -1975,6 +1984,12 @@ int ipfwd_learn (struct sk_buff *skb,uint8_t dev_type)
 		cvmx_atomic_add64(&fwd_learn_stats.pkt_type_nonsupport, 1);
 		log(DEBUG_LVL,"ipfwd_learn: not udp tcp icmp packet\n");
 		return IPFWD_LEARN_RETURN_FAIL;
+	}
+
+	/*add by wangjian for support pppoe 2013-7-25 */
+	if ((pppoe_flag == 1) && (pppoe_enable == FUNC_DISABLE))
+	{
+		return IPFWD_LEARN_RETURN_OK;
 	}
 
 	if((skb_type == ETH_ICMP ||skb_type == CW_802_3_ICMP ||skb_type == CW_802_11_ICMP)&&\
