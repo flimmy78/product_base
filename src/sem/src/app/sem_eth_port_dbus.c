@@ -1359,8 +1359,8 @@ static unsigned int sem_ethport_packet_statistic
 	int fd = -1;
     char ifName[21];
 
-	if ((local_board->name, "AX81_AC12C") && (portNum >=1 && portNum <= 4)) {
-		sem_syslog_dbg("ax81_ac12c port %d not support statistics now.");
+	if ((!strcmp(local_board->name, "AX81_AC12C")) && (portNum >=1 && portNum <= 4)) {
+		sem_syslog_dbg("ax81_ac12c port %d not support statistics now.",portNum);
 		return ETHPORT_RETURN_CODE_ERR_GENERAL;
 	}
 	
