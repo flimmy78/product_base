@@ -90,6 +90,17 @@ void sem_syslog_emit
 	
 	if(sem_bootlog_fd > 0){
 		if(0 == sem_startup_end){
+            if (access(SEM_SYSTEM_STARTUP_LOG_PATH, F_OK) == -1){
+                printf("access f_ok faild\n");
+                close(sem_bootlog_fd);
+
+                sem_bootlog_fd = open(SEM_SYSTEM_STARTUP_LOG_PATH, O_RDWR|O_CREAT|O_APPEND);
+                if(sem_bootlog_fd < 0){ 
+                    printf("open failed\n");
+                    sem_bootlog_fd = -1;
+                }
+            }
+            if (sem_bootlog_fd > 0)
 			write(sem_bootlog_fd, buf, strlen(buf));
 			if (priority == LOG_WARNING||priority == LOG_ERR||priority == LOG_NOTICE)
 			{
