@@ -901,10 +901,31 @@ static int set_ethport_flowCtrl( unsigned char port, unsigned long state)
 	return SEM_OPERATE_NOT_SUPPORT;
 }
 
+static int set_ethport_backPressure( unsigned char port, unsigned long state)
+{
+	return SEM_OPERATE_NOT_SUPPORT;
+}
+
+static int set_port_duplex_mode(unsigned int port, unsigned int mode)
+{
+	return SEM_OPERATE_NOT_SUPPORT;
+}
+
+static int get_eth_port_trans_media(unsigned int port, unsigned int *media)
+{
+    return SEM_OPERATE_NOT_SUPPORT;
+}
+
+static int set_ethport_speed(unsigned int port, PORT_SPEED_ENT speed)
+{
+	return SEM_OPERATE_NOT_SUPPORT;
+}
+
 static int set_port_autoneg_status( unsigned int port, unsigned int state)
 {
 	return SEM_OPERATE_NOT_SUPPORT;
 }
+
 /*
 	attr_bitmap-->
 		 bit 0 : admin state
@@ -1082,9 +1103,16 @@ board_fix_param_t ax81_1x12g12s =
 	.set_port_preferr_media = set_port_preferr_media,
 	.set_port_admin_status = set_port_admin_status,
 	.set_port_autoneg_status = set_port_autoneg_status,
+	.get_eth_port_trans_media = get_eth_port_trans_media,
+    .set_ethport_speed = set_ethport_speed,
+	.set_port_duplex_mode = set_port_duplex_mode,
+	.set_ethport_flowCtrl = set_ethport_flowCtrl,
+	.set_ethport_backPressure = set_ethport_backPressure,
+	.set_ethport_speed_autoneg = set_ethport_speed_autoneg,
+    .set_ethport_duplex_autoneg = set_ethport_duplex_autoneg,
+	.set_ethport_fc_autoneg = set_ethport_fc_autoneg,
 	.set_ethport_mtu = set_ethport_mtu,
 	.read_eth_port_info = read_eth_port_info,
-	.set_ethport_flowCtrl = set_ethport_flowCtrl,
 	.show_system_environment = ax81_1x12g12s_show_system_environment
 };
 
