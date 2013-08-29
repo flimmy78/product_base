@@ -3492,9 +3492,12 @@ uint32_t  fwd_filter_large_pkts(rule_item_t  *rule, cvmx_wqe_t* work)
         return RETURN_OK;
 	
     /* if packet len > downlink mtu, send to linux */
-    if(rule->rules.action_type == FLOW_ACTION_CAPWAP_FORWARD)
+    if((rule->rules.action_type == FLOW_ACTION_CAPWAP_FORWARD) 
+		|| (FLOW_ACTION_CAPWAP_802_11_ICMP == rule->rules.action_type)
+		|| (FLOW_ACTION_CAPWAP_802_3_ICMP == rule->rules.action_type)
+		|| (FLOW_ACTION_CAP802_3_FORWARD == rule->rules.action_type))
     {
-        if (CVM_WQE_GET_UNUSED(work) == PACKET_TYPE_ETH_IP) /* Eth ==> CAPWAP 802.11 */
+        if ((CVM_WQE_GET_UNUSED(work) == PACKET_TYPE_ETH_IP) || (PACKET_TYPE_ICMP == CVM_WQE_GET_UNUSED(work))) /* Eth ==> CAPWAP 802.11 */
         { 
             FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
                     "flow_action_process: Eth ==> CAPWAP 802.11.\n");
@@ -3517,7 +3520,7 @@ uint32_t  fwd_filter_large_pkts(rule_item_t  *rule, cvmx_wqe_t* work)
             }
         }
     }
-    if(rule->rules.action_type == FLOW_ACTION_RPA_ETH_FORWARD)
+	if((rule->rules.action_type == FLOW_ACTION_RPA_ETH_FORWARD) || (FLOW_ACTION_RPA_ICMP == rule->rules.action_type))
     {
         if(CVM_WQE_GET_LEN(work) > (int)(downlink_mtu - RPA_HEAD_LEN))
         {
@@ -3525,7 +3528,15 @@ uint32_t  fwd_filter_large_pkts(rule_item_t  *rule, cvmx_wqe_t* work)
 			return FLOW_ACTION_TOLINUX;
         }
     }
-    if(rule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_FORWARD)
+    if((rule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_FORWARD) || (FLOW_ACTION_RPA_CAPWAP_802_11_ICMP == rule->rules.action_type))
+    {
+        if(CVM_WQE_GET_LEN(work) > (int)(downlink_mtu - RPA_HEAD_LEN))
+        {
+            cvmx_fau_atomic_add64(CVM_FAU_LARGE_CW_RPA_FWD_PACKET, 1);
+			return FLOW_ACTION_TOLINUX;
+        }
+    }
+    if((rule->rules.action_type == FLOW_ACTION_RPA_CAP802_3_FORWARD) || (FLOW_ACTION_RPA_CAPWAP_802_3_ICMP == rule->rules.action_type))
     {
         if(CVM_WQE_GET_LEN(work) > (int)(downlink_mtu - RPA_HEAD_LEN))
         {

@@ -1339,6 +1339,11 @@ int32_t acl_self_learn_icmp_rule(rule_param_t *rule_para, capwap_cache_t *cw_cac
 					cvmx_spinlock_unlock(head_lock);
 					return RETURN_ERROR;
 				}
+
+				/* add by wangjian for "clear fastfwd rule ip"cant delete icmp rule */
+#ifdef USER_TABLE_FUNCTION	
+				set_acl_mask(head_rule);
+#endif
 				cvmx_spinlock_unlock(head_lock);
 				return RETURN_OK;
 			}

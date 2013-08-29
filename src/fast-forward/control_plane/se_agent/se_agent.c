@@ -1117,7 +1117,7 @@ void se_agent_save_cfg(unsigned char *buf,int cpu_tag, unsigned int bufLen)
 		{
 			if ((length + 30) < bufLen) 
 			{
-				length += sprintf(current, " config aging-time %d\n",aging_time);
+				length += sprintf(current, " config aging-time %u\n",aging_time);
 
 
 
@@ -1164,7 +1164,7 @@ void se_agent_save_cfg(unsigned char *buf,int cpu_tag, unsigned int bufLen)
 		{
 			if ((length + 30) < bufLen) 
 			{
-				length += sprintf(current, " config aging-time %d\n",slave_aging_time);
+				length += sprintf(current, " config aging-time %u\n",slave_aging_time);
 				current = showStr + length;
 			}
 		}
