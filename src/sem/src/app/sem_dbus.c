@@ -149,6 +149,16 @@ extern DBusMessage *sem_dbus_md5_patch_slot(DBusConnection *conn, DBusMessage *m
 extern DBusMessage *sem_dbus_img_or_fastfwd_slot(DBusConnection *conn, DBusMessage *msg, void *user_data);
 extern DBusMessage *sem_dbus_delete_img_or_fastfwd_slot(DBusConnection *conn, DBusMessage *msg, void *user_data);
 
+extern DBusMessage *sem_dbus_user_add_slot(DBusConnection *conn, DBusMessage *msg, void *user_data);
+extern DBusMessage *sem_dbus_user_del_slot(DBusConnection *conn, DBusMessage *msg, void *user_data);
+extern DBusMessage *sem_dbus_user_role_slot(DBusConnection *conn, DBusMessage *msg, void *user_data);
+extern DBusMessage *sem_dbus_user_show_slot(DBusConnection *conn, DBusMessage *msg, void *user_data);
+extern DBusMessage *sem_dbus_user_show_running(DBusConnection *conn, DBusMessage *msg, void *user_data);
+extern DBusMessage *sem_dbus_user_passwd_slot(DBusConnection *conn, DBusMessage *msg, void *user_data);
+extern DBusMessage *sem_dbus_user_is_exsit_slot(DBusConnection *conn, DBusMessage *msg, void *user_data);
+
+extern DBusMessage *sem_dbus_download_img_slot(DBusConnection *conn, DBusMessage *msg, void *user_data);
+extern DBusMessage *sem_dbus_download_cpy_config_slot(DBusConnection *conn, DBusMessage *msg, void *user_data);
 extern DBusMessage  *flash_erase_partition(DBusConnection *conn, DBusMessage *msg, void *user_data);
 extern DBusMessage *write_boot_to_flash(DBusConnection *conn, DBusMessage *msg, void  *user_data);
 
@@ -1681,6 +1691,42 @@ static DBusHandlerResult sem_dbus_msg_handler (
 		else if (dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_UPLOAD_SNAPSHOT))
 		{
 			reply = sem_dbus_upload_snapshot(conn, msg, user_data);		
+		}
+		else if (dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_USER_ADD_SLOT))
+		{
+			reply = sem_dbus_user_add_slot(conn, msg, user_data);		
+		}
+		else if (dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_USER_DEL_SLOT))
+		{
+			reply = sem_dbus_user_del_slot(conn, msg, user_data);		
+		}
+		else if (dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_USER_ROLE_SLOT))
+		{
+			reply = sem_dbus_user_role_slot(conn, msg, user_data);		
+		}
+		else if (dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_USER_SHOW_SLOT))
+		{
+			reply = sem_dbus_user_show_slot(conn, msg, user_data);		
+		}
+		else if (dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_USER_SHOW_RUNNING))
+		{
+			reply = sem_dbus_user_show_running(conn, msg, user_data);		
+		}
+		else if (dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_USER_PASSWD_SLOT))
+		{
+			reply = sem_dbus_user_passwd_slot(conn, msg, user_data);		
+		}
+		else if (dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_USER_IS_EXSIT_SLOT))
+		{
+			reply = sem_dbus_user_is_exsit_slot(conn, msg, user_data);		
+		}
+		else if (dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_DOWNLOAD_IMG_SLOT))
+		{
+			reply = sem_dbus_download_img_slot(conn, msg, user_data);		
+		}
+		else if (dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_DOWNLOAD_CPY_CONFIG_SLOT))
+		{
+			reply = sem_dbus_download_cpy_config_slot(conn, msg, user_data);		
 		}
     }
 	else if (strcmp(dbus_message_get_path(msg), SEM_DBUS_ETHPORTS_OBJPATH) == 0) 

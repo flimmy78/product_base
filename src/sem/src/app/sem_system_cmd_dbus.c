@@ -27,6 +27,9 @@ extern "C"
 #include <linux/if_arp.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <pwd.h>
+#include <grp.h>
+#include <shadow.h>
 
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -2347,6 +2350,499 @@ DBusMessage *sem_dbus_sem_send_trap(DBusConnection *conn, DBusMessage *msg, void
 	return reply;
 }
 
+
+DBusMessage *sem_dbus_user_add_slot(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+
+	int ret = 0;
+	int flag = 0;
+	char *cmdstr = NULL;
+	char cmd[256] = {0};
+	dbus_error_init(&err);
+	if (!(dbus_message_get_args(msg, &err,
+									DBUS_TYPE_UINT32, &flag,
+									DBUS_TYPE_STRING, &cmdstr,
+									DBUS_TYPE_INVALID)))
+	{
+		if (dbus_error_is_set(&err)) 
+		{
+			sem_syslog_dbg("%s raised: %s", err.name, err.message);
+			dbus_error_free(&err);
+		}
+		
+		return NULL;
+
+	}
+	
+	if(flag)
+		sprintf(cmd,"sudo /opt/bin/vtysh -b -c \'%s\n\'",cmdstr);
+	else
+		sprintf(cmd,"sudo /opt/bin/vtysh -c \'%s\n\'",cmdstr);
+		
+	ret=system(cmd);
+	
+	
+	reply = dbus_message_new_method_return(msg);
+
+	dbus_message_iter_init_append (reply, &iter);
+
+	dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32,&ret);
+	return reply;
+}
+
+DBusMessage *sem_dbus_user_del_slot(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+
+	int ret = 0;
+	char *cmdstr = NULL;
+	char cmd[256] = {0};
+ 
+	dbus_error_init(&err);
+	if (!(dbus_message_get_args(msg, &err,
+		                        DBUS_TYPE_STRING, &cmdstr,
+								DBUS_TYPE_INVALID)))
+	{
+		if (dbus_error_is_set(&err)) 
+		{
+			sem_syslog_dbg("%s raised: %s", err.name, err.message);
+			dbus_error_free(&err);
+		}
+		
+		return NULL;
+
+	}
+	sprintf(cmd,"sudo /opt/bin/vtysh -c \'%s\n\'",cmdstr);
+	ret=system(cmd);
+	reply = dbus_message_new_method_return(msg);
+
+	dbus_message_iter_init_append (reply, &iter);
+
+	dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32,&ret);
+	
+	return reply;
+}
+DBusMessage *sem_dbus_user_role_slot(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+
+	int ret = 0;
+	char *cmdstr = NULL;
+	char cmd[256] = {0};
+ 
+	dbus_error_init(&err);
+
+	if (!(dbus_message_get_args(msg, &err,
+		                        DBUS_TYPE_STRING, &cmdstr,
+								DBUS_TYPE_INVALID)))
+	{
+		if (dbus_error_is_set(&err)) 
+		{
+			sem_syslog_dbg("%s raised: %s", err.name, err.message);
+			dbus_error_free(&err);
+		}
+		
+		return NULL;
+
+	}
+	sprintf(cmd,"vtysh -c \'%s\'\n",cmdstr);
+	ret=system(cmd);
+	reply = dbus_message_new_method_return(msg);
+
+	dbus_message_iter_init_append (reply, &iter);
+
+	dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32,&ret);
+	
+	return reply;
+}
+#define VIEWGROUP "vtyview"
+#define ADMINGROUP "vtyadmin"
+
+DBusMessage *sem_dbus_user_show_slot(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+	dbus_error_init(&err);
+	int i;
+	int admin_num = 0;
+	int view_num = 0;
+	char admin_group[32][64]= {0};
+	char view_group[32][64] = {0};
+	char *username = NULL;
+	struct group *admin_grentry = NULL;
+	struct group *view_grentry = NULL;
+	char *ptr=NULL;
+	
+	admin_grentry = getgrnam(ADMINGROUP);
+	if (admin_grentry)
+	{
+		for(i=0;ptr=admin_grentry->gr_mem[i];i++)
+		{
+			strncpy(admin_group[admin_num++],ptr,strlen(ptr));
+		}
+	}
+	
+	view_grentry = getgrnam(VIEWGROUP);
+	if (view_grentry)
+	{
+		for(i=0;ptr=view_grentry->gr_mem[i];i++)
+		{
+			strncpy(view_group[view_num++],ptr,strlen(ptr));
+		}
+			
+	
+	}
+	reply = dbus_message_new_method_return(msg);
+
+	dbus_message_iter_init_append (reply, &iter);
+	dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32,&admin_num);
+	for(i=0;i<admin_num;i++)
+	{
+		username=admin_group[i];
+		dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING,&username);
+	}
+	dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32,&view_num);	
+	for(i=0;i<view_num;i++)
+	{
+		username=view_group[i];
+		dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING,&username);
+	}
+	return reply;
+}
+
+DBusMessage *sem_dbus_user_show_running(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+	dbus_error_init(&err);
+	int i;
+	int admin_num = 0;
+	int view_num = 0;
+	int slot_id;
+	char admin_group[32][256]= {0};
+	char view_group[32][256] = {0};
+	char *cmdstr = NULL;
+	
+	char *cmdadmin = "enable";
+	char *cmdview= "view";
+	char *ptr=NULL;
+	struct group *grentry = NULL;
+	struct passwd *passwd = NULL;
+	struct spwd *spwd=NULL;
+	char tmp[128]={0};
+	if (!(dbus_message_get_args(msg, &err,
+		                        DBUS_TYPE_UINT32, &slot_id,
+								DBUS_TYPE_INVALID)))
+	{
+		if (dbus_error_is_set(&err)) 
+		{
+			sem_syslog_dbg("%s raised: %s", err.name, err.message);
+			dbus_error_free(&err);
+		}
+		
+		return NULL;
+
+	}
+
+	grentry = getgrnam(VIEWGROUP);
+	if (grentry)
+	{
+		for(i=0;ptr=grentry->gr_mem[i];i++)
+		{
+			passwd=getpwnam(ptr);
+			if(passwd)
+			{
+				spwd = getspnam(ptr);
+				if(spwd)
+				{
+					if(strcmp(ptr,"admin"))
+					{
+						
+						sprintf(tmp,"user add slot %d %s %s %s\n",slot_id,ptr,spwd->sp_pwdp,cmdview);
+						strncpy(view_group[view_num++],tmp,strlen(tmp));
+					}
+					else
+						continue;				
+				}
+			}
+		}
+	}	
+	
+	grentry = getgrnam(ADMINGROUP);
+	if (grentry)
+	{
+		for(i=0;ptr=grentry->gr_mem[i];i++)
+		{
+			passwd=getpwnam(ptr);
+			if(passwd)
+			{
+				spwd = getspnam(ptr);
+				if(spwd)
+				{
+					if(strcmp(ptr,"admin"))
+					{
+						char tmp[81];
+						sprintf(tmp,"user add slot %d %s %s %s\n",slot_id,ptr,spwd->sp_pwdp,cmdadmin);
+						strncpy(admin_group[admin_num++],tmp,strlen(tmp));
+					}
+					else
+						continue;				
+				}
+			}
+		}
+			
+	}
+
+	reply = dbus_message_new_method_return(msg);
+
+	dbus_message_iter_init_append (reply, &iter);
+	dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32,&admin_num);
+	
+	for(i=0;i<admin_num;i++)
+	{
+		cmdstr=admin_group[i];
+		dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING,&cmdstr);
+	}
+	
+	dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32,&view_num);	
+	for(i=0;i<view_num;i++)
+	{
+		cmdstr=view_group[i];
+		dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING,&cmdstr);
+	}
+	return reply;
+}
+DBusMessage *sem_dbus_user_passwd_slot(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+
+	int ret = 0;
+	char *cmdstr = NULL;
+	char cmd[256] = {0};
+ 
+	dbus_error_init(&err);
+	if (!(dbus_message_get_args(msg, &err,
+		                        DBUS_TYPE_STRING, &cmdstr,
+								DBUS_TYPE_INVALID)))
+	{
+		if (dbus_error_is_set(&err)) 
+		{
+			sem_syslog_dbg("%s raised: %s", err.name, err.message);
+			dbus_error_free(&err);
+		}
+		
+		return NULL;
+
+	}
+	
+	ret=system(cmdstr);
+	reply = dbus_message_new_method_return(msg);
+
+	dbus_message_iter_init_append (reply, &iter);
+
+	dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32,&ret);
+	
+	return reply;
+}
+DBusMessage *sem_dbus_user_is_exsit_slot(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+	char *cmdstr = NULL;
+	int ret = 0;
+	int opt = 0;
+ 	struct passwd *passwd = NULL;
+ 	
+	struct group *group=NULL;
+	dbus_error_init(&err);
+	if (!(dbus_message_get_args(msg, &err,
+		                        DBUS_TYPE_STRING, &cmdstr,
+								DBUS_TYPE_INVALID)))
+	{
+		if (dbus_error_is_set(&err)) 
+		{
+			sem_syslog_dbg("%s raised: %s", err.name, err.message);
+			dbus_error_free(&err);
+		}
+		
+		return NULL;
+
+	}
+
+	passwd = getpwnam(cmdstr);
+	if(passwd)
+		ret = 1;
+	else
+		ret = 0;
+
+	{
+	int uid,i;
+
+	group = getgrnam(ADMINGROUP);
+	if(group && group->gr_mem )
+	{
+		for(i=0;group->gr_mem[i];i++)
+			if(!strcmp(group->gr_mem[i],cmdstr))
+				opt = 1;
+
+	}
+#if 0
+	group = getgrnam(VIEWGROUP);
+	if(group && group->gr_mem )
+	{
+		for(i=0;group->gr_mem[i];i++)
+			if(!strcmp(group->gr_mem[i],name))
+				return 0;
+
+	}
+	return -1;
+#endif
+}
+	reply = dbus_message_new_method_return(msg);
+
+	dbus_message_iter_init_append (reply, &iter);
+
+	dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32,&ret);
+	dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32,&opt);
+	
+	return reply;
+}
+
+DBusMessage *sem_dbus_download_img_slot(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+	char * cmdstr = NULL;
+	int ret = 0;
+ 	char *urlstr = NULL;
+	char *username = NULL;
+	char *password = NULL;
+	char *filename = NULL;
+	dbus_error_init(&err);
+	if (!(dbus_message_get_args(msg, &err,
+		                        DBUS_TYPE_STRING, &cmdstr,
+								DBUS_TYPE_INVALID)))
+	{
+		if (dbus_error_is_set(&err)) 
+		{
+			sem_syslog_dbg("%s raised: %s", err.name, err.message);
+			dbus_error_free(&err);
+		}
+		return NULL;
+	}
+	/*
+	sprintf(cmdstr,"downimg.sh %s %s %s %s;echo 1 > /var/run/download_slot_flag &",urlstr,username,password,filename);
+  */
+	ret = system(cmdstr);
+
+	reply = dbus_message_new_method_return(msg);
+
+	dbus_message_iter_init_append (reply, &iter);
+
+	dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32,&ret);
+	
+	return reply;
+}
+DBusMessage *sem_dbus_download_cpy_config_slot(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+	char path[256]={0};
+	char cmdstr[512] = {0};
+	char error_buf[128] = {0};
+	char *error_str= NULL;
+	int err_flag=0;
+	int ret = 0;
+	unsigned int host_id = 0;
+	unsigned int local_id = 0;
+ 	char *urlstr = NULL;
+	char *username = NULL;
+	char *password = NULL;
+	char *filename = NULL;
+
+	
+	dbus_error_init(&err);
+	if (!(dbus_message_get_args(msg, &err,	
+								DBUS_TYPE_UINT32,&local_id,
+								DBUS_TYPE_UINT32,&host_id,
+								DBUS_TYPE_STRING, &filename,
+								DBUS_TYPE_INVALID)))
+	{
+		if (dbus_error_is_set(&err)) 
+		{
+			sem_syslog_dbg("%s raised: %s", err.name, err.message);
+			dbus_error_free(&err);
+		}
+		
+		return NULL;
+
+	}
+	
+	memset(cmdstr,0,sizeof(cmdstr));
+	sprintf(cmdstr, "sudo /opt/bin/vtysh -c \'configure terminal\ncopy %d %s to %d %s\'",local_id,filename, host_id,filename);						   	
+	ret=system(cmdstr);
+	if (-1 == ret)	
+	{  
+	   sprintf(error_buf,"system error!"); 
+	   err_flag = 1;
+	   goto out;
+	}  
+	else  
+	{  
+  
+	   if (WIFEXITED(ret))	
+	   {  
+		   switch (WEXITSTATUS(ret))
+		   {	
+				case 0: 		 
+					   	break;
+				default:			
+					sprintf(error_buf,"download error\n"); 
+					err_flag = 1;
+					goto out;
+						
+			}	
+	   }  
+	   else  
+	   {  
+		   sprintf(error_buf,"exit status = [%d]\n", WEXITSTATUS(ret));  
+		   err_flag = 1;
+		   goto out;
+	   }  
+    } 
+    				   	
+	reply = dbus_message_new_method_return(msg);
+
+	dbus_message_iter_init_append (reply, &iter);
+
+	dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32,&err_flag);
+	dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32,&ret);
+	return reply;
+ 	 
+out:
+	reply = dbus_message_new_method_return(msg);
+
+	dbus_message_iter_init_append (reply, &iter);
+
+	dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32,&err_flag);
+	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING,&error_str);
+	
+	return reply;
+}
 
 #ifdef __cplusplus
 extern "C"
