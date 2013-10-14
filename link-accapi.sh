@@ -7,7 +7,7 @@ else
     pb_dir="$rootdir/src/accapi_pb"
 fi
 
-daem_dir="$rootdir/../daemongroup-1.0.1/accapi"
+daem_dir="$rootdir/src/dg/accapi"
 if [ "$1" = "copy" ] ; then
     action0="rm -f"
     action=cp
