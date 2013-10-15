@@ -21,6 +21,13 @@
 				((uint8_t*)&(m))[1], \
 				((uint8_t*)&(m))[2], \
 				((uint8_t*)&(m))[3]
+
+#define IPV6_FMT(m)	\
+				((uint16_t*)&(m))[0], \
+				((uint16_t*)&(m))[1], \
+				((uint16_t*)&(m))[2], \
+				((uint16_t*)&(m))[3]
+
 				
 /* for print mac */
 #define MAC_FMT(m)  \
@@ -40,6 +47,10 @@
 #define TO_LINUX_FCCP_GROUP      14 /*group number of fccp packets which SE send to linux*/
 #define TO_LINUX_GROUP           15 /*group number of normal packets which SE send to linux*/
 #define DEFAULT_AGENT_TIME       600
+
+
+
+
 extern uint64_t get_sec();
  
 extern void se_agent_delete_specified_rule(char *buf,struct sockaddr_tipc *client_addr,unsigned int len);
@@ -55,6 +66,8 @@ extern void se_agent_show_learned_acl(char *buf,struct sockaddr_tipc *client_add
 extern void se_agent_show_learning_acl(char *buf,struct sockaddr_tipc *client_addr,unsigned int len);
 extern void se_agent_clear_rule_ip(char *buf,struct sockaddr_tipc *client_addr,unsigned int len);  /* wangjian clear */
 extern void se_agent_show_rule_ip(char *buf,struct sockaddr_tipc *client_addr,unsigned int len); /*wangjian 2012.07.09 add ip */
+extern void se_agent_show_rule_ipv6(char *buf,struct sockaddr_tipc *client_addr,unsigned int len); 
+
 
 typedef struct  rule_item_s{
 	struct rule_item_s *next;

@@ -64,7 +64,7 @@ inline int rpa_packet_handle(cvmx_wqe_t* work,cvm_common_ip_hdr_t **ip,uint32_t 
 		return RETURN_ERROR;
 	}
 	*ip = ip_head;
-	if((ip_head->ip_off&0x3f) != 0)/*frag ip*/
+	if((4 == ip_head->ip_v) && ((ip_head->ip_off&0x3f) != 0))/*frag ip*/
 	{		
 		return RETURN_ERROR;
 	}
@@ -149,9 +149,3 @@ inline void add_rpa_head(cvmx_wqe_t *work, rule_item_t *rule)
 }
 
 
-
-
-
-
-
-	

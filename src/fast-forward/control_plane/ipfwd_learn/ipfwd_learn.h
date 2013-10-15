@@ -57,13 +57,55 @@
 *   ACL Rule related
 *****************************************************************************/
 
+struct cvm_ip6_in6_addr
+{
+	union 
+	{
+		uint8_t			u6_addr8[16];
+		uint16_t		u6_addr16[8];
+		uint32_t		u6_addr32[4];
+		uint64_t		u6_addr64[2];
+	} in6_u;
+#define s6_addr			in6_u.u6_addr8
+#define s6_addr16		in6_u.u6_addr16
+#define s6_addr32		in6_u.u6_addr32
+#define s6_addr64		in6_u.u6_addr64
+};
+
+
 /* CAPWAP rule table structer */
 typedef struct  capwap_cache_tbl_s
 {
     uint32_t use_num;
     /* Extern IP header */
-    uint32_t dip;
-    uint32_t sip;
+	union {
+			uint32_t cw_sip_v4;
+			struct	cvm_ip6_in6_addr	cw_sip_v6;
+
+	}cw_sip_addr;
+
+	union {
+			uint32_t cw_dip_v4;
+			struct	cvm_ip6_in6_addr	cw_dip_v6;
+	
+	}cw_dip_addr;
+				
+#define cw_sip 			cw_sip_addr.cw_sip_v4
+#define cw_dip 			cw_dip_addr.cw_dip_v4
+#define cw_ipv6_sip 	cw_sip_addr.cw_sip_v6
+#define cw_ipv6_sip8 	cw_sip_addr.cw_sip_v6.s6_addr8
+#define cw_ipv6_sip16 	cw_sip_addr.cw_sip_v6.s6_addr16
+#define cw_ipv6_sip32 	cw_sip_addr.cw_sip_v6.s6_addr32
+#define cw_ipv6_sip64 	cw_sip_addr.cw_sip_v6.s6_addr64
+#define cw_ipv6_dip 	cw_dip_addr.cw_dip_v6
+#define cw_ipv6_dip8 	cw_dip_addr.cw_dip_v6.s6_addr8
+#define cw_ipv6_dip16 	cw_dip_addr.cw_dip_v6.s6_addr16
+#define cw_ipv6_dip32 	cw_dip_addr.cw_dip_v6.s6_addr32
+#define cw_ipv6_dip64 	cw_dip_addr.cw_dip_v6.s6_addr64
+
+
+	//uint32_t dip;
+	//uint32_t sip;
     uint16_t dport;
     uint16_t sport;
     uint8_t tos;	
@@ -121,10 +163,39 @@ typedef struct  rule_param_s{
 #define	acl_tunnel_eth_header_smac		tunnel_l2_header.eth_header.smac
 #define	acl_tunnel_eth_header_ether		tunnel_l2_header.eth_header.ether_type
 
+		union {
+				uint32_t acl_sip_v4;
+				struct	cvm_ip6_in6_addr acl_sip_v6;
+	
+		}sip_addr;
+	
+		union {
+				uint32_t acl_dip_v4;
+				struct	cvm_ip6_in6_addr acl_dip_v6;
+		
+		}dip_addr;
+					
+#define ipv4_sip 	sip_addr.acl_sip_v4
+#define ipv4_dip 	dip_addr.acl_dip_v4
+#define ipv6_sip	sip_addr.acl_sip_v6
+#define ipv6_sip8 	sip_addr.acl_sip_v6.s6_addr
+#define ipv6_sip16 	sip_addr.acl_sip_v6.s6_addr16
+#define ipv6_sip32 	sip_addr.acl_sip_v6.s6_addr32
+#define ipv6_sip64 	sip_addr.acl_sip_v6.s6_addr64
+#define ipv6_dip 	dip_addr.acl_dip_v6
+#define ipv6_dip8 	dip_addr.acl_dip_v6.s6_addr
+#define ipv6_dip16 	dip_addr.acl_dip_v6.s6_addr16
+#define ipv6_dip32 	dip_addr.acl_dip_v6.s6_addr32
+#define ipv6_dip64 	dip_addr.acl_dip_v6.s6_addr64
 
+
+
+
+	
+	uint8_t ipv6_flag;
 	/*L3-4 header, the HASH key  14Bytes	*/	
-	uint32_t  sip;
-	uint32_t  dip;  
+	//uint32_t  sip;
+	//uint32_t  dip;  
 	uint16_t  sport;
 	uint16_t  dport;
 	uint8_t  protocol;

@@ -74,7 +74,10 @@
 #define FCCP_CMD_CLEAR_PART_FAU64 			48
 #define FCCP_CMD_ENABLE_PPPOE             	49
 #define FCCP_CMD_GET_PPPOE_STATE          	50
-
+#define FCCP_CMD_ENABLE_IPV6		        51
+#define FCCP_CMD_GET_IPV6_STATE    			52
+#define FCCP_CMD_ENABLE_PURE_IPV6           53
+#define FCCP_CMD_GET_PURE_IPV6_STATE    	54
 
 
 

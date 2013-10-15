@@ -78,13 +78,6 @@
 #define PACKET_DROP_PIP_QOS7_HIGH   1700
 
 
-
-
-
-
-
-
-
 /* abstract virtual port communication to control plane */
 typedef enum
 {

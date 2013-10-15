@@ -48,6 +48,7 @@
 #define IP_IP_802_3_OFFSET        (IP_H_LEN + UDP_H_LEN + CW_H_LEN + ETH_H_LEN)  /* From extern ip header to capwap 802.3 internal ip header */
 
 #define ETH_P_IP			0x0800
+#define ETH_P_IPV6			0x86dd
 #define PPPOE_TYPE			0x8864
 #define PPPOE_IP_TYPE		0x0021
 #define PPPOE_H_LEN			8
@@ -173,24 +174,52 @@ union capwap_hd {
 
 #define MAX_CAPWAP_CACHE_NUM 8192   /*8K Capwap ËíµÀ*/
 #define CAPWAP_CACHE_TBL_NAME "capwap_cache_tbl"
+
+
+
+
 typedef struct  capwap_cache_tbl_s
 {
 	/* how many rules use this cache, add by zhaohan */
 	int32_t use_num;
 
-	/* Extern IP header */
-	uint32_t dip;
-	uint32_t sip;
-	uint16_t dport;
-	uint16_t sport;
-	uint8_t tos;
+    /* Extern IP header */
+		union {
+				uint32_t cw_sip_v4;
+				struct	cvm_ip6_in6_addr	cw_sip_v6;
+	
+		}cw_sip_addr;
+	
+		union {
+				uint32_t cw_dip_v4;
+				struct	cvm_ip6_in6_addr	cw_dip_v6;
+		
+		}cw_dip_addr;
+					
+#define cw_sip 			cw_sip_addr.cw_sip_v4
+#define cw_dip 			cw_dip_addr.cw_dip_v4
+#define cw_ipv6_sip 	cw_sip_addr.cw_sip_v6
+#define cw_ipv6_sip8 	cw_sip_addr.cw_sip_v6.s6_addr8
+#define cw_ipv6_sip16 	cw_sip_addr.cw_sip_v6.s6_addr16
+#define cw_ipv6_sip32 	cw_sip_addr.cw_sip_v6.s6_addr32
+#define cw_ipv6_sip64 	cw_sip_addr.cw_sip_v6.s6_addr64
+#define cw_ipv6_dip 	cw_dip_addr.cw_dip_v6
+#define cw_ipv6_dip8 	cw_dip_addr.cw_dip_v6.s6_addr8
+#define cw_ipv6_dip16 	cw_dip_addr.cw_dip_v6.s6_addr16
+#define cw_ipv6_dip32 	cw_dip_addr.cw_dip_v6.s6_addr32
+#define cw_ipv6_dip64 	cw_dip_addr.cw_dip_v6.s6_addr64
 
-	/*current entry is valid or not*/
-	/*uint8_t    valid_bit;	*/
 
-	/* CAPWAP header */
-	uint8_t cw_hd[CW_H_LEN];
-} capwap_cache_t ;
+	//uint32_t dip;
+	//uint32_t sip;
+    uint16_t dport;
+    uint16_t sport;
+    uint8_t tos;
+    /*current entry is valid or not*/
+    /*uint8_t    valid_bit;	*/
+    /* CAPWAP header */
+    uint8_t cw_hd[CW_H_LEN];
+}capwap_cache_t;
 
 
 /**

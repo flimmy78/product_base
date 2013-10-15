@@ -37,6 +37,13 @@ struct cmd {
 				((uint8_t*)&(m))[1], \
 				((uint8_t*)&(m))[2], \
 				((uint8_t*)&(m))[3]
+
+#define IPV6_FMT(m)	\
+				((uint16_t*)&(m))[0], \
+				((uint16_t*)&(m))[1], \
+				((uint16_t*)&(m))[2], \
+				((uint16_t*)&(m))[3]
+
 				
 /* for print mac */
 #define MAC_FMT(m)  \

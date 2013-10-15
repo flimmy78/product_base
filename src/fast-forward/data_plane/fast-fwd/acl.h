@@ -44,15 +44,13 @@
 #include "shell.h"
 
 
-
-
 #define ACL_TBL_RULE_NAME "acl_tbl_rule"
 #define ACL_DYNAMIC_TBL_RULE_NAME   "acl_dynamic_tbl_rule"
 #define USER_TBL_RULE_NAME "user_tbl"
 #define USER_DYNAMIC_TBL_RULE_NAME "user_dynamic_tbl"
 #define BASE_MAC_TABLE_NAME     "basemac_table"
 
-
+#define IPV6_CMP(a, b) ((a.s6_addr64[0] == b.s6_addr64[0]) && (a.s6_addr64[1] == b.s6_addr64[1]))
 
 /*contain the packet fast parse result*/
 typedef enum { 	
@@ -180,10 +178,35 @@ typedef struct  rule_param_s{
 #define	acl_tunnel_eth_header_smac		tunnel_l2_header.eth_header.smac
 #define	acl_tunnel_eth_header_ether		tunnel_l2_header.eth_header.ether_type
 
+		union {
+				uint32_t acl_sip_v4;
+				struct	cvm_ip6_in6_addr acl_sip_v6;
+	
+		}sip_addr;
+	
+		union {
+				uint32_t acl_dip_v4;
+				struct	cvm_ip6_in6_addr acl_dip_v6;
+		
+		}dip_addr;
+								
+#define ipv4_sip 	sip_addr.acl_sip_v4
+#define ipv4_dip 	dip_addr.acl_dip_v4
+#define ipv6_sip	sip_addr.acl_sip_v6
+#define ipv6_sip8 	sip_addr.acl_sip_v6.s6_addr
+#define ipv6_sip16 	sip_addr.acl_sip_v6.s6_addr16
+#define ipv6_sip32 	sip_addr.acl_sip_v6.s6_addr32
+#define ipv6_sip64 	sip_addr.acl_sip_v6.s6_addr64
+#define ipv6_dip 	dip_addr.acl_dip_v6
+#define ipv6_dip8 	dip_addr.acl_dip_v6.s6_addr
+#define ipv6_dip16 	dip_addr.acl_dip_v6.s6_addr16
+#define ipv6_dip32 	dip_addr.acl_dip_v6.s6_addr32
+#define ipv6_dip64 	dip_addr.acl_dip_v6.s6_addr64
 
+	uint8_t ipv6_flag;
 	/*L3-4 header, the HASH key  14Bytes	*/	
-	uint32_t  sip;
-	uint32_t  dip;  
+	//uint32_t  sip;
+	//uint32_t  dip;  
 	uint16_t  sport;
 	uint16_t  dport;
 	uint8_t  protocol;
@@ -748,7 +771,7 @@ static inline void fast_del_rule_by_ip(uint32_t ip)
 				{   
 					free_entry_flag=0;							  
 
-					if((p_age_index->rules.sip == ip) || (p_age_index->rules.dip == ip))
+					if((p_age_index->rules.ipv4_sip == ip) || (p_age_index->rules.ipv4_dip == ip))
 					{							
 						/*删除一个表项，可能还有需要删除其他的，所以不能返回;*/
 						if (delete_fast_rule_by_addr(p_base_addr,p_pre_age_index ,p_age_index) == FREE_ACL_BUCKET)
@@ -877,6 +900,53 @@ static inline rule_item_t* cvm_ip_hash_lookup (uint32_t ip)
 	return (bucket);
 }
 
+static inline rule_item_t *hash_v6_pure_ip(uint64_t dip_1, uint64_t dip_2, uint64_t sip_1, uint64_t sip_2)
+{
+	rule_item_t *bucket;
+	uint64_t  result = 0;
+
+	CVMX_MT_CRC_POLYNOMIAL(0x1edc6f41);
+	CVMX_MT_CRC_IV(0);
+	CVMX_MT_CRC_DWORD(dip_1);
+	CVMX_MT_CRC_DWORD(dip_2);
+	CVMX_MT_CRC_DWORD(sip_1);
+	CVMX_MT_CRC_DWORD(sip_2);
+	CVMX_MF_CRC_IV(result);
+
+	result &= (acl_static_tbl_size - 1);
+
+	/*Save bucket address in the scratch memory.*/
+	bucket = &acl_bucket_tbl[result];	
+	cvmx_scratch_write64(CVM_SCR_ACL_CACHE_PTR, (uint64_t) (CAST64(bucket)));
+	return (bucket);
+}
+
+static inline rule_item_t *hash_v6_pure_ip_32(uint32_t dip_1, uint32_t dip_2, uint32_t dip_3, uint32_t dip_4, uint32_t sip_1, uint32_t sip_2, uint32_t sip_3, uint32_t sip_4)
+{
+	rule_item_t *bucket;
+	uint64_t  result = 0;
+
+	CVMX_MT_CRC_POLYNOMIAL(0x1edc6f41);
+	CVMX_MT_CRC_IV(0);
+	CVMX_MT_CRC_WORD(dip_1);
+	CVMX_MT_CRC_WORD(dip_2);
+	CVMX_MT_CRC_WORD(dip_3);
+	CVMX_MT_CRC_WORD(dip_4);
+	CVMX_MT_CRC_WORD(sip_1);
+	CVMX_MT_CRC_WORD(sip_2);
+	CVMX_MT_CRC_WORD(sip_3);
+	CVMX_MT_CRC_WORD(sip_4);
+	CVMX_MF_CRC_IV(result);
+
+	result &= (acl_static_tbl_size - 1);
+
+	/*Save bucket address in the scratch memory.*/
+	bucket = &acl_bucket_tbl[result];	
+	cvmx_scratch_write64(CVM_SCR_ACL_CACHE_PTR, (uint64_t) (CAST64(bucket)));
+	return (bucket);
+}
+
+
 static inline rule_item_t * cvm_two_tupe_hash_lookup(uint32_t dip, uint32_t sip)
 {
 	rule_item_t *bucket;
@@ -940,6 +1010,61 @@ static inline rule_item_t * hash(uint32_t dip, uint32_t sip, uint8_t proto, uint
 	cvmx_scratch_write64(CVM_SCR_ACL_CACHE_PTR, (uint64_t) (CAST64(bucket)));
 	return (bucket);
 }
+
+/* hash ipv6 function */
+static inline rule_item_t * hash_v6(uint64_t dip_1, uint64_t dip_2, uint64_t sip_1, uint64_t sip_2, uint8_t proto, uint16_t dport, uint16_t sport)
+{
+	rule_item_t *bucket;
+	uint64_t  result = 0;
+
+	CVMX_MT_CRC_POLYNOMIAL(0x1edc6f41);
+	CVMX_MT_CRC_IV(0);
+	CVMX_MT_CRC_DWORD(dip_1);
+	CVMX_MT_CRC_DWORD(dip_2);
+	CVMX_MT_CRC_DWORD(sip_1);
+	CVMX_MT_CRC_DWORD(sip_2);
+	CVMX_MT_CRC_HALF(dport);
+	CVMX_MT_CRC_HALF(sport);
+	CVMX_MT_CRC_BYTE(proto);
+	CVMX_MF_CRC_IV(result);
+
+	result &= (acl_static_tbl_size - 1);
+
+	/*Save bucket address in the scratch memory.*/
+	bucket = &acl_bucket_tbl[result];	
+	cvmx_scratch_write64(CVM_SCR_ACL_CACHE_PTR, (uint64_t) (CAST64(bucket)));
+	return (bucket);
+}
+
+static inline rule_item_t * hash_v6_32(uint32_t dip_1, uint32_t dip_2, uint32_t dip_3, uint32_t dip_4,uint32_t sip_1, uint32_t sip_2, uint32_t sip_3, uint32_t sip_4,uint8_t proto, uint16_t dport, uint16_t sport)
+{
+	rule_item_t *bucket;
+	uint64_t  result = 0;
+
+	CVMX_MT_CRC_POLYNOMIAL(0x1edc6f41);
+	CVMX_MT_CRC_IV(0);
+	CVMX_MT_CRC_WORD(dip_1);
+	CVMX_MT_CRC_WORD(dip_2);
+	CVMX_MT_CRC_WORD(dip_3);
+	CVMX_MT_CRC_WORD(dip_4);
+	CVMX_MT_CRC_WORD(sip_1);
+	CVMX_MT_CRC_WORD(sip_2);
+	CVMX_MT_CRC_WORD(sip_3);
+	CVMX_MT_CRC_WORD(sip_4);
+	CVMX_MT_CRC_HALF(dport);
+	CVMX_MT_CRC_HALF(sport);
+	CVMX_MT_CRC_BYTE(proto);
+	CVMX_MF_CRC_IV(result);
+
+	result &= (acl_static_tbl_size - 1);
+
+	/*Save bucket address in the scratch memory.*/
+	bucket = &acl_bucket_tbl[result];	
+	cvmx_scratch_write64(CVM_SCR_ACL_CACHE_PTR, (uint64_t) (CAST64(bucket)));
+	return (bucket);
+}
+
+
 
 /*
    区分上下行，分别使用SIP/DIP获取用户表的索引
@@ -1087,6 +1212,8 @@ static inline int acl_delete_rule_by_aging( rule_item_t *head_rule ,rule_item_t 
 	return RETURN_OK;
 }
 
+
+
 /*
  * lookup the table, if find, check the state,
  * learned: get the action
@@ -1094,7 +1221,7 @@ static inline int acl_delete_rule_by_aging( rule_item_t *head_rule ,rule_item_t 
  * if not find, malloc the new entry, and insert, set the state to learning
  * lutao
  */
-static inline rule_item_t  * acl_table_lookup(cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th,
+static inline rule_item_t  * acl_table_lookup_v4(cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th,
 		cvmx_spinlock_t  **first_lock)
 
 {    
@@ -1108,13 +1235,13 @@ static inline rule_item_t  * acl_table_lookup(cvm_common_ip_hdr_t *ip, cvm_commo
 	if ((ip == NULL) || (th == NULL))
 	{
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_WARNING,
-				"acl_table_lookup: NULL Pointer !...\r\n");	
+				"acl_table_lookup_v4: NULL Pointer !...\r\n");	
 		return NULL;		
 	}
 
 	cvmx_fau_atomic_add64(CVM_FAU_TOTAL_ACL_LOOKUP, 1);
 	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
-			"acl_table_lookup: packet-fiveTuple----dip=%d.%d.%d.%d, sip=%d.%d.%d.%d,dport=%d, sport=%d,proto=%d.  \r\n",
+			"acl_table_lookup_v4: packet-fiveTuple----dip=%d.%d.%d.%d, sip=%d.%d.%d.%d,dport=%d, sport=%d,proto=%d.  \r\n",
 			IP_FMT(ip->ip_dst),IP_FMT(ip->ip_src),th->th_dport,th->th_sport,ip->ip_p);
 
 	/*look up ACL Table and get the bucket*/
@@ -1123,7 +1250,7 @@ static inline rule_item_t  * acl_table_lookup(cvm_common_ip_hdr_t *ip, cvm_commo
 	if (NULL == rule)
 	{
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_WARNING,
-				"acl_table_lookup: Hash rule is NULL Pointer !...\r\n");	
+				"acl_table_lookup_v4: Hash rule is NULL Pointer !...\r\n");	
 		return NULL;		
 	}
 
@@ -1138,7 +1265,7 @@ static inline rule_item_t  * acl_table_lookup(cvm_common_ip_hdr_t *ip, cvm_commo
     /* debug trace.add by zhaohan */
     if((head_rule->valid_entries == acl_bucket_max_entries)&&(head_rule->next == NULL))
     {
-        printf("Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
+        printf("acl_table_lookup_v4: Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
     }
 
 	/*if the first bucket is empty and there are no more buckets, then insert current flow*/
@@ -1147,8 +1274,8 @@ static inline rule_item_t  * acl_table_lookup(cvm_common_ip_hdr_t *ip, cvm_commo
 		if(head_rule->valid_entries == 0)
 		{
 			head_rule->rules.time_stamp = get_sec(); 
-			head_rule->rules.dip = ip->ip_dst;
-			head_rule->rules.sip = ip->ip_src;
+			head_rule->rules.ipv4_dip = ip->ip_dst;
+			head_rule->rules.ipv4_sip = ip->ip_src;
 			head_rule->rules.protocol= ip->ip_p;
 			head_rule->rules.dport= th->th_dport;
 			head_rule->rules.sport= th->th_sport;
@@ -1176,7 +1303,7 @@ static inline rule_item_t  * acl_table_lookup(cvm_common_ip_hdr_t *ip, cvm_commo
 			else
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
-						"acl_table_lookup: Should never come to here file%s, line %d, rule=0x%p, num=0x%d,next=0x%p.\r\n",__FILE__, __LINE__,rule,rule->valid_entries,rule->next);	
+						"acl_table_lookup_v4: Should never come to here file%s, line %d, rule=0x%p, num=0x%d,next=0x%p.\r\n",__FILE__, __LINE__,rule,rule->valid_entries,rule->next);	
 				cvmx_spinlock_unlock(head_lock);
 				return NULL;
 			}
@@ -1190,14 +1317,14 @@ static inline rule_item_t  * acl_table_lookup(cvm_common_ip_hdr_t *ip, cvm_commo
 		if(rule == NULL || aging_pre_rule == NULL)
 		{
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
-					"acl_table_lookup: Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
+					"acl_table_lookup_v4: Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
 			cvmx_spinlock_unlock(head_lock);
 			return NULL;
 		}
 
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
-				"acl_table_lookup: current Rule info: dip=%d.%d.%d.%d, sip=%d.%d.%d.%d,dport=%d, sport=%d,proto=%d.  \r\n",
-				IP_FMT(rule->rules.dip),IP_FMT(rule->rules.sip),rule->rules.dport,rule->rules.sport,rule->rules.protocol);
+				"acl_table_lookup_v4: current Rule info: dip=%d.%d.%d.%d, sip=%d.%d.%d.%d,dport=%d, sport=%d,proto=%d.  \r\n",
+				IP_FMT(rule->rules.ipv4_dip),IP_FMT(rule->rules.ipv4_sip),rule->rules.dport,rule->rules.sport,rule->rules.protocol);
 
 		/************************aging first*****************************/
 		if((acl_aging_check(&(rule->rules)) > 0) && (rule->rules.rule_state != RULE_IS_STATIC))
@@ -1233,9 +1360,376 @@ static inline rule_item_t  * acl_table_lookup(cvm_common_ip_hdr_t *ip, cvm_commo
 					}
 
 					free_rule->rules.time_stamp = get_sec(); 
-					free_rule->rules.dip = ip->ip_dst;
-					free_rule->rules.sip = ip->ip_src;
+					free_rule->rules.ipv4_dip = ip->ip_dst;
+					free_rule->rules.ipv4_sip = ip->ip_src;
 					free_rule->rules.protocol= ip->ip_p;
+					free_rule->rules.dport= th->th_dport;
+					free_rule->rules.sport= th->th_sport;
+					free_rule->rules.rule_state = RULE_IS_LEARNING;
+					free_rule->rules.action_type = FLOW_ACTION_TOLINUX;
+					head_rule->valid_entries++; /* ---------- modify by zhaohan ----------- */
+					cvmx_fau_atomic_add64(CVM_FAU_ACL_REG, 1);
+					cvmx_spinlock_unlock(head_lock);
+
+#ifdef USER_TABLE_FUNCTION	
+        			set_acl_mask(head_rule);
+#endif
+
+					return free_rule;
+				}
+				else
+					continue;
+			}
+			else
+			{
+				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
+						"acl_table_lookup_v4: Should never come to here file%s, line %d.\r\n",__FILE__, __LINE__);
+				cvmx_spinlock_unlock(head_lock);
+				return NULL;
+			}
+		}
+		/************************aging end*****************************/
+		if((rule->rules.ipv4_dip == ip->ip_dst) && (rule->rules.ipv4_sip == ip->ip_src) &&
+				(rule->rules.dport == th->th_dport) &&(rule->rules.sport == th->th_sport) &&(rule->rules.protocol == ip->ip_p)) 
+		{		
+			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+					"acl_table_lookup_v4: Find the rule=0x%p\n",rule);
+
+			if(rule->rules.rule_state== RULE_IS_STATIC) 
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_FLOWTABLE_HIT_PACKETS, 1);
+				cvmx_spinlock_unlock(head_lock);
+				return rule;
+			}
+
+			/*是否打开周期性强制老化*/
+			if(acl_aging_enable == FUNC_ENABLE)
+				rule->rules.time_stamp = get_sec(); 
+
+			if(rule->rules.rule_state == RULE_IS_LEARNED)
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_FLOWTABLE_HIT_PACKETS, 1);		
+				cvmx_spinlock_unlock(head_lock);
+				return rule;
+			}
+			else if(rule->rules.rule_state == RULE_IS_LEARNING)
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_ACL_REG, 1);
+				cvmx_spinlock_unlock(head_lock);
+				return rule;
+			}
+			else
+			{
+				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
+						"acl_table_lookup_v4: Should never come to here file%s, line %d, rule_state=%d.\r\n",__FILE__, __LINE__,rule->rules.rule_state);	
+				cvmx_spinlock_unlock(head_lock);
+				return NULL;
+			}
+
+		}
+		else
+		{
+			if(rule->next != NULL)
+			{
+				aging_pre_rule=rule;
+				rule = rule->next;
+				aging_cur_rule=rule;
+			}
+			else
+			{
+				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+						"Need to malloc new rule\n");
+
+				if(free_rule == NULL)
+				{
+					/* if more than 8 node at one list, replace the first un-static dynamic rule, add by zhaohan */
+					if(head_rule->valid_entries >= acl_bucket_max_entries)
+					{
+						rule_item_t* replace_rule = head_rule->next;
+						rule_item_t* pre_rule = head_rule;
+						uint64_t *ptmp;
+						uint32_t tmp = 0;  
+
+                        /* bug trace */
+                        if(replace_rule == NULL)
+                        {
+                            printf("replace_rule == NULL! should not be here!\n");
+                            printf("head_rule->valid_entries = %d\n", head_rule->valid_entries);
+                            printf("head_rule->rules.rule_state=%d\n", head_rule->rules.rule_state);
+                            printf("header rule info: dip=%d.%d.%d.%d, sip=%d.%d.%d.%d,dport=%d, sport=%d,proto=%d.  \r\n",
+                                            IP_FMT(head_rule->rules.ipv4_dip),IP_FMT(head_rule->rules.ipv4_sip),head_rule->rules.dport,head_rule->rules.sport,head_rule->rules.protocol);
+                            return NULL;
+                        }
+
+						/* find the first none-static rule */
+						while(replace_rule->rules.rule_state == RULE_IS_STATIC)
+						{
+							if(NULL == replace_rule->next)
+							{
+								cvmx_spinlock_unlock(head_lock);
+								return NULL;
+							}
+							pre_rule = replace_rule;
+							replace_rule = replace_rule->next;
+						}
+
+						/* remove & clear replace rule */
+						if(replace_rule->next != NULL)
+						{
+    						pre_rule->next = replace_rule->next;  /* there is a bug when acl_bucket_max_entries = 2 */
+                            rule->next = replace_rule;  
+                        }
+						
+						ptmp = (uint64_t*)replace_rule;
+						while(tmp < sizeof(rule_item_t)/8) /*144 Bytes*//*没有考虑capwap表项删除*/
+						{
+							*ptmp = 0;
+							ptmp = ptmp + 1;
+							tmp++;
+						}
+
+						/* add replace_rule to tail */						
+						replace_rule->next = NULL;
+                		/* debug trace.add by zhaohan */
+                        if((head_rule->valid_entries == acl_bucket_max_entries)&&(head_rule->next == NULL))
+                        {
+                            printf("Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
+                        }
+						replace_rule->rules.time_stamp = get_sec();
+						replace_rule->rules.ipv4_dip = ip->ip_dst;
+						replace_rule->rules.ipv4_sip = ip->ip_src;
+						replace_rule->rules.protocol= ip->ip_p;
+						replace_rule->rules.dport= th->th_dport;
+						replace_rule->rules.sport= th->th_sport;
+						replace_rule->rules.rule_state = RULE_IS_LEARNING;
+						replace_rule->rules.action_type = FLOW_ACTION_TOLINUX;
+						cvmx_spinlock_unlock(head_lock);
+						cvmx_fau_atomic_add64(CVM_FAU_MAX_RULE_ENTRIES, 1);
+						cvmx_fau_atomic_add64(CVM_FAU_ACL_REG, 1);
+						return replace_rule;
+					}
+
+					rule->next = (rule_item_t *)cvmx_malloc(rule_arena, sizeof(rule_item_t));
+					if(rule->next == NULL)
+					{
+						FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_ERROR, 
+						"InsertFastRule: Memory not available for adding rules\n");
+						cvmx_fau_atomic_add64(CVM_FAU_ALLOC_RULE_FAIL, 1);	
+						cvmx_spinlock_unlock(head_lock);
+						return NULL;
+					}	
+					memset(rule->next, 0, sizeof(rule_item_t));
+					free_rule = rule->next;
+					atomic_add64_nosync(&(rule_cnt_info.dynamic_rule_cnt));  // add by zhaohan
+				}
+
+				free_rule->rules.time_stamp = get_sec(); 
+				free_rule->rules.ipv4_dip = ip->ip_dst;
+				free_rule->rules.ipv4_sip = ip->ip_src;
+				free_rule->rules.protocol= ip->ip_p;
+				free_rule->rules.dport= th->th_dport;
+				free_rule->rules.sport= th->th_sport;
+				free_rule->rules.rule_state = RULE_IS_LEARNING;
+				free_rule->rules.action_type = FLOW_ACTION_TOLINUX;
+				head_rule->valid_entries++;
+				cvmx_spinlock_unlock(head_lock);
+				cvmx_fau_atomic_add64(CVM_FAU_ACL_REG, 1);
+				return free_rule;
+
+			}
+		}
+	}
+}
+	
+
+
+/*
+ * lookup the table, if find, check the state,
+ * learned: get the action
+ * learning: forward to the Linux
+ * if not find, malloc the new entry, and insert, set the state to learning
+ * lutao
+ */
+static inline rule_item_t  * acl_table_lookup_v6(cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th,
+		cvmx_spinlock_t  **first_lock)
+
+{    
+	rule_item_t  *rule  = NULL;
+	rule_item_t  *free_rule  = NULL; /*the first free bucket position*/
+	rule_item_t  *aging_cur_rule = NULL;
+	rule_item_t  *head_rule = NULL;
+	rule_item_t  *aging_pre_rule = NULL;
+	cvmx_spinlock_t  *head_lock = NULL;
+	cvm_common_ipv6_hdr_t *ipv6 = NULL;
+
+	if ((ip == NULL) || (th == NULL))
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_WARNING,
+				"acl_table_lookup_v6: NULL Pointer !...\r\n");	
+		return NULL;		
+	}
+	/* IPV4 table look up */
+	if (CVM_IP_IPVERSION_V6 != ip->ip_v)
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_WARNING,
+				"acl_table_lookup_v6: warning: the protocol=%d, not equal IPV6\r\n",ip->ip_v);
+        return NULL;
+	}
+
+	cvmx_fau_atomic_add64(CVM_FAU_TOTAL_ACL_LOOKUP, 1);
+
+    /* IPV6 table look up */
+	ipv6 = (cvm_common_ipv6_hdr_t *)ip;
+	hash_v6(ipv6->ip_dst.s6_addr64[0],ipv6->ip_dst.s6_addr64[1],ipv6->ip_src.s6_addr64[0],ipv6->ip_src.s6_addr64[1], ipv6->ip_nexthdr, th->th_dport, th->th_sport);
+	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+		"acl_table_lookup_v6: packet-fiveTuple----%x:%x:%x:%x : %u => %x:%x:%x:%x : %u proto=%d\n",
+		ipv6->ip_src.s6_addr32[0], ipv6->ip_src.s6_addr32[1],
+		ipv6->ip_src.s6_addr32[2], ipv6->ip_src.s6_addr32[3],
+		th->th_sport,
+		ipv6->ip_dst.s6_addr32[0], ipv6->ip_dst.s6_addr32[1],
+		ipv6->ip_dst.s6_addr32[2], ipv6->ip_dst.s6_addr32[3],
+		th->th_dport,
+		ipv6->ip_nexthdr);
+
+	rule = CASTPTR(rule_item_t, cvmx_scratch_read64(CVM_SCR_ACL_CACHE_PTR));
+	if (NULL == rule)
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_WARNING,
+				"acl_table_lookup_v6: Hash rule is NULL Pointer !...\r\n");	
+		return NULL;		
+	}
+
+	head_rule = rule;
+	aging_cur_rule = rule;
+	aging_pre_rule = rule;
+
+	head_lock = &rule->lock;
+	*first_lock = head_lock;
+	cvmx_spinlock_lock(head_lock);
+
+    /* debug trace.add by zhaohan */
+    if((head_rule->valid_entries == acl_bucket_max_entries)&&(head_rule->next == NULL))
+    {
+        FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_WARNING,
+            "Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
+    }
+
+	/*if the first bucket is empty and there are no more buckets, then insert current flow*/
+	if(head_rule->rules.rule_state == RULE_IS_EMPTY)
+	{
+		if(head_rule->valid_entries == 0)
+		{
+			head_rule->rules.time_stamp = get_sec(); 
+
+            /* IPv6 address */
+			head_rule->rules.ipv6_dip64[0] = ipv6->ip_dst.s6_addr64[0];
+			head_rule->rules.ipv6_dip64[1] = ipv6->ip_dst.s6_addr64[1];
+			head_rule->rules.ipv6_sip64[0] = ipv6->ip_src.s6_addr64[0];
+			head_rule->rules.ipv6_sip64[1] = ipv6->ip_src.s6_addr64[1];
+			head_rule->rules.protocol= ipv6->ip_nexthdr;
+			head_rule->rules.ipv6_flag = 1;
+			
+			head_rule->rules.dport= th->th_dport;
+			head_rule->rules.sport= th->th_sport;
+			head_rule->rules.rule_state = RULE_IS_LEARNING;
+			head_rule->rules.action_type = FLOW_ACTION_TOLINUX;
+			head_rule->valid_entries++;
+			cvmx_fau_atomic_add64(CVM_FAU_ACL_REG, 1);
+			cvmx_spinlock_unlock(head_lock);
+
+#ifdef USER_TABLE_FUNCTION	
+			set_acl_mask(head_rule);
+#endif
+			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+					"acl_table_lookup: Find the rule=0x%p\n",rule);
+            
+			return rule;
+		}
+		else /*first bucket is empty but with other buckets*/
+		{
+			free_rule = head_rule; /*record current free bucket position*/
+
+			if(head_rule->next != NULL)
+			{
+				aging_cur_rule = head_rule->next;
+				rule = head_rule->next;
+			}
+			else
+			{
+				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
+						"acl_table_lookup: Should never come to here file%s, line %d, rule=0x%p, num=0x%d,next=0x%p.\r\n",__FILE__, __LINE__,rule,rule->valid_entries,rule->next);	
+				cvmx_spinlock_unlock(head_lock);
+				return NULL;
+			}
+		}
+	}
+
+	/*aging the current rule first then compare the rule with the key,loop*/			 
+	while(1)
+	{
+		/*add for coverity by wangjian */
+		if(rule == NULL || aging_pre_rule == NULL)
+		{
+			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
+					"acl_table_lookup: Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
+			cvmx_spinlock_unlock(head_lock);
+			return NULL;
+		}
+		
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+			"acl_table_lookup: current Rule info: %x:%x:%x:%x : %u => %x:%x:%x:%x : %u proto=%d\n",
+			rule->rules.ipv6_sip32[0], rule->rules.ipv6_sip32[1],
+			rule->rules.ipv6_sip32[2], rule->rules.ipv6_sip32[3],
+			rule->rules.sport,
+			rule->rules.ipv6_dip32[0], rule->rules.ipv6_dip32[1],
+			rule->rules.ipv6_dip32[2], rule->rules.ipv6_dip32[3],
+			rule->rules.sport,
+			rule->rules.protocol);
+
+		
+		/************************aging first*****************************/
+		if((acl_aging_check(&(rule->rules)) > 0) && (rule->rules.rule_state != RULE_IS_STATIC))
+		{   
+			atomic_add64_nosync(&(rule_cnt_info.rule_age_cnt)); /*rule need to be aging*/
+			if(acl_delete_rule_by_aging(head_rule,aging_pre_rule ,aging_cur_rule)==RETURN_OK)
+			{
+				if(aging_cur_rule == head_rule)     /* add by zhaohan */
+				{
+					free_rule = head_rule;
+				}
+				
+				rule=aging_pre_rule->next;
+				aging_cur_rule=aging_pre_rule->next;
+
+				if(rule==NULL)/*after age, there is no more bucket*/
+				{
+					if(free_rule == NULL)
+					{
+						aging_pre_rule->next = (rule_item_t *)cvmx_malloc(rule_arena, sizeof(rule_item_t));
+						if(aging_pre_rule->next == NULL)
+						{
+							FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, 
+									FASTFWD_COMMON_DBG_LVL_ERROR,
+									"InsertFastRule: Memory not available for adding rules line=%d\n",__LINE__);
+							cvmx_fau_atomic_add64(CVM_FAU_ALLOC_RULE_FAIL, 1);			
+							cvmx_spinlock_unlock(head_lock);
+							return NULL;
+						}	
+						memset(aging_pre_rule->next, 0, sizeof(rule_item_t));
+						free_rule = aging_pre_rule->next;
+						atomic_add64_nosync(&(rule_cnt_info.dynamic_rule_cnt));  /* add by zhaohan */
+					}
+
+					free_rule->rules.time_stamp = get_sec(); 
+
+                    /* IPv6 address */
+					free_rule->rules.ipv6_dip64[0] = ipv6->ip_dst.s6_addr64[0];
+					free_rule->rules.ipv6_dip64[1] = ipv6->ip_dst.s6_addr64[1];
+					free_rule->rules.ipv6_sip64[0] = ipv6->ip_src.s6_addr64[0];
+					free_rule->rules.ipv6_sip64[1] = ipv6->ip_src.s6_addr64[1];
+					free_rule->rules.protocol= ipv6->ip_nexthdr;
+					free_rule->rules.ipv6_flag = 1;
+
 					free_rule->rules.dport= th->th_dport;
 					free_rule->rules.sport= th->th_sport;
 					free_rule->rules.rule_state = RULE_IS_LEARNING;
@@ -1262,8 +1756,13 @@ static inline rule_item_t  * acl_table_lookup(cvm_common_ip_hdr_t *ip, cvm_commo
 			}
 		}
 		/************************aging end*****************************/
-		if((rule->rules.dip == ip->ip_dst) && (rule->rules.sip == ip->ip_src) &&
-				(rule->rules.dport == th->th_dport) &&(rule->rules.sport == th->th_sport) &&(rule->rules.protocol == ip->ip_p)) 
+		/* sip dip protocol dport sport five tuple compare, ipv4 ipv6 sip dip prococol need different process */
+		if ((1 == rule->rules.ipv6_flag) && 
+			 IPV6_CMP(rule->rules.ipv6_sip, ipv6->ip_src) && 
+			 IPV6_CMP(rule->rules.ipv6_dip, ipv6->ip_dst) && 
+			 (rule->rules.protocol == ipv6->ip_nexthdr) &&
+			 (rule->rules.dport == th->th_dport) &&
+			 (rule->rules.sport == th->th_sport))     		
 		{		
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"acl_table_lookup: Find the rule=0x%p\n",rule);
@@ -1330,8 +1829,10 @@ static inline rule_item_t  * acl_table_lookup(cvm_common_ip_hdr_t *ip, cvm_commo
                             printf("head_rule->valid_entries = %d\n", head_rule->valid_entries);
                             printf("head_rule->rules.rule_state=%d\n", head_rule->rules.rule_state);
                             printf("header rule info: dip=%d.%d.%d.%d, sip=%d.%d.%d.%d,dport=%d, sport=%d,proto=%d.  \r\n",
-                                            IP_FMT(head_rule->rules.dip),IP_FMT(head_rule->rules.sip),head_rule->rules.dport,head_rule->rules.sport,head_rule->rules.protocol);
-                            return NULL;
+                                            IP_FMT(head_rule->rules.ipv4_dip),IP_FMT(head_rule->rules.ipv4_sip),head_rule->rules.dport,head_rule->rules.sport,head_rule->rules.protocol);
+							FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
+								"acl_table_lookup: Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
+							return NULL;
                         }
 
 						/* find the first none-static rule */
@@ -1367,11 +1868,19 @@ static inline rule_item_t  * acl_table_lookup(cvm_common_ip_hdr_t *ip, cvm_commo
                         if((head_rule->valid_entries == acl_bucket_max_entries)&&(head_rule->next == NULL))
                         {
                             printf("Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
+							FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
+								"acl_table_lookup: Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
                         }
 						replace_rule->rules.time_stamp = get_sec();
-						replace_rule->rules.dip = ip->ip_dst;
-						replace_rule->rules.sip = ip->ip_src;
-						replace_rule->rules.protocol= ip->ip_p;
+
+						/* IPv6 address */
+						replace_rule->rules.ipv6_dip64[0] = ipv6->ip_dst.s6_addr64[0];
+						replace_rule->rules.ipv6_dip64[1] = ipv6->ip_dst.s6_addr64[1];
+						replace_rule->rules.ipv6_sip64[0] = ipv6->ip_src.s6_addr64[0];
+						replace_rule->rules.ipv6_sip64[1] = ipv6->ip_src.s6_addr64[1];
+						replace_rule->rules.protocol= ipv6->ip_nexthdr;
+						replace_rule->rules.ipv6_flag = 1;
+						
 						replace_rule->rules.dport= th->th_dport;
 						replace_rule->rules.sport= th->th_sport;
 						replace_rule->rules.rule_state = RULE_IS_LEARNING;
@@ -1397,9 +1906,15 @@ static inline rule_item_t  * acl_table_lookup(cvm_common_ip_hdr_t *ip, cvm_commo
 				}
 
 				free_rule->rules.time_stamp = get_sec(); 
-				free_rule->rules.dip = ip->ip_dst;
-				free_rule->rules.sip = ip->ip_src;
-				free_rule->rules.protocol= ip->ip_p;
+
+                /* IPv6 address */
+				free_rule->rules.ipv6_dip64[0] = ipv6->ip_dst.s6_addr64[0];
+				free_rule->rules.ipv6_dip64[1] = ipv6->ip_dst.s6_addr64[1];
+				free_rule->rules.ipv6_sip64[0] = ipv6->ip_src.s6_addr64[0];
+				free_rule->rules.ipv6_sip64[1] = ipv6->ip_src.s6_addr64[1];
+				free_rule->rules.protocol= ipv6->ip_nexthdr;
+				free_rule->rules.ipv6_flag = 1;
+
 				free_rule->rules.dport= th->th_dport;
 				free_rule->rules.sport= th->th_sport;
 				free_rule->rules.rule_state = RULE_IS_LEARNING;
@@ -1413,6 +1928,31 @@ static inline rule_item_t  * acl_table_lookup(cvm_common_ip_hdr_t *ip, cvm_commo
 		}
 	}
 }
+
+
+static inline rule_item_t  * acl_table_lookup(cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th,
+		cvmx_spinlock_t  **first_lock)
+{
+	if ((ip == NULL) || (th == NULL))
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_WARNING,
+				"acl_table_lookup: NULL Pointer !...\r\n");	
+		return NULL;		
+	}
+
+    if (CVM_IP_IPVERSION == ip->ip_v)
+        return acl_table_lookup_v4(ip, th,first_lock);
+    else if (CVM_IP_IPVERSION_V6 == ip->ip_v)
+        return acl_table_lookup_v6(ip, th,first_lock);
+    else
+    {
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_WARNING,
+				"acl_table_lookup: ip version is neither  v4 nor v6.\r\n");	    
+        return NULL;
+    }
+
+}	
+
 
 static inline rule_item_t  * acl_table_one_tuple_lookup(cvm_common_ip_hdr_t *ip, cvm_common_tcp_hdr_t *th)
 {    
@@ -1461,8 +2001,8 @@ static inline rule_item_t  * acl_table_one_tuple_lookup(cvm_common_ip_hdr_t *ip,
 		if(head_rule->valid_entries == 0)
 		{
 			head_rule->rules.time_stamp = get_sec(); 
-			head_rule->rules.dip = ip->ip_dst;
-			head_rule->rules.sip = ip->ip_src;
+			head_rule->rules.ipv4_dip = ip->ip_dst;
+			head_rule->rules.ipv4_sip = ip->ip_src;
 			head_rule->rules.protocol= ip->ip_p;
 			head_rule->rules.dport= th->th_dport;
 			head_rule->rules.sport= th->th_sport;
@@ -1506,7 +2046,7 @@ static inline rule_item_t  * acl_table_one_tuple_lookup(cvm_common_ip_hdr_t *ip,
 
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 				"acl_table_lookup: current Rule info: dip=%d.%d.%d.%d, sip=%d.%d.%d.%d,dport=%d, sport=%d,proto=%d.  \r\n",
-				IP_FMT(rule->rules.dip),IP_FMT(rule->rules.sip),rule->rules.dport,rule->rules.sport,rule->rules.protocol);
+				IP_FMT(rule->rules.ipv4_dip),IP_FMT(rule->rules.ipv4_sip),rule->rules.dport,rule->rules.sport,rule->rules.protocol);
 
 		/************************aging first*****************************/
 		if((acl_aging_check(&(rule->rules)) > 0) && (rule->rules.rule_state != RULE_IS_STATIC))
@@ -1542,8 +2082,8 @@ static inline rule_item_t  * acl_table_one_tuple_lookup(cvm_common_ip_hdr_t *ip,
 					}
 
 					free_rule->rules.time_stamp = get_sec(); 
-					free_rule->rules.dip = ip->ip_dst;
-					free_rule->rules.sip = ip->ip_src;
+					free_rule->rules.ipv4_dip = ip->ip_dst;
+					free_rule->rules.ipv4_sip = ip->ip_src;
 					free_rule->rules.protocol= ip->ip_p;
 					free_rule->rules.dport= th->th_dport;
 					free_rule->rules.sport= th->th_sport;
@@ -1567,7 +2107,7 @@ static inline rule_item_t  * acl_table_one_tuple_lookup(cvm_common_ip_hdr_t *ip,
 		}
 		/************************aging end*****************************/
 
-		if(rule->rules.dip== ip->ip_dst)    /* only compare dest ip */
+		if(rule->rules.ipv4_dip== ip->ip_dst)    /* only compare dest ip */
 		{		
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"acl_table_lookup: Find the rule=0x%p\n",rule);
@@ -1653,8 +2193,8 @@ static inline rule_item_t  * acl_table_one_tuple_lookup(cvm_common_ip_hdr_t *ip,
 						rule->next = replace_rule;  
 						replace_rule->next = NULL;
 						replace_rule->rules.time_stamp = get_sec();
-						replace_rule->rules.dip = ip->ip_dst;
-						replace_rule->rules.sip = ip->ip_src;
+						replace_rule->rules.ipv4_dip = ip->ip_dst;
+						replace_rule->rules.ipv4_sip = ip->ip_src;
 						replace_rule->rules.protocol= ip->ip_p;
 						replace_rule->rules.dport= th->th_dport;
 						replace_rule->rules.sport= th->th_sport;
@@ -1681,8 +2221,8 @@ static inline rule_item_t  * acl_table_one_tuple_lookup(cvm_common_ip_hdr_t *ip,
 				}
 
 				free_rule->rules.time_stamp = get_sec(); 
-				free_rule->rules.dip = ip->ip_dst;
-				free_rule->rules.sip = ip->ip_src;
+				free_rule->rules.ipv4_dip = ip->ip_dst;
+				free_rule->rules.ipv4_sip = ip->ip_src;
 				free_rule->rules.protocol= ip->ip_p;
 				free_rule->rules.dport= th->th_dport;
 				free_rule->rules.sport= th->th_sport;
@@ -1753,8 +2293,8 @@ static inline rule_item_t  * acl_table_icmp_lookup(cvm_common_ip_hdr_t *ip)
 		if(head_rule->valid_entries == 0)
 		{
 			head_rule->rules.time_stamp = get_sec(); 
-			head_rule->rules.dip = ip->ip_dst;
-			head_rule->rules.sip = ip->ip_src;
+			head_rule->rules.ipv4_dip = ip->ip_dst;
+			head_rule->rules.ipv4_sip = ip->ip_src;
 			head_rule->rules.protocol= ip->ip_p;
 			head_rule->rules.rule_state = RULE_IS_LEARNING;
 			head_rule->rules.action_type = FLOW_ACTION_TOLINUX;
@@ -1828,8 +2368,8 @@ static inline rule_item_t  * acl_table_icmp_lookup(cvm_common_ip_hdr_t *ip)
 					}
 
 					free_rule->rules.time_stamp = get_sec(); 
-					free_rule->rules.dip = ip->ip_dst;
-					free_rule->rules.sip = ip->ip_src;
+					free_rule->rules.ipv4_dip = ip->ip_dst;
+					free_rule->rules.ipv4_sip = ip->ip_src;
 					free_rule->rules.protocol= ip->ip_p;
 					free_rule->rules.rule_state = RULE_IS_LEARNING;
 					free_rule->rules.action_type = FLOW_ACTION_TOLINUX;
@@ -1851,11 +2391,11 @@ static inline rule_item_t  * acl_table_icmp_lookup(cvm_common_ip_hdr_t *ip)
 		}
 		/************************aging end*****************************/
 
-		if((rule->rules.dip == ip->ip_dst) && (rule->rules.sip == ip->ip_src) && (rule->rules.protocol == ip->ip_p))
+		if((rule->rules.ipv4_dip == ip->ip_dst) && (rule->rules.ipv4_sip == ip->ip_src) && (rule->rules.protocol == ip->ip_p))
 		{		
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"acl_table_icmp_lookup: Find the rule: dip=%d.%d.%d.%d, sip=%d.%d.%d.%d, proto=%d.  \r\n",
-					IP_FMT(rule->rules.dip),IP_FMT(rule->rules.sip),rule->rules.protocol);
+					IP_FMT(rule->rules.ipv4_dip),IP_FMT(rule->rules.ipv4_sip),rule->rules.protocol);
 
 			if(rule->rules.rule_state== RULE_IS_STATIC) 
 			{
@@ -1938,8 +2478,8 @@ static inline rule_item_t  * acl_table_icmp_lookup(cvm_common_ip_hdr_t *ip)
 						rule->next = replace_rule;  
 						replace_rule->next = NULL;
 						replace_rule->rules.time_stamp = get_sec();
-						replace_rule->rules.dip = ip->ip_dst;
-						replace_rule->rules.sip = ip->ip_src;
+						replace_rule->rules.ipv4_dip = ip->ip_dst;
+						replace_rule->rules.ipv4_sip = ip->ip_src;
 						replace_rule->rules.protocol= ip->ip_p;
 						replace_rule->rules.rule_state = RULE_IS_LEARNING;
 						replace_rule->rules.action_type = FLOW_ACTION_TOLINUX;
@@ -1964,8 +2504,8 @@ static inline rule_item_t  * acl_table_icmp_lookup(cvm_common_ip_hdr_t *ip)
 				}
 
 				free_rule->rules.time_stamp = get_sec(); 
-				free_rule->rules.dip = ip->ip_dst;
-				free_rule->rules.sip = ip->ip_src;
+				free_rule->rules.ipv4_dip = ip->ip_dst;
+				free_rule->rules.ipv4_sip = ip->ip_src;
 				free_rule->rules.protocol= ip->ip_p;
 				free_rule->rules.rule_state = RULE_IS_LEARNING;
 				free_rule->rules.action_type = FLOW_ACTION_TOLINUX;

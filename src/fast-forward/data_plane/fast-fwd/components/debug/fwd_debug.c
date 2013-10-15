@@ -198,7 +198,7 @@ static void print_icmp_rule(rule_item_t* rule)
 		return;
 	}
 	fwd_debug_printf("  five tuple: %d.%d.%d.%d => %d.%d.%d.%d    icmp\n",
-			IP_FMT(rule->rules.sip), IP_FMT(rule->rules.dip));
+			IP_FMT(rule->rules.ipv4_sip), IP_FMT(rule->rules.ipv4_dip));
 
 	switch(rule->rules.action_type)
 	{
@@ -251,13 +251,27 @@ int fwd_debug_rule_to_log(rule_item_t  *rule)
 	if(cvm_ip_only_enable == FUNC_ENABLE)
 	{
 		fwd_debug_printf("  five tuple: any-ip:any-port => %d.%d.%d.%d:any-port   any(tcp|udp)\n",
-				IP_FMT(rule->rules.dip));
+				IP_FMT(rule->rules.ipv4_dip));
 	}
-	else
+	else if (0 == rule->rules.ipv6_flag)
 	{
 		fwd_debug_printf("  five tuple: %d.%d.%d.%d:%d => %d.%d.%d.%d:%d    %s\n",
-				IP_FMT(rule->rules.sip), rule->rules.sport,
-				IP_FMT(rule->rules.dip), rule->rules.dport, PROTO_STR(rule->rules.protocol));	
+				IP_FMT(rule->rules.ipv4_sip), rule->rules.sport,
+				IP_FMT(rule->rules.ipv4_dip), rule->rules.dport, PROTO_STR(rule->rules.protocol));	
+	}
+	else if (1 == rule->rules.ipv6_flag)
+	{
+		fwd_debug_printf("  five tuple: %x.%x.%x.%x:%d => %x.%x.%x.%x:%d    %s\n",
+				rule->rules.ipv6_sip32[0],
+				rule->rules.ipv6_sip32[1],
+				rule->rules.ipv6_sip32[2],
+				rule->rules.ipv6_sip32[3],
+				rule->rules.sport,
+				rule->rules.ipv6_dip32[0],
+				rule->rules.ipv6_dip32[1],
+				rule->rules.ipv6_dip32[2],
+				rule->rules.ipv6_dip32[3],
+				rule->rules.dport, PROTO_STR(rule->rules.protocol));	
 	}
 
 	if(rule->rules.rule_state == RULE_IS_LEARNING)
@@ -298,10 +312,28 @@ int fwd_debug_rule_to_log(rule_item_t  *rule)
 		case FLOW_ACTION_RPA_CAP802_3_FORWARD:
 			fwd_debug_printf("    tunnel_index: %d\n", rule->rules.tunnel_index);
 			fwd_debug_printf("    capwap use_num = %d\n", capwap_cache_bl[rule->rules.tunnel_index].use_num);
-			fwd_debug_printf("    capwap tunnel: %d.%d.%d.%d:%d => %d.%d.%d.%d:%d  tos = 0x%02x\n",
-					IP_FMT(capwap_cache_bl[rule->rules.tunnel_index].sip), capwap_cache_bl[rule->rules.tunnel_index].sport,
-					IP_FMT(capwap_cache_bl[rule->rules.tunnel_index].dip), capwap_cache_bl[rule->rules.tunnel_index].dport,  
+			if (CVM_ETH_P_IP == rule->rules.ether_type)
+			{
+				fwd_debug_printf("    capwap tunnel: %d.%d.%d.%d:%d => %d.%d.%d.%d:%d  tos = 0x%02x\n",
+					IP_FMT(capwap_cache_bl[rule->rules.tunnel_index].cw_sip), capwap_cache_bl[rule->rules.tunnel_index].sport,
+					IP_FMT(capwap_cache_bl[rule->rules.tunnel_index].cw_dip), capwap_cache_bl[rule->rules.tunnel_index].dport,  
 					capwap_cache_bl[rule->rules.tunnel_index].tos);
+			}
+			else if (CVM_ETH_P_IPV6 == rule->rules.ether_type)
+			{
+				fwd_debug_printf("    capwap tunnel: %x.%x.%x.%x:%d => %x.%x.%x.%x:%d \n",
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip32[0], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip32[1], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip32[2], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip32[3], 
+					capwap_cache_bl[rule->rules.tunnel_index].sport,
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip32[0], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip32[1], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip32[2], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip32[3], 
+					capwap_cache_bl[rule->rules.tunnel_index].dport);
+			}
+			
 			if(rule->rules.action_type == FLOW_ACTION_CAP802_3_FORWARD)
 			{
 				fwd_debug_printf("  action_type = FLOW_ACTION_CAP802_3_FORWARD\n");
@@ -317,10 +349,28 @@ int fwd_debug_rule_to_log(rule_item_t  *rule)
 			
 			fwd_debug_printf("    tunnel_index: %d\n", rule->rules.tunnel_index);
 			fwd_debug_printf("    capwap use_num = %d\n", capwap_cache_bl[rule->rules.tunnel_index].use_num);
-			fwd_debug_printf("    capwap tunnel: %d.%d.%d.%d:%d => %d.%d.%d.%d:%d  tos = 0x%02x\n",
-					IP_FMT(capwap_cache_bl[rule->rules.tunnel_index].sip), capwap_cache_bl[rule->rules.tunnel_index].sport,
-					IP_FMT(capwap_cache_bl[rule->rules.tunnel_index].dip), capwap_cache_bl[rule->rules.tunnel_index].dport,  
+			if (CVM_ETH_P_IP == rule->rules.ether_type)
+			{
+				fwd_debug_printf("    capwap tunnel: %d.%d.%d.%d:%d => %d.%d.%d.%d:%d  tos = 0x%02x\n",
+					IP_FMT(capwap_cache_bl[rule->rules.tunnel_index].cw_sip), capwap_cache_bl[rule->rules.tunnel_index].sport,
+					IP_FMT(capwap_cache_bl[rule->rules.tunnel_index].cw_dip), capwap_cache_bl[rule->rules.tunnel_index].dport,  
 					capwap_cache_bl[rule->rules.tunnel_index].tos);
+			}
+			else if (CVM_ETH_P_IPV6 == rule->rules.ether_type)
+			{
+				fwd_debug_printf("    capwap tunnel: %x.%x.%x.%x:%d => %x.%x.%x.%x:%d \n",
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip32[0], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip32[1], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip32[2], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip32[3], 
+					capwap_cache_bl[rule->rules.tunnel_index].sport,
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip32[0], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip32[1], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip32[2], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip32[3], 
+					capwap_cache_bl[rule->rules.tunnel_index].dport);
+			}
+
 			if(rule->rules.action_type == FLOW_ACTION_CAPWAP_FORWARD)
 			{
 				fwd_debug_printf("  action_type = FLOW_ACTION_CAPWAP_FORWARD\n");
@@ -421,7 +471,7 @@ int fwd_debug_printf(const char * fmt,...)
 }
 
 
-extern int32_t return_fccp(cvmx_wqe_t* work, uint32_t ret_val, fccp_data_t* fccp_data, uint8_t grp);
+extern int32_t return_fccp(cvmx_wqe_t* work, uint32_t ret_val, control_cmd_t* fccp_data, uint8_t grp);
 
 
 int fwd_debug_agent_printf(const char * fmt,...)
@@ -487,8 +537,8 @@ int fwd_debug_agent_printf(const char * fmt,...)
 	work->packet_ptr.s.size = CVMX_FPA_PACKET_LOG_POOL_SIZE;
 	work->packet_ptr.s.back = (pkt_ptr - pkt_buffer)>>7; 
 	work->word2.snoip.not_IP = 1; 	/* IP was done up above */
-	
-	return_fccp(work, FCCP_RETURN_OK, &(fccp_cmd->fccp_data), product_info.to_linux_fccp_group);
+
+	return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
 
 	return msg_size;
 }

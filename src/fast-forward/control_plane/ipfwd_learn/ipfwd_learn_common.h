@@ -11,7 +11,7 @@
 #define ALERT_LVL			1
 #define CRIT_LVL			2
 #define ERR_LVL				3
-#define WARNING_LVL		4
+#define WARNING_LVL			4
 #define NOTICE_LVL			5
 #define INFO_LVL			6
 #define ICMP_DEBUG			7
@@ -36,12 +36,16 @@
 #define VLAN_PROTO_LEN		2
 #define VLAN_HLEN			4
 #define IP_H_LEN			20
+#define IPV6_H_LEN			40
 #define UDP_H_LEN			8
 #define CW_H_LEN			16
 
 #define IP_PROTOCOL_ICMP            0x1
 #define IP_PROTOCOL_TCP             0x6
 #define IP_PROTOCOL_UDP             0x11
+
+#define IP_VERSION_V4		4
+#define IP_VERSION_V6		6
 
 #define ETH_P_IP			0x0800
 
@@ -75,6 +79,13 @@ typedef struct vlan_eth_hdr_s {
 				((uint8_t*)&(m))[1], \
 				((uint8_t*)&(m))[2], \
 				((uint8_t*)&(m))[3]
+
+#define IPV6_FMT(m)	\
+				((uint16_t*)&(m))[0], \
+				((uint16_t*)&(m))[1], \
+				((uint16_t*)&(m))[2], \
+				((uint16_t*)&(m))[3]
+
 
 #define MAC_FMT_DEFINE(m)  \
 				((uint8_t*)(m))[0], \

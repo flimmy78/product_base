@@ -26,6 +26,7 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/netdevice.h>
+#include <linux/ipv6.h>
 
 #ifdef BUILDNO_VERSION2_1
 #include <asm/octeon/octeon.h>
@@ -73,7 +74,8 @@ int icmp_enable = FUNC_DISABLE;
 int learn_enable = FUNC_ENABLE;
 
 int pure_ip_enable = FUNC_DISABLE;
-
+int pure_ipv6_enable = FUNC_DISABLE;
+int ipv6_enable = FUNC_DISABLE;
 int pppoe_enable = FUNC_DISABLE;
 
 
@@ -118,6 +120,22 @@ MODULE_PARM_DESC(pure_ip_enable,"\n"
 		"\t\t 0 disable pure_ip function\n"
 		"\t\t 1 enable  pure_ip function\n"
 	    );
+
+module_param(pure_ipv6_enable,int,0644);
+MODULE_PARM_DESC(pure_ipv6_enable,"\n"
+		"\t\t enable|disable pure_ip function\n"
+		"\t\t 0 disable pure_ip function\n"
+		"\t\t 1 enable  pure_ip function\n"
+	    );
+
+
+module_param(ipv6_enable,int,0644);
+MODULE_PARM_DESC(ipv6_enable,"\n"
+		"\t\t enable|disable ipv6 function\n"
+		"\t\t 0 disable ipv6 function\n"
+		"\t\t 1 enable  ipv6 function\n"
+	    );
+
 
 module_param(pppoe_enable,int,0644);
 MODULE_PARM_DESC(pppoe_enable,"\n"
@@ -216,13 +234,32 @@ static inline void dump_fccp_packet(control_cmd_t *fccp_packet)
 		case FLOW_ACTION_RPA_CAPWAP_802_3_ICMP:
 		case FLOW_ACTION_RPA_CAPWAP_802_11_ICMP:
 			log(DEBUG_LVL,"capwap tunnel info :\n");
-			log(DEBUG_LVL,"\tsrc ip :%d.%d.%d.%d\n\tdest ip: %d.%d.%d.%d\n"		
-			              "\ttos: %d\n\tsrc port : %d\n\tdest port: %d\n\tcapwap header:",
-			              IP_FMT(fccp_packet->fccp_data.rule_info.cw_cache.sip), \
-			              IP_FMT(fccp_packet->fccp_data.rule_info.cw_cache.dip),\
-			              fccp_packet->fccp_data.rule_info.cw_cache.tos,\
-			              fccp_packet->fccp_data.rule_info.cw_cache.sport, \
-			              fccp_packet->fccp_data.rule_info.cw_cache.dport);
+			if (ETH_P_IP == fccp_packet->fccp_data.rule_info.rule_param.ether_type)
+			{
+				log(DEBUG_LVL,"\tsrc ip :%d.%d.%d.%d\n\tdest ip: %d.%d.%d.%d\n"		
+			    	"\ttos: %d\n\tsrc port : %d\n\tdest port: %d\n\tcapwap header:",
+			        IP_FMT(fccp_packet->fccp_data.rule_info.cw_cache.cw_sip), \
+			        IP_FMT(fccp_packet->fccp_data.rule_info.cw_cache.cw_dip),\
+			        fccp_packet->fccp_data.rule_info.cw_cache.tos,\
+			        fccp_packet->fccp_data.rule_info.cw_cache.sport, \
+			        fccp_packet->fccp_data.rule_info.cw_cache.dport);
+			}
+			else if (ETH_P_IPV6 == fccp_packet->fccp_data.rule_info.rule_param.ether_type)
+			{
+				log(DEBUG_LVL,"\tsrc ip :%x.%x.%x.%x\n\tdest ip: %x.%x.%x.%x\n"		
+			    	"\tsrc port : %d\n\tdest port: %d\n\tcapwap header:",
+			        fccp_packet->fccp_data.rule_info.cw_cache.cw_ipv6_sip32[0], \
+			        fccp_packet->fccp_data.rule_info.cw_cache.cw_ipv6_sip32[1], \
+			        fccp_packet->fccp_data.rule_info.cw_cache.cw_ipv6_sip32[2], \
+			        fccp_packet->fccp_data.rule_info.cw_cache.cw_ipv6_sip32[3], \
+			        fccp_packet->fccp_data.rule_info.cw_cache.cw_ipv6_dip32[0], \
+			        fccp_packet->fccp_data.rule_info.cw_cache.cw_ipv6_dip32[1], \
+			        fccp_packet->fccp_data.rule_info.cw_cache.cw_ipv6_dip32[2], \
+			        fccp_packet->fccp_data.rule_info.cw_cache.cw_ipv6_dip32[3], \
+			        fccp_packet->fccp_data.rule_info.cw_cache.sport, \
+			        fccp_packet->fccp_data.rule_info.cw_cache.dport);
+			}
+
 			for(i=0;i<CW_H_LEN;i++)
 			{
 				log(DEBUG_LVL,"%02x ",fccp_packet->fccp_data.rule_info.cw_cache.cw_hd[i]);
@@ -235,6 +272,7 @@ static inline void dump_fccp_packet(control_cmd_t *fccp_packet)
 				case FLOW_ACTION_RPA_CAPWAP_FORWARD:
 				case FLOW_ACTION_CAPWAP_802_11_ICMP :
 				case FLOW_ACTION_RPA_CAPWAP_802_11_ICMP:
+
 					log(DEBUG_LVL,"\tWifi fc : %02x%02x\n"
 						"\tWifi qos: %02x%02x\n"
 			            "\tWifi addr1:%02x%02x%02x%02x%02x%02x\n"
@@ -504,7 +542,7 @@ static inline int8_t tx_l2hdr_parse(struct sk_buff *skb,
         return IPFWD_LEARN_RETURN_FAIL;
     }
 
-	if (eth_hdr->h_vlan_proto == ETH_P_IP) 
+	if ((eth_hdr->h_vlan_proto == ETH_P_IP) || (ETH_P_IPV6 == eth_hdr->h_vlan_proto)) 
 	{
 		*ip	= (struct iphdr *)((uint8_t*)eth_hdr + ETH_H_LEN);
 		return IPFWD_LEARN_RETURN_OK;
@@ -516,7 +554,7 @@ static inline int8_t tx_l2hdr_parse(struct sk_buff *skb,
 		proto = (uint16_t*)((uint8_t*)eth_hdr + ETH_H_LEN + VLAN_PROTO_LEN );
 		*out_ether_type = *((uint16_t*)((uint8_t*)eth_hdr + MAC_LEN*2));
 
-		if (*proto == ETH_P_IP) 
+		if ((*proto == ETH_P_IP) || (*proto == ETH_P_IPV6)) 
 		{
 			*ip = (struct iphdr*)((uint8_t*)eth_hdr + ETH_H_LEN + VLAN_HLEN);
 			return IPFWD_LEARN_RETURN_OK;	
@@ -529,7 +567,7 @@ static inline int8_t tx_l2hdr_parse(struct sk_buff *skb,
 			*inter_ether_type =  *((uint16_t*)((uint8_t*)eth_hdr + MAC_LEN*2 + VLAN_HLEN));
 
 			proto = (uint16_t*)((uint8_t*)eth_hdr + ETH_H_LEN + VLAN_HLEN + VLAN_PROTO_LEN);
-			if (*proto == ETH_P_IP) 
+			if ((*proto == ETH_P_IP) || (*proto == ETH_P_IPV6)) 
 			{
 				*ip = (struct iphdr*)((uint8_t*)eth_hdr + ETH_H_LEN + VLAN_HLEN * 2);
 				return IPFWD_LEARN_RETURN_OK;
@@ -696,6 +734,7 @@ static inline int8_t tx_udp_decap(struct udphdr *uh, struct iphdr** true_ip, uin
 	int len = 0;
 	struct iphdr* in_ip = NULL;
 	uint16_t *proto = NULL;
+	struct ipv6hdr* in_ipv6 = NULL;
 	if ((uh->source == CW_DAT_STD_PORT || uh->source == CW_DAT_TMP_PORT) && (uh->dest == CW_DAT_AP_PORT))
 	{		
 		packet_type = get_capwap_type((union capwap_hd *)((char *)uh + UDP_H_LEN));
@@ -715,7 +754,7 @@ static inline int8_t tx_udp_decap(struct udphdr *uh, struct iphdr** true_ip, uin
 			proto = (uint16_t*)((uint8_t*)ieee80211_hdr + len + LLC_H_LEN - 2);
 
 			/* Default Ip */
-			if (ETH_P_IP == *proto)
+			if ((ETH_P_IP == *proto) || (ETH_P_IPV6 == *proto))
 			{
 				in_ip = (struct iphdr*)((uint8_t*)ieee80211_hdr + len + LLC_H_LEN);
 			}
@@ -740,11 +779,17 @@ static inline int8_t tx_udp_decap(struct udphdr *uh, struct iphdr** true_ip, uin
 			}
 			
 			*true_ip = in_ip;
+			in_ipv6 = (struct ipv6hdr *)in_ip;
 			
-			/* Is capwap 802.11 icmp? */
-			if (in_ip->protocol == IP_PROTOCOL_ICMP)
+			/* Is capwap 802.11 icmp? ,IPV6 dont support CW_802_11_ICMP*/
+			if ((4 == in_ip->version) && (in_ip->protocol == IP_PROTOCOL_ICMP) && (FUNC_DISABLE == pure_ip_enable))
 			{
 				return CW_802_11_ICMP;
+			}
+			/*1.ipv6 disable 2.IPV6 DONT support expand header now ,maybe support later */
+			else if ((6 == in_ip->version) && ((ipv6_enable == FUNC_DISABLE) || ((FUNC_DISABLE == pure_ipv6_enable) && ((IP_PROTOCOL_TCP != in_ipv6->nexthdr) && (IP_PROTOCOL_UDP != in_ipv6->nexthdr)))))
+			{
+				return CW_UNKNOWN_STREAM;
 			}
 			else
 			{
@@ -781,11 +826,17 @@ static inline int8_t tx_udp_decap(struct udphdr *uh, struct iphdr** true_ip, uin
 			}
 			
 			*true_ip = in_ip;
+			in_ipv6 = (struct ipv6hdr *)in_ip;
 			
-			/* Is capwap 802.3 icmp? */
-			if (in_ip->protocol == IP_PROTOCOL_ICMP)
+			/* Is capwap 802.3 icmp? IPV6 dont support CW_802_11_ICMP*/
+			if ((4 == in_ip->version) && (in_ip->protocol == IP_PROTOCOL_ICMP) && (FUNC_DISABLE == pure_ip_enable))
 			{
 				return CW_802_3_ICMP;
+			}
+			/*1.ipv6 disable 2.IPV6 DONT support expand header now ,maybe support later */
+			else if ((6 == in_ip->version) && ((ipv6_enable == FUNC_DISABLE) || ((FUNC_DISABLE == pure_ipv6_enable) && ((IP_PROTOCOL_TCP != in_ipv6->nexthdr) && (IP_PROTOCOL_UDP != in_ipv6->nexthdr)))))
+			{
+				return CW_UNKNOWN_STREAM;
 			}
 			else
 			{
@@ -924,6 +975,8 @@ static inline int cw_802_3_cache_learned(struct sk_buff *skb,
 	struct iphdr *in_ip = NULL;
 	struct tcphdr *in_th = NULL;
     int16_t fwd_port = -1;
+	struct ipv6hdr *ipv6 = NULL;
+	struct ipv6hdr *in_ipv6 = NULL;
 
 	if(!skb || !ip || !uh || !fccp_cmd)
 	{
@@ -931,6 +984,10 @@ static inline int cw_802_3_cache_learned(struct sk_buff *skb,
 		return IPFWD_LEARN_RETURN_FAIL;
 	}
 
+	if (IP_VERSION_V6 == ip->version)
+	{
+		ipv6 = (struct ipv6hdr *)ip;
+	}
 
 	in_l2_hd = ((uint8_t*)uh + UDP_H_LEN + CW_H_LEN);
 	in_ip = (struct iphdr*)((uint8_t*)in_l2_hd + ETH_H_LEN);
@@ -940,20 +997,34 @@ static inline int cw_802_3_cache_learned(struct sk_buff *skb,
 	{
 		in_ip = (struct iphdr*)((uint8_t*)in_ip + PPPOE_H_LEN);
 	}
-	
-	if (SPE_IP_HDR(in_ip) || SPE_IP_ADDR(in_ip->saddr, in_ip->daddr))
-	{
-		cvmx_atomic_add64(&fwd_learn_stats.cw8023_spe_ip, 1);
-		log(DEBUG_LVL, "ipfwd_learn:Special IP version 0x%x, frag_off 0x%x, protocol 0x%0x, "
-							"source ip %d.%d.%d.%d, "
-							"dest ip %d.%d.%d.%d\n ",
-							in_ip->version, in_ip->frag_off, in_ip->protocol, 
-							IP_FMT(uh->source), IP_FMT(uh->dest));
-		return IPFWD_LEARN_RETURN_FAIL;
-	}
 
-	in_th = (struct tcphdr*)((uint32_t*)in_ip + in_ip->ihl);
-	if (SPE_UDP_PORT(in_th))
+	if (IP_VERSION_V4 == in_ip->version)
+	{
+		if (SPE_IP_HDR(in_ip) || SPE_IP_ADDR(in_ip->saddr, in_ip->daddr))
+		{
+			cvmx_atomic_add64(&fwd_learn_stats.cw8023_spe_ip, 1);
+			log(DEBUG_LVL, "ipfwd_learn:Special IP version 0x%x, frag_off 0x%x, protocol 0x%0x, "
+								"source ip %d.%d.%d.%d, "
+								"dest ip %d.%d.%d.%d\n ",
+								in_ip->version, in_ip->frag_off, in_ip->protocol, 
+								IP_FMT(uh->source), IP_FMT(uh->dest));
+			return IPFWD_LEARN_RETURN_FAIL;
+		}
+
+		in_th = (struct tcphdr*)((uint32_t*)in_ip + in_ip->ihl);
+	}
+	else if (IP_VERSION_V6 == in_ip->version)
+	{
+		in_ipv6 = (struct ipv6hdr *)in_ip;
+		/*filter ipv6 addr tag*/
+		
+		in_th = (struct tcphdr*)((uint8_t *)in_ip + IPV6_H_LEN);
+	}
+	
+	/* pure ip enable dont need check th */
+	//if ((FUNC_DISABLE == pure_ipv6_enable) && (FUNC_DISABLE == pure_ip_enable) && SPE_UDP_PORT(in_th))
+	if (((IP_VERSION_V4 == in_ip->version) && (FUNC_DISABLE == pure_ip_enable) && (in_ip->protocol == IP_PROTOCOL_UDP) && SPE_UDP_PORT(in_th)) 
+		|| ((IP_VERSION_V6 == in_ip->version) && (FUNC_DISABLE == pure_ipv6_enable) && (in_ipv6->nexthdr == IP_PROTOCOL_UDP) && SPE_UDP_PORT(in_th)))
 	{
 		cvmx_atomic_add64(&fwd_learn_stats.cw8023_spe_udp_port, 1);
 		log(DEBUG_LVL, "ipfwd_learn :skip special udp source port %d, dest port %d\n",\
@@ -971,9 +1042,6 @@ static inline int cw_802_3_cache_learned(struct sk_buff *skb,
 	memcpy(fccp_cmd->fccp_data.rule_info.rule_param.ether_shost, \
 	                     (skb->data + MAC_LEN + (IS_RPA_PKT(*rpa_flag)?RPA_HEAD_LEN(*rpa_flag):0)), MAC_LEN);
 
-
-	
-	fccp_cmd->fccp_data.rule_info.rule_param.ether_type = ETH_P_IP;
 	fccp_cmd->fccp_data.rule_info.rule_param.out_ether_type = out_ether_type;
 	fccp_cmd->fccp_data.rule_info.rule_param.in_ether_type = inter_ether_type;
 	fccp_cmd->fccp_data.rule_info.rule_param.out_tag = vtag1;
@@ -982,19 +1050,62 @@ static inline int cw_802_3_cache_learned(struct sk_buff *skb,
 	fccp_cmd->fccp_data.rule_info.rule_param.pppoe_flag = pppoe_flag;
 	fccp_cmd->fccp_data.rule_info.rule_param.pppoe_session_id = pppoe_session_id;
 
-	fccp_cmd->fccp_data.rule_info.rule_param.dip = in_ip->daddr;
-	fccp_cmd->fccp_data.rule_info.rule_param.sip = in_ip->saddr;
-	fccp_cmd->fccp_data.rule_info.rule_param.dport = in_th->dest;
-	fccp_cmd->fccp_data.rule_info.rule_param.sport = in_th->source;
-	fccp_cmd->fccp_data.rule_info.rule_param.protocol = in_ip->protocol;	
+	if (IP_VERSION_V4 == in_ip->version)
+	{
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv4_dip = in_ip->daddr;
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv4_sip = in_ip->saddr;
+		if (FUNC_DISABLE == pure_ip_enable)
+		{
+			fccp_cmd->fccp_data.rule_info.rule_param.protocol = in_ip->protocol;			
+			fccp_cmd->fccp_data.rule_info.rule_param.dport = in_th->dest;
+			fccp_cmd->fccp_data.rule_info.rule_param.sport = in_th->source;
+		}
+	}
+	else if (IP_VERSION_V6 == in_ip->version)
+	{
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_dip32[0] = in_ipv6->daddr.s6_addr32[0];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_dip32[1] = in_ipv6->daddr.s6_addr32[1];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_dip32[2] = in_ipv6->daddr.s6_addr32[2];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_dip32[3] = in_ipv6->daddr.s6_addr32[3];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_sip32[0] = in_ipv6->saddr.s6_addr32[0];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_sip32[1] = in_ipv6->saddr.s6_addr32[1];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_sip32[2] = in_ipv6->saddr.s6_addr32[2];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_sip32[3] = in_ipv6->saddr.s6_addr32[3];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_flag = 1;
+		if (FUNC_DISABLE == pure_ipv6_enable)
+		{
+			fccp_cmd->fccp_data.rule_info.rule_param.protocol = in_ipv6->nexthdr;
+			fccp_cmd->fccp_data.rule_info.rule_param.dport = in_th->dest;
+			fccp_cmd->fccp_data.rule_info.rule_param.sport = in_th->source;
+		}
+	}
+
+
 
 	memcpy(fccp_cmd->fccp_data.rule_info.rule_param.acl_tunnel_eth_header_dmac, in_l2_hd, MAC_LEN);
 	memcpy(fccp_cmd->fccp_data.rule_info.rule_param.acl_tunnel_eth_header_smac, (in_l2_hd + MAC_LEN), MAC_LEN);
 	fccp_cmd->fccp_data.rule_info.rule_param.acl_tunnel_eth_header_ether = *((uint16_t*)(in_l2_hd + MAC_LEN*2));
 
-	fccp_cmd->fccp_data.rule_info.cw_cache.dip = ip->daddr;
-	fccp_cmd->fccp_data.rule_info.cw_cache.sip = ip->saddr;
-	fccp_cmd->fccp_data.rule_info.cw_cache.tos = ip->tos;
+	if (IP_VERSION_V4 == ip->version)
+	{	
+		fccp_cmd->fccp_data.rule_info.rule_param.ether_type = ETH_P_IP;
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_dip = ip->daddr;
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_sip = ip->saddr;
+		fccp_cmd->fccp_data.rule_info.cw_cache.tos = ip->tos;
+	}
+	else if (IP_VERSION_V6 == ip->version)
+	{
+		fccp_cmd->fccp_data.rule_info.rule_param.ether_type = ETH_P_IPV6;
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_ipv6_dip32[0] = ipv6->daddr.s6_addr32[0];
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_ipv6_dip32[1] = ipv6->daddr.s6_addr32[1];
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_ipv6_dip32[2] = ipv6->daddr.s6_addr32[2];
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_ipv6_dip32[3] = ipv6->daddr.s6_addr32[3];
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_ipv6_sip32[0] = ipv6->saddr.s6_addr32[0];
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_ipv6_sip32[1] = ipv6->saddr.s6_addr32[1];
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_ipv6_sip32[2] = ipv6->saddr.s6_addr32[2];
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_ipv6_sip32[3] = ipv6->saddr.s6_addr32[3];
+		/*other more need record ? tag */
+	}
 	fccp_cmd->fccp_data.rule_info.cw_cache.dport = uh->dest;
 	fccp_cmd->fccp_data.rule_info.cw_cache.sport = uh->source;	
 	memcpy(fccp_cmd->fccp_data.rule_info.cw_cache.cw_hd, ((uint8_t*)uh + UDP_H_LEN), CW_H_LEN);
@@ -1073,13 +1184,19 @@ static inline int cw_cache_learned(struct sk_buff *skb,
 	uint8_t len = 0;
 	uint8_t is_qos = 0;
     int16_t fwd_port = -1;
+	struct ipv6hdr *ipv6 = NULL;
+	struct ipv6hdr *in_ipv6 = NULL;
 
 	if(!skb || !ip || !uh || !fccp_cmd){
 		log(ERR_LVL, "ipfwd_learn :capwap 802.11 leanrned input argument is NULL\n");
 		return IPFWD_LEARN_RETURN_FAIL;
 	}
-
-
+	
+	if (IP_VERSION_V6 == ip->version)
+	{
+		ipv6 = (struct ipv6hdr *)ip;
+	}
+	
 	ieee80211_hdr = (struct ieee80211_frame*)((uint8_t*)uh + UDP_H_LEN + CW_H_LEN);
 	if (ieee80211_hdr->i_fc[0] & IEEE80211_FC0_QOS_MASK) 
 	{
@@ -1099,19 +1216,32 @@ static inline int cw_cache_learned(struct sk_buff *skb,
 	{
 		in_ip = (struct iphdr*)((uint8_t*)in_ip + PPPOE_H_LEN);
 	}
-	
-	if (SPE_IP_HDR(in_ip) || SPE_IP_ADDR(in_ip->saddr, in_ip->daddr))
-	{	
-		cvmx_atomic_add64(&fwd_learn_stats.cw_spe_ip, 1);
-		log(DEBUG_LVL, "ipfwd_learn:Special IP version 0x%x, frag_off 0x%x, "
-			             "protocol 0x%0x, source ip %d.%d.%d.%d "
-						 "dest ip %d.%d.%d.%d\n", 
-						 in_ip->version, in_ip->frag_off, in_ip->protocol, 
-						 IP_FMT(uh->source), IP_FMT(uh->dest));
-		return IPFWD_LEARN_RETURN_FAIL;
+	if (IP_VERSION_V4 == in_ip->version)
+	{
+		if (SPE_IP_HDR(in_ip) || SPE_IP_ADDR(in_ip->saddr, in_ip->daddr))
+		{	
+			cvmx_atomic_add64(&fwd_learn_stats.cw_spe_ip, 1);
+			log(DEBUG_LVL, "ipfwd_learn:Special IP version 0x%x, frag_off 0x%x, "
+				             "protocol 0x%0x, source ip %d.%d.%d.%d "
+							 "dest ip %d.%d.%d.%d\n", 
+							 in_ip->version, in_ip->frag_off, in_ip->protocol, 
+							 IP_FMT(uh->source), IP_FMT(uh->dest));
+			return IPFWD_LEARN_RETURN_FAIL;
+		}
+		in_th = (struct tcphdr*)((uint32_t*)in_ip + in_ip->ihl);
 	}
-	in_th = (struct tcphdr*)((uint32_t*)in_ip + in_ip->ihl);
-	if (SPE_UDP_PORT(in_th))
+	else if (IP_VERSION_V6 == in_ip->version)
+	{
+		in_ipv6 = (struct ipv6hdr *)in_ip;
+		/*filter ipv6 addr tag*/
+		
+		in_th = (struct tcphdr*)((uint8_t *)in_ip + IPV6_H_LEN);
+	}
+	
+	/* pure ip enable dont need check th */
+	//if ((FUNC_DISABLE == pure_ipv6_enable) && (FUNC_DISABLE == pure_ip_enable) && SPE_UDP_PORT(in_th))
+	if (((IP_VERSION_V4 == in_ip->version) && (FUNC_DISABLE == pure_ip_enable) && (in_ip->protocol == IP_PROTOCOL_UDP) && SPE_UDP_PORT(in_th)) 
+		|| ((IP_VERSION_V6 == in_ip->version) && (FUNC_DISABLE == pure_ipv6_enable) && (in_ipv6->nexthdr == IP_PROTOCOL_UDP) && SPE_UDP_PORT(in_th)))
 	{
 		cvmx_atomic_add64(&fwd_learn_stats.cw_spe_udp_port, 1);
 		log(DEBUG_LVL, "ipfwd_learn :skip special udp source port %d, dest port %d\n", \
@@ -1127,8 +1257,6 @@ static inline int cw_cache_learned(struct sk_buff *skb,
 	memcpy(fccp_cmd->fccp_data.rule_info.rule_param.ether_shost, \
 					(skb->data + MAC_LEN + (IS_RPA_PKT(*rpa_flag)?RPA_HEAD_LEN(*rpa_flag):0)), MAC_LEN);
 
-	fccp_cmd->fccp_data.rule_info.rule_param.ether_type = ETH_P_IP;
-
 	fccp_cmd->fccp_data.rule_info.rule_param.out_ether_type = out_ether_type;
 	fccp_cmd->fccp_data.rule_info.rule_param.in_ether_type = inter_ether_type;
 	fccp_cmd->fccp_data.rule_info.rule_param.out_tag = vtag1;
@@ -1137,11 +1265,37 @@ static inline int cw_cache_learned(struct sk_buff *skb,
 	fccp_cmd->fccp_data.rule_info.rule_param.pppoe_flag = pppoe_flag;
 	fccp_cmd->fccp_data.rule_info.rule_param.pppoe_session_id = pppoe_session_id;
 
-	fccp_cmd->fccp_data.rule_info.rule_param.dip = in_ip->daddr;
-	fccp_cmd->fccp_data.rule_info.rule_param.sip = in_ip->saddr;
-	fccp_cmd->fccp_data.rule_info.rule_param.dport = in_th->dest;
-	fccp_cmd->fccp_data.rule_info.rule_param.sport = in_th->source;
-	fccp_cmd->fccp_data.rule_info.rule_param.protocol = in_ip->protocol;
+	if (IP_VERSION_V4 == in_ip->version)
+	{
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv4_dip = in_ip->daddr;
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv4_sip = in_ip->saddr;
+		if (FUNC_DISABLE == pure_ip_enable)
+		{
+			fccp_cmd->fccp_data.rule_info.rule_param.protocol = in_ip->protocol;
+			fccp_cmd->fccp_data.rule_info.rule_param.dport = in_th->dest;
+			fccp_cmd->fccp_data.rule_info.rule_param.sport = in_th->source;
+		}
+	}
+	else if (IP_VERSION_V6 == in_ip->version)
+	{
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_dip32[0] = in_ipv6->daddr.s6_addr32[0];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_dip32[1] = in_ipv6->daddr.s6_addr32[1];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_dip32[2] = in_ipv6->daddr.s6_addr32[2];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_dip32[3] = in_ipv6->daddr.s6_addr32[3];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_sip32[0] = in_ipv6->saddr.s6_addr32[0];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_sip32[1] = in_ipv6->saddr.s6_addr32[1];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_sip32[2] = in_ipv6->saddr.s6_addr32[2];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_sip32[3] = in_ipv6->saddr.s6_addr32[3];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_flag = 1;
+		if (FUNC_DISABLE == pure_ipv6_enable)
+		{
+			fccp_cmd->fccp_data.rule_info.rule_param.protocol = in_ipv6->nexthdr;
+			fccp_cmd->fccp_data.rule_info.rule_param.dport = in_th->dest;
+			fccp_cmd->fccp_data.rule_info.rule_param.sport = in_th->source;
+		}
+	}
+	
+
 
 	fccp_cmd->fccp_data.rule_info.rule_param.acl_tunnel_wifi_header_fc[0] = ieee80211_hdr->i_fc[0];
 	fccp_cmd->fccp_data.rule_info.rule_param.acl_tunnel_wifi_header_fc[1] = ieee80211_hdr->i_fc[1]; 
@@ -1157,10 +1311,27 @@ static inline int cw_cache_learned(struct sk_buff *skb,
 	memcpy(fccp_cmd->fccp_data.rule_info.rule_param.tunnel_l2_header.wifi_header.addr, \
 			         ieee80211_hdr->i_addr1, MAC_LEN * 3); 
 
-
-	fccp_cmd->fccp_data.rule_info.cw_cache.dip = ip->daddr;
-	fccp_cmd->fccp_data.rule_info.cw_cache.sip = ip->saddr;
-	fccp_cmd->fccp_data.rule_info.cw_cache.tos = ip->tos;
+	if (IP_VERSION_V4 == ip->version)
+	{
+		fccp_cmd->fccp_data.rule_info.rule_param.ether_type = ETH_P_IP;
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_dip = ip->daddr;
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_sip = ip->saddr;
+		fccp_cmd->fccp_data.rule_info.cw_cache.tos = ip->tos;
+	}
+	else if (IP_VERSION_V6 == ip->version)
+	{
+		fccp_cmd->fccp_data.rule_info.rule_param.ether_type = ETH_P_IPV6;
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_ipv6_dip32[0] = ipv6->daddr.s6_addr32[0];
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_ipv6_dip32[1] = ipv6->daddr.s6_addr32[1];
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_ipv6_dip32[2] = ipv6->daddr.s6_addr32[2];
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_ipv6_dip32[3] = ipv6->daddr.s6_addr32[3];
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_ipv6_sip32[0] = ipv6->saddr.s6_addr32[0];
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_ipv6_sip32[1] = ipv6->saddr.s6_addr32[1];
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_ipv6_sip32[2] = ipv6->saddr.s6_addr32[2];
+		fccp_cmd->fccp_data.rule_info.cw_cache.cw_ipv6_sip32[3] = ipv6->saddr.s6_addr32[3];
+		/*other more need record ? tag */
+	}
+	
 	fccp_cmd->fccp_data.rule_info.cw_cache.dport = uh->dest;
 	fccp_cmd->fccp_data.rule_info.cw_cache.sport = uh->source;	
 	memcpy(fccp_cmd->fccp_data.rule_info.cw_cache.cw_hd, ((uint8_t*)uh + UDP_H_LEN), CW_H_LEN);
@@ -1232,6 +1403,7 @@ static inline int eth_cache_learned(struct sk_buff *skb, struct iphdr *ip,
 )
 {	
     int16_t fwd_port = -1;
+	struct ipv6hdr *ipv6 = NULL;
     
 	if(!skb || !ip || !th || !fccp_cmd || !(skb->dev))
 	{
@@ -1239,7 +1411,16 @@ static inline int eth_cache_learned(struct sk_buff *skb, struct iphdr *ip,
 		return IPFWD_LEARN_RETURN_FAIL;
 	}
 
-	if (SPE_UDP_PORT(th))
+	if (IP_VERSION_V6 == ip->version)
+	{
+		ipv6 = (struct ipv6hdr *)ip;
+		/*filter ipv6 addr tag*/
+	}
+
+	/* pure ip enable dont need check th */
+	//if ((FUNC_DISABLE == pure_ipv6_enable) && (FUNC_DISABLE == pure_ip_enable) && SPE_UDP_PORT(th))
+	if (((IP_VERSION_V4 == ip->version) && (FUNC_DISABLE == pure_ip_enable) && (ip->protocol == IP_PROTOCOL_UDP) && SPE_UDP_PORT(th)) 
+		|| ((IP_VERSION_V6 == ip->version) && (FUNC_DISABLE == pure_ipv6_enable) && (ipv6->nexthdr == IP_PROTOCOL_UDP) && SPE_UDP_PORT(th)))
 	{
 		cvmx_atomic_add64(&fwd_learn_stats.spe_udp_port, 1);
 		log(DEBUG_LVL, "ipfwd_learn :dhcp packet:udp source port %d, dest port %d\n",\
@@ -1263,9 +1444,18 @@ static inline int eth_cache_learned(struct sk_buff *skb, struct iphdr *ip,
 	{
 		fccp_cmd->fccp_data.rule_info.rule_param.ether_type = PPPOE_TYPE;
 	}
-	else
+	else if (IP_VERSION_V4 == ip->version)
 	{
 		fccp_cmd->fccp_data.rule_info.rule_param.ether_type = ETH_P_IP;
+	}
+	else if (IP_VERSION_V6 == ip->version)
+	{
+		fccp_cmd->fccp_data.rule_info.rule_param.ether_type = ETH_P_IPV6;
+	}
+	else 
+	{
+		log(DEBUG_LVL, "ipfwd_learn :ip->version = %d.\n", ip->version);
+		return IPFWD_LEARN_RETURN_FAIL;
 	}
 
 	fccp_cmd->fccp_data.rule_info.rule_param.out_ether_type = out_ether_type;
@@ -1276,11 +1466,39 @@ static inline int eth_cache_learned(struct sk_buff *skb, struct iphdr *ip,
 	fccp_cmd->fccp_data.rule_info.rule_param.pppoe_flag = pppoe_flag;
 	fccp_cmd->fccp_data.rule_info.rule_param.pppoe_session_id = pppoe_session_id;
 
-	fccp_cmd->fccp_data.rule_info.rule_param.dip = ip->daddr;
-	fccp_cmd->fccp_data.rule_info.rule_param.sip = ip->saddr;
-	fccp_cmd->fccp_data.rule_info.rule_param.dport = th->dest;
-	fccp_cmd->fccp_data.rule_info.rule_param.sport = th->source;
-	fccp_cmd->fccp_data.rule_info.rule_param.protocol = ip->protocol;
+	if (IP_VERSION_V4 == ip->version)
+	{
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv4_dip = ip->daddr;
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv4_sip = ip->saddr;
+		
+		if (FUNC_DISABLE == pure_ip_enable)
+		{
+			fccp_cmd->fccp_data.rule_info.rule_param.dport = th->dest;
+			fccp_cmd->fccp_data.rule_info.rule_param.sport = th->source;
+			fccp_cmd->fccp_data.rule_info.rule_param.protocol = ip->protocol;
+		}
+	} 
+	else if (IP_VERSION_V6 == ip->version)
+	{
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_dip32[0] = ipv6->daddr.s6_addr32[0];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_dip32[1] = ipv6->daddr.s6_addr32[1];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_dip32[2] = ipv6->daddr.s6_addr32[2];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_dip32[3] = ipv6->daddr.s6_addr32[3];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_sip32[0] = ipv6->saddr.s6_addr32[0];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_sip32[1] = ipv6->saddr.s6_addr32[1];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_sip32[2] = ipv6->saddr.s6_addr32[2];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_sip32[3] = ipv6->saddr.s6_addr32[3];
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv6_flag = 1;
+
+		if (FUNC_DISABLE == pure_ipv6_enable)
+		{
+			fccp_cmd->fccp_data.rule_info.rule_param.dport = th->dest;
+			fccp_cmd->fccp_data.rule_info.rule_param.sport = th->source;
+			fccp_cmd->fccp_data.rule_info.rule_param.protocol = ipv6->nexthdr;
+		}
+	}
+	
+
 
 	if(IS_RPA_PKT(*rpa_flag))
 	{
@@ -1386,8 +1604,8 @@ static inline int eth_icmp_cache_learned(struct sk_buff *skb, struct iphdr *ip,
 	fccp_cmd->fccp_data.rule_info.rule_param.pppoe_flag = pppoe_flag;
 	fccp_cmd->fccp_data.rule_info.rule_param.pppoe_session_id = pppoe_session_id;
 	
-	fccp_cmd->fccp_data.rule_info.rule_param.dip = ip->daddr;
-	fccp_cmd->fccp_data.rule_info.rule_param.sip = ip->saddr;
+	fccp_cmd->fccp_data.rule_info.rule_param.ipv4_dip = ip->daddr;
+	fccp_cmd->fccp_data.rule_info.rule_param.ipv4_sip = ip->saddr;
 	fccp_cmd->fccp_data.rule_info.rule_param.protocol = ip->protocol;
 	if(IS_RPA_PKT(*rpa_flag))
 	{
@@ -1503,14 +1721,14 @@ static inline int cw_802_3_icmp_cache_learned(struct sk_buff *skb,
 	fccp_cmd->fccp_data.rule_info.rule_param.pppoe_flag = pppoe_flag;
 	fccp_cmd->fccp_data.rule_info.rule_param.pppoe_session_id = pppoe_session_id;
 	
-	fccp_cmd->fccp_data.rule_info.rule_param.dip = in_ip->daddr;
-	fccp_cmd->fccp_data.rule_info.rule_param.sip = in_ip->saddr;
+	fccp_cmd->fccp_data.rule_info.rule_param.ipv4_dip = in_ip->daddr;
+	fccp_cmd->fccp_data.rule_info.rule_param.ipv4_sip = in_ip->saddr;
 	fccp_cmd->fccp_data.rule_info.rule_param.protocol = in_ip->protocol;	
 	memcpy(fccp_cmd->fccp_data.rule_info.rule_param.acl_tunnel_eth_header_dmac, in_l2_hd, MAC_LEN);
 	memcpy(fccp_cmd->fccp_data.rule_info.rule_param.acl_tunnel_eth_header_smac, (in_l2_hd + MAC_LEN), MAC_LEN);
 	fccp_cmd->fccp_data.rule_info.rule_param.acl_tunnel_eth_header_ether = *((uint16_t*)(in_l2_hd + MAC_LEN*2));
-	fccp_cmd->fccp_data.rule_info.cw_cache.dip = ip->daddr;
-	fccp_cmd->fccp_data.rule_info.cw_cache.sip = ip->saddr;
+	fccp_cmd->fccp_data.rule_info.cw_cache.cw_dip = ip->daddr;
+	fccp_cmd->fccp_data.rule_info.cw_cache.cw_sip = ip->saddr;
 	fccp_cmd->fccp_data.rule_info.cw_cache.tos = ip->tos;
 	fccp_cmd->fccp_data.rule_info.cw_cache.dport = uh->dest;
 	fccp_cmd->fccp_data.rule_info.cw_cache.sport = uh->source;	
@@ -1628,7 +1846,7 @@ static inline int cw_802_11_icmp_cache_learned(struct sk_buff *skb,
 	/*get SMAC addr*/
 	memcpy(fccp_cmd->fccp_data.rule_info.rule_param.ether_shost, \
 					(skb->data + MAC_LEN + (IS_RPA_PKT(*rpa_flag)?RPA_HEAD_LEN(*rpa_flag):0)), MAC_LEN);
-	fccp_cmd->fccp_data.rule_info.rule_param.ether_type = 0x0800;
+	fccp_cmd->fccp_data.rule_info.rule_param.ether_type = ETH_P_IP;
 	fccp_cmd->fccp_data.rule_info.rule_param.out_ether_type = out_ether_type;
 	fccp_cmd->fccp_data.rule_info.rule_param.in_ether_type = inter_ether_type;
 	fccp_cmd->fccp_data.rule_info.rule_param.out_tag = vtag1;
@@ -1637,8 +1855,8 @@ static inline int cw_802_11_icmp_cache_learned(struct sk_buff *skb,
 	fccp_cmd->fccp_data.rule_info.rule_param.pppoe_flag = pppoe_flag;
 	fccp_cmd->fccp_data.rule_info.rule_param.pppoe_session_id = pppoe_session_id;
 	
-	fccp_cmd->fccp_data.rule_info.rule_param.dip = in_ip->daddr;
-	fccp_cmd->fccp_data.rule_info.rule_param.sip = in_ip->saddr;
+	fccp_cmd->fccp_data.rule_info.rule_param.ipv4_dip = in_ip->daddr;
+	fccp_cmd->fccp_data.rule_info.rule_param.ipv4_sip = in_ip->saddr;
 	fccp_cmd->fccp_data.rule_info.rule_param.protocol = in_ip->protocol;
 	fccp_cmd->fccp_data.rule_info.rule_param.acl_tunnel_wifi_header_fc[0] = ieee80211_hdr->i_fc[0];
 	fccp_cmd->fccp_data.rule_info.rule_param.acl_tunnel_wifi_header_fc[1] = ieee80211_hdr->i_fc[1]; 
@@ -1652,8 +1870,8 @@ static inline int cw_802_11_icmp_cache_learned(struct sk_buff *skb,
 	/* add for coverity by wangjian dont need modify */
 	memcpy(fccp_cmd->fccp_data.rule_info.rule_param.tunnel_l2_header.wifi_header.addr, \
 		                                  ieee80211_hdr->i_addr1, MAC_LEN * 3); 
-	fccp_cmd->fccp_data.rule_info.cw_cache.dip = ip->daddr;
-	fccp_cmd->fccp_data.rule_info.cw_cache.sip = ip->saddr;
+	fccp_cmd->fccp_data.rule_info.cw_cache.cw_dip = ip->daddr;
+	fccp_cmd->fccp_data.rule_info.cw_cache.cw_sip = ip->saddr;
 	fccp_cmd->fccp_data.rule_info.cw_cache.tos = ip->tos;
 	fccp_cmd->fccp_data.rule_info.cw_cache.dport = uh->dest;
 	fccp_cmd->fccp_data.rule_info.cw_cache.sport = uh->source;	
@@ -1752,8 +1970,8 @@ nat_cache_learned(struct net *net, control_cmd_t *fccp_cmd, struct iphdr *ip) {
 		t = &ct->tuplehash[IP_CT_DIR_REPLY].tuple;
 	}
 
-	fccp_cmd->fccp_data.rule_info.rule_param.sip = t->src.u3.ip;
-	fccp_cmd->fccp_data.rule_info.rule_param.dip = t->dst.u3.ip;	
+	fccp_cmd->fccp_data.rule_info.rule_param.ipv4_sip = t->src.u3.ip;
+	fccp_cmd->fccp_data.rule_info.rule_param.ipv4_dip = t->dst.u3.ip;	
 	fccp_cmd->fccp_data.rule_info.rule_param.sport = t->src.u.all;
 	fccp_cmd->fccp_data.rule_info.rule_param.dport = t->dst.u.all;
 	fccp_cmd->fccp_data.rule_info.rule_param.protocol = t->dst.protonum;
@@ -1812,9 +2030,7 @@ int ipfwd_learn (struct sk_buff *skb,uint8_t dev_type)
 	uint32_t rpa_flag = 0;
 	uint16_t pppoe_flag = 0;
 	uint16_t pppoe_session_id = 0;
-
-
-
+	struct ipv6hdr *ipv6 = NULL;
 
 	cvmx_wqe_t *work = NULL;
 #ifdef IPFWD_LEARN_MODE_STANDALONE
@@ -1923,7 +2139,8 @@ int ipfwd_learn (struct sk_buff *skb,uint8_t dev_type)
 	}	
 
 	/* Skip special IP addr */
-	if (SPE_IP_HDR(ip) || SPE_IP_ADDR(ip->saddr, ip->daddr))
+	/* filter ipv6 addr tag */
+	if ((IP_VERSION_V4 == ip->version) && (SPE_IP_HDR(ip) || SPE_IP_ADDR(ip->saddr, ip->daddr)))
 	{
 		cvmx_atomic_add64(&fwd_learn_stats.spe_ip, 1);
 		log(DEBUG_LVL,"ipfwd_learn: skip SPE_IP_HDR(ip) or SPE_IP_ADDR(ip->saddr, ip->daddr)\n");
@@ -1931,59 +2148,94 @@ int ipfwd_learn (struct sk_buff *skb,uint8_t dev_type)
 		return IPFWD_LEARN_RETURN_OK;
 	}
 
-
 	//	if(IPFWD_LEARN_RETURN_FAIL == get_dsa_info(skb, &dsa_info))
 	//	{
 	//		return IPFWD_LEARN_RETURN_FAIL;
 	//	}
 
 	true_ip = ip;
-	th = (struct tcphdr *)((uint32_t*)ip + ip->ihl);
-	if(ip->protocol == IP_PROTOCOL_ICMP)
+	if (IP_VERSION_V4 == ip->version)
 	{
-		if (FUNC_DISABLE == pure_ip_enable)
+		th = (struct tcphdr *)((uint32_t*)ip + ip->ihl);
+
+		if(ip->protocol == IP_PROTOCOL_ICMP)
 		{
-			skb_type = ETH_ICMP;
+			if (FUNC_DISABLE == pure_ip_enable)
+			{
+				skb_type = ETH_ICMP;
+			}
+			else
+			{
+				skb_type = ETH_TYPE;
+			}
 		}
-		else
+		else if (ip->protocol == IP_PROTOCOL_TCP)
 		{
+			th = (struct tcphdr *)((uint32_t*)ip + ip->ihl);
 			skb_type = ETH_TYPE;
 		}
-	}
-	else if (ip->protocol == IP_PROTOCOL_TCP)
-	{
-		th = (struct tcphdr *)((uint32_t*)ip + ip->ihl);
-		skb_type = ETH_TYPE;
-	}
-	else if(ip->protocol == IP_PROTOCOL_UDP)
-	{
-		th = (struct tcphdr *)((uint32_t*)ip + ip->ihl);
-		skb_type = tx_udp_decap((struct udphdr *)th,&true_ip,&pppoe_session_id,&pppoe_flag);
-		if(CW_UNKNOWN_STREAM == skb_type)
+		else if(ip->protocol == IP_PROTOCOL_UDP)
 		{
-			cvmx_atomic_add64(&fwd_learn_stats.udp_decap_fail, 1);
-			log(DEBUG_LVL,"ipfwd_learn: tx_udp_decap error\n");
+			th = (struct tcphdr *)((uint32_t*)ip + ip->ihl);
+			skb_type = tx_udp_decap((struct udphdr *)th,&true_ip,&pppoe_session_id,&pppoe_flag);
+			if(CW_UNKNOWN_STREAM == skb_type)
+			{
+				cvmx_atomic_add64(&fwd_learn_stats.udp_decap_fail, 1);
+				log(DEBUG_LVL,"ipfwd_learn: tx_udp_decap error\n");
+				return IPFWD_LEARN_RETURN_OK;
+			}
+			if(ETH_TYPE == skb_type)
+			{
+		        true_ip = ip;
+			}
+		}
+		else if (FUNC_ENABLE == pure_ip_enable)
+		{
+			skb_type = ETH_TYPE;
+		}	
+		else
+		{	
+			cvmx_atomic_add64(&fwd_learn_stats.pkt_type_nonsupport, 1);
+			log(DEBUG_LVL,"ipfwd_learn: not udp tcp icmp packet\n");
+			return IPFWD_LEARN_RETURN_FAIL;
+		}
+	}
+	else if (IP_VERSION_V6 == ip->version)
+	{
+		if (ipv6_enable == FUNC_DISABLE)
+		{
 			return IPFWD_LEARN_RETURN_OK;
 		}
-		if(ETH_TYPE == skb_type)
+		ipv6 = (struct ipv6hdr *)ip;
+		th = (struct tcphdr *)((uint8_t*)ipv6 + IPV6_H_LEN);
+
+		if (IP_PROTOCOL_TCP == ipv6->nexthdr)
 		{
-            true_ip = ip;
+			th = (struct tcphdr *)((uint8_t*)ipv6 + IPV6_H_LEN);
+			skb_type = ETH_TYPE;
 		}
-		/* add by wangjian for pure ip forward 2013-5-9 */
-		else if ((CW_802_11_ICMP == skb_type) && (FUNC_ENABLE == pure_ip_enable))
+		else if (IP_PROTOCOL_UDP == ipv6->nexthdr)
 		{
-			skb_type = CW_802_11_STREAM;
+			th = (struct tcphdr *)((uint8_t*)ipv6 + IPV6_H_LEN);
+			skb_type = tx_udp_decap((struct udphdr *)th,&true_ip,&pppoe_session_id,&pppoe_flag);
+			if(CW_UNKNOWN_STREAM == skb_type)
+			{
+				cvmx_atomic_add64(&fwd_learn_stats.udp_decap_fail, 1);
+				log(DEBUG_LVL,"ipfwd_learn: tx_udp_decap error\n");
+				return IPFWD_LEARN_RETURN_OK;
+			}
 		}
-		else if ((CW_802_3_ICMP == skb_type) && (FUNC_ENABLE == pure_ip_enable))
+		else if (FUNC_ENABLE == pure_ipv6_enable)
 		{
-			skb_type = CW_802_3_STREAM;
+			skb_type = ETH_TYPE;
+		}	
+		else
+		{
+			/*ipv6 Extended Header or not tcpdup,dont support yet*/
+			cvmx_atomic_add64(&fwd_learn_stats.pkt_type_nonsupport, 1);
+			log(DEBUG_LVL,"ipfwd_learn: not udp tcp packet or have extended header packet\n");
+			return IPFWD_LEARN_RETURN_FAIL;
 		}
-	}
-	else
-	{	
-		cvmx_atomic_add64(&fwd_learn_stats.pkt_type_nonsupport, 1);
-		log(DEBUG_LVL,"ipfwd_learn: not udp tcp icmp packet\n");
-		return IPFWD_LEARN_RETURN_FAIL;
 	}
 
 	/*add by wangjian for support pppoe 2013-7-25 */
@@ -2129,13 +2381,16 @@ int ipfwd_learn (struct sk_buff *skb,uint8_t dev_type)
 	}
 
 	/* lixiang modify NAT ipfwd_learn: 20130412 */
-	nat_cache_learned(dev_net(skb->dev), fccp_cmd, true_ip);
-
+	if (IP_VERSION_V4 == true_ip->version)
+	{
+		nat_cache_learned(dev_net(skb->dev), fccp_cmd, true_ip);
+	}
+	
 	/* Filter local ip if nat_flag == 1 dont filter */
 	if (0 == fccp_cmd->fccp_data.rule_info.rule_param.nat_flag)
 	{
-	    uint32_t sip = fccp_cmd->fccp_data.rule_info.rule_param.sip;
-	    uint32_t dip = fccp_cmd->fccp_data.rule_info.rule_param.dip;
+	    uint32_t sip = fccp_cmd->fccp_data.rule_info.rule_param.ipv4_sip;
+	    uint32_t dip = fccp_cmd->fccp_data.rule_info.rule_param.ipv4_dip;
 	    
 	    if(fwd_ifa_table_lookup(sip) != NULL)
 		{
@@ -2151,13 +2406,12 @@ int ipfwd_learn (struct sk_buff *skb,uint8_t dev_type)
 	    }
 	}
 	/* add by wangjian for pure ip forward 2013-5-7 nat & pure_ip need free dont fccp to forward */
-	else if (FUNC_ENABLE == pure_ip_enable)
+	else if ((FUNC_ENABLE == pure_ip_enable) || (FUNC_ENABLE == pure_ipv6_enable))
 	{
 		log(DEBUG_LVL, "nat & pure_ip, skip\n");
 		goto free_buf;
 	}
 	
-
 	fccp_cmd->dest_module = FCCP_MODULE_ACL;
 	fccp_cmd->src_module = FCCP_MODULE_AGENT_ACL;
 	if(skb_type == CW_802_11_ICMP || skb_type == CW_802_3_ICMP || skb_type == ETH_ICMP)

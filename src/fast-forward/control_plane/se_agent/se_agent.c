@@ -1028,12 +1028,18 @@ void se_agent_save_cfg(unsigned char *buf,int cpu_tag, unsigned int bufLen)
 	FILE *file_icmp = NULL;
 	FILE *file_fastfwd = NULL;
 	FILE *file_pppoe = NULL;
+	FILE *file_ipv6 = NULL;
+	FILE *file_pure_ipv6 = NULL;
+	FILE *file_pure_ip = NULL;
 	char file_path[100] = {0};
 	unsigned char stricmp[64] = {0};
 	unsigned char strfastfwd[64] = {0};
 	int icmp_enable = FUNC_DISABLE;
 	int pppoe_enable = FUNC_DISABLE;
 	int fastfwd_enable = FUNC_ENABLE;
+	int ipv6_enable_master = FUNC_DISABLE;
+	int pure_ipv6_enable_master = FUNC_DISABLE;
+	int pure_ip_enable_master = FUNC_DISABLE;
 
 	if (NULL == buf) 
 	{
@@ -1109,6 +1115,63 @@ void se_agent_save_cfg(unsigned char *buf,int cpu_tag, unsigned int bufLen)
 			if(pppoe_enable==1)
 			{
 				length +=sprintf(current," config fast-pppoe enable\n");
+				current =showStr + length;
+			}
+		}
+
+		/*now only master cpu support ipv6*/
+		memset(file_path, 0, sizeof(file_path));
+		sprintf(file_path,"/sys/module/%s/parameters/ipv6_enable",ipfwd_learn_name);
+		file_ipv6 = fopen(file_path,"r");
+		if(file_ipv6 != NULL)
+		{
+			ret = fread(stricmp,sizeof(int),sizeof(stricmp),file_ipv6);
+			fclose(file_ipv6);
+			ipv6_enable_master = atoi((char*)stricmp);
+		}
+		if((length + 30) < bufLen)
+		{
+			if(ipv6_enable_master==1)
+			{
+				length +=sprintf(current," config fast-ipv6 enable\n");
+				current =showStr + length;
+			}
+		}
+
+		/* now only master cpu support ipv6 pure ip forward */
+		memset(file_path, 0, sizeof(file_path));
+		sprintf(file_path,"/sys/module/%s/parameters/pure_ipv6_enable",ipfwd_learn_name);
+		file_pure_ipv6 = fopen(file_path,"r");
+		if(file_pure_ipv6 != NULL)
+		{
+			ret = fread(stricmp,sizeof(int),sizeof(stricmp),file_pure_ipv6);
+			fclose(file_pure_ipv6);
+			pure_ipv6_enable_master = atoi((char*)stricmp);
+		}
+		if((length + 30) < bufLen)
+		{
+			if(pure_ipv6_enable_master==1)
+			{
+				length +=sprintf(current," config fast-pure-ipv6 enable\n");
+				current =showStr + length;
+			}
+		}
+
+		/* now only master cpu support ipv4 pure ip forward */
+		memset(file_path, 0, sizeof(file_path));
+		sprintf(file_path,"/sys/module/%s/parameters/pure_ip_enable",ipfwd_learn_name);
+		file_pure_ip = fopen(file_path,"r");
+		if(file_pure_ip != NULL)
+		{
+			ret = fread(stricmp,sizeof(int),sizeof(stricmp),file_pure_ip);
+			fclose(file_pure_ip);
+			pure_ip_enable_master = atoi((char*)stricmp);
+		}
+		if((length + 30) < bufLen)
+		{
+			if(pure_ip_enable_master==1)
+			{
+				length +=sprintf(current," config fast-pure-ip enable\n");
 				current =showStr + length;
 			}
 		}
@@ -2270,6 +2333,195 @@ void se_agent_show_pure_ip_enable(char *buf, struct sockaddr_tipc *client_addr, 
 	return; 
 }
 
+void se_agent_pure_ipv6_enable(char *buf, struct sockaddr_tipc *client_addr, unsigned int len)
+{
+	uint32_t enable;
+	se_interative_t *se_buf=NULL;
+	int ret,rval,status;
+	char str[100]={0};
+	
+	if(NULL==buf || NULL==client_addr ||0==len)
+	{
+		se_agent_syslog_err("se_agent_pure_ipv6_enable  param error\n");
+		return ;
+	}
+	if(NULL == ipfwd_learn_name)
+	{
+		se_agent_syslog_err("se_agent_pure_ipv6_enable not find ipfwd_learn module\n");
+		return ;
+	}
+	
+	se_buf=(se_interative_t *)buf;
+	if(FASTFWD_NOT_LOADED == (fast_forward_module_load_check()))
+	{
+		strncpy((se_buf->err_info),FASTFWD_NOT_LOADED_STR,strlen(FASTFWD_NOT_LOADED_STR));
+		se_buf->cmd_result = AGENT_RETURN_FAIL;
+		goto func_end;
+	}
+	enable=se_buf->fccp_cmd.fccp_data.module_enable;
+	sprintf(str,"echo %d > /sys/module/%s/parameters/pure_ipv6_enable",enable, ipfwd_learn_name);
+	rval=system(str);
+	status=WEXITSTATUS(rval);
+	if(status)
+	{
+		se_agent_syslog_err("set fast_forward pure ipv6 learned error\n");
+		goto learned_pure_ipv6_err;
+	}
+	
+	se_buf->fccp_cmd.dest_module=FCCP_MODULE_ACL;
+	se_buf->fccp_cmd.src_module=FCCP_MODULE_AGENT_ACL;
+	se_buf->fccp_cmd.cmd_opcode=FCCP_CMD_ENABLE_PURE_IPV6;
+
+	ret = se_agent_fccp_process(buf, len, 1);
+	if(ret ==SE_AGENT_RETURN_OK)
+	{
+		se_buf->cmd_result=AGENT_RETURN_OK;
+		goto func_end;
+	}
+	else
+	{
+		goto se_pure_ipv6_err;
+	}
+	
+learned_pure_ipv6_err:
+	se_buf->cmd_result=AGENT_RETURN_FAIL;
+	strncpy((char*)(se_buf->err_info),"set ipfwd_learned pure ipv6 failed\n",ERR_INFO_SIZE);
+	goto func_end;
+se_pure_ipv6_err:
+	se_buf->cmd_result=AGENT_RETURN_FAIL;
+	strncpy(se_buf->err_info,"set fastfwd pure ipv6 failed\n",ERR_INFO_SIZE);
+	goto func_end;
+func_end:
+	ret=sendto(se_socket,(char*)buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
+	if(ret<0)
+	{
+		se_agent_syslog_err("se_agent_pure_ipv6_enable send to dcli failed:%s\n",strerror(errno));
+		return ;
+	}
+	return ;
+}
+
+void se_agent_show_pure_ipv6_enable(char *buf, struct sockaddr_tipc *client_addr, unsigned int len)
+{
+	se_interative_t *se_buf = NULL;
+
+	if(NULL == buf || NULL == client_addr || 0 ==len)
+	{
+		se_agent_syslog_err("se_agent_show_pure_ipv6_enable param error\n");
+		return; 
+	}  
+
+	se_buf = (se_interative_t *)buf;
+	se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
+	se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
+	se_buf->fccp_cmd.cmd_opcode = FCCP_CMD_GET_PURE_IPV6_STATE;
+
+    se_agent_fccp_process(buf, len, 1);
+
+    if(sendto(se_socket, buf, sizeof(se_interative_t), 0, (struct sockaddr*)client_addr,len) < 0)
+	{
+		se_agent_syslog_err("se_agent_show_pure_ipv6_enable send to dcli failed\n");
+		return; 
+	}
+
+	return; 
+}
+
+
+void se_agent_ipv6_enable(char *buf, struct sockaddr_tipc *client_addr, unsigned int len)
+{
+	uint32_t enable;
+	se_interative_t *se_buf=NULL;
+	int ret,rval,status;
+	char str[100]={0};
+	
+	if(NULL==buf || NULL==client_addr ||0==len)
+	{
+		se_agent_syslog_err("se_agent_ipv6_enable  param error\n");
+		return ;
+	}
+	if(NULL == ipfwd_learn_name)
+	{
+		se_agent_syslog_err("se_agent_ipv6_enable not find ipfwd_learn module\n");
+		return ;
+	}
+	
+	se_buf=(se_interative_t *)buf;
+	if(FASTFWD_NOT_LOADED == (fast_forward_module_load_check()))
+	{
+		strncpy((se_buf->err_info),FASTFWD_NOT_LOADED_STR,strlen(FASTFWD_NOT_LOADED_STR));
+		se_buf->cmd_result = AGENT_RETURN_FAIL;
+		goto func_end;
+	}
+	enable=se_buf->fccp_cmd.fccp_data.module_enable;
+	sprintf(str,"echo %d > /sys/module/%s/parameters/ipv6_enable",enable, ipfwd_learn_name);
+	rval=system(str);
+	status=WEXITSTATUS(rval);
+	if(status)
+	{
+		se_agent_syslog_err("set fast_forward ipv6 learned error\n");
+		goto learned_pure_ip_err;
+	}
+	
+	se_buf->fccp_cmd.dest_module=FCCP_MODULE_ACL;
+	se_buf->fccp_cmd.src_module=FCCP_MODULE_AGENT_ACL;
+	se_buf->fccp_cmd.cmd_opcode=FCCP_CMD_ENABLE_IPV6;
+
+	ret = se_agent_fccp_process(buf, len, 1);
+	if(ret ==SE_AGENT_RETURN_OK)
+	{
+		se_buf->cmd_result=AGENT_RETURN_OK;
+		goto func_end;
+	}
+	else
+	{
+		goto se_pure_ip_err;
+	}
+	
+learned_pure_ip_err:
+	se_buf->cmd_result=AGENT_RETURN_FAIL;
+	strncpy((char*)(se_buf->err_info),"set ipfwd_learned ipv6 failed\n",ERR_INFO_SIZE);
+	goto func_end;
+se_pure_ip_err:
+	se_buf->cmd_result=AGENT_RETURN_FAIL;
+	strncpy(se_buf->err_info,"set fastfwd ipv6 failed\n",ERR_INFO_SIZE);
+	goto func_end;
+func_end:
+	ret=sendto(se_socket,(char*)buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
+	if(ret<0)
+	{
+		se_agent_syslog_err("se_agent_ipv6_enable send to dcli failed:%s\n",strerror(errno));
+		return ;
+	}
+	return ;
+}
+
+void se_agent_show_ipv6_enable(char *buf, struct sockaddr_tipc *client_addr, unsigned int len)
+{
+	se_interative_t *se_buf = NULL;
+
+	if(NULL == buf || NULL == client_addr || 0 ==len)
+	{
+		se_agent_syslog_err("se_agent_show_ipv6_enable param error\n");
+		return; 
+	}  
+
+	se_buf = (se_interative_t *)buf;
+	se_buf->fccp_cmd.dest_module = FCCP_MODULE_ACL;
+	se_buf->fccp_cmd.src_module = FCCP_MODULE_AGENT_ACL;
+	se_buf->fccp_cmd.cmd_opcode = FCCP_CMD_GET_IPV6_STATE;
+
+    se_agent_fccp_process(buf, len, 1);
+
+    if(sendto(se_socket, buf, sizeof(se_interative_t), 0, (struct sockaddr*)client_addr,len) < 0)
+	{
+		se_agent_syslog_err("se_agent_show_ipv6_enable send to dcli failed\n");
+		return; 
+	}
+
+	return; 
+}
+
 
 int32_t get_fastfwd_stats()
 {
@@ -2872,6 +3124,10 @@ int se_agent_cmd_func_table_init()
 	se_agent_cmd_func_register(SE_AGENT_PPPOE_ENABLE,(cmd_handle_func)se_agent_pppoe_enable);
 	se_agent_cmd_func_register(SE_AGENT_PURE_IP_ENABLE,(cmd_handle_func)se_agent_pure_ip_enable);
 	se_agent_cmd_func_register(SE_AGENT_SHOW_PURE_IP_ENABLE,(cmd_handle_func)se_agent_show_pure_ip_enable);
+	se_agent_cmd_func_register(SE_AGENT_PURE_IPV6_ENABLE,(cmd_handle_func)se_agent_pure_ipv6_enable);
+	se_agent_cmd_func_register(SE_AGENT_SHOW_PURE_IPV6_ENABLE,(cmd_handle_func)se_agent_show_pure_ipv6_enable);
+	se_agent_cmd_func_register(SE_AGENT_IPV6_ENABLE,(cmd_handle_func)se_agent_ipv6_enable);
+	se_agent_cmd_func_register(SE_AGENT_SHOW_IPV6_ENABLE,(cmd_handle_func)se_agent_show_ipv6_enable);
 	se_agent_cmd_func_register(SE_AGENT_FASTFWD_ENABLE,(cmd_handle_func)se_agent_fastfwd_enable);
 	se_agent_cmd_func_register(SE_AGENT_SHOW_ACL_STATS,(cmd_handle_func)se_agent_show_rule_sum);
 	se_agent_cmd_func_register(SE_AGENT_SHOW_CAPWAP,(cmd_handle_func)se_agent_show_capwap_rule);
@@ -2904,7 +3160,8 @@ int se_agent_cmd_func_table_init()
 	se_agent_cmd_func_register(SE_AGENT_WRITE_REG,(cmd_handle_func)se_agent_write_reg);
 	se_agent_cmd_func_register(SE_AGENT_CLEAR_RULE_IP,(cmd_handle_func)se_agent_clear_rule_ip); /* wangjian clear */
 	se_agent_cmd_func_register(SE_AGENT_SHOW_FAST_FWD_INFO,(cmd_handle_func)se_agent_show_fast_fwd_info);   /*wangjian 2012.07.09 add fwd info */
-	se_agent_cmd_func_register(SE_AGENT_SHOW_RULE_IP,(cmd_handle_func)se_agent_show_rule_ip);               /*wangjian 2012.07.09 add ip */
+	se_agent_cmd_func_register(SE_AGENT_SHOW_RULE_IP,(cmd_handle_func)se_agent_show_rule_ip);  /*wangjian 2012.07.09 add ip */
+	se_agent_cmd_func_register(SE_AGENT_SHOW_RULE_IPV6,(cmd_handle_func)se_agent_show_rule_ipv6);
 	se_agent_cmd_func_register(SE_AGENT_CONFIG_FWDLOG_ENABLE,(cmd_handle_func)se_agent_config_fwdlog_enable);
 	se_agent_cmd_func_register(SE_AGENT_SHOW_FWDLOG_ENABLE,(cmd_handle_func)se_agent_show_fwdlog_enable);
 	se_agent_cmd_func_register(SE_AGENT_CONFIG_FWDLOG_LEVEL,(cmd_handle_func)se_agent_config_fwdlog_level);

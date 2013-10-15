@@ -3,6 +3,10 @@
 
 #include "acl.h"
 
+extern CVMX_SHARED int pure_ip_forward_enable;
+extern CVMX_SHARED int pure_ipv6_forward_enable;
+
+
 extern inline rule_item_t * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spinlock_t  **first_lock);
 
 extern inline uint32_t pure_ip_get(cvm_common_ip_hdr_t **true_ip, cvm_common_tcp_hdr_t **true_th,cvmx_wqe_t* work);

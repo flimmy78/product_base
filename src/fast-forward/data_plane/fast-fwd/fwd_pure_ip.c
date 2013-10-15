@@ -20,6 +20,7 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 	rule_item_t  *head_rule = NULL;
 	rule_item_t  *aging_pre_rule = NULL;
 	cvmx_spinlock_t  *head_lock = NULL;
+	cvm_common_ipv6_hdr_t *ipv6 = NULL;
 
 	if (ip == NULL)
 	{
@@ -29,12 +30,37 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 	}
 
 	cvmx_fau_atomic_add64(CVM_FAU_TOTAL_ACL_LOOKUP, 1);
-	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
-			"acl_table_pure_ip_lookup: packet-fiveTuple----dip=%d.%d.%d.%d, sip=%d.%d.%d.%d.  \r\n",
-			IP_FMT(ip->ip_dst),IP_FMT(ip->ip_src));
 
-	/*look up ACL Table and get the bucket*/
-	cvm_two_tupe_hash_lookup(ip->ip_dst, ip->ip_src);
+	if ((FUNC_ENABLE == pure_ip_forward_enable) && (CVM_IP_IPVERSION == ip->ip_v))
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+				"acl_table_pure_ip_lookup: packet-fiveTuple----dip=%d.%d.%d.%d, sip=%d.%d.%d.%d.  \r\n",
+				IP_FMT(ip->ip_dst),IP_FMT(ip->ip_src));
+
+		/*look up ACL Table and get the bucket*/
+		cvm_two_tupe_hash_lookup(ip->ip_dst, ip->ip_src);
+	}
+	else if ((FUNC_ENABLE == pure_ipv6_forward_enable) && (CVM_IP_IPVERSION_V6 == ip->ip_v))
+	{
+		ipv6 = (cvm_common_ipv6_hdr_t *)ip;
+		hash_v6_pure_ip(ipv6->ip_dst.s6_addr64[0],ipv6->ip_dst.s6_addr64[1],ipv6->ip_src.s6_addr64[0],ipv6->ip_src.s6_addr64[1]);
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+			"acl_table_pure_ip_lookup: packet-fiveTuple----%x:%x:%x:%x => %x:%x:%x:%x \r\n",
+			ipv6->ip_src.s6_addr32[0],
+			ipv6->ip_src.s6_addr32[1],
+			ipv6->ip_src.s6_addr32[2],
+			ipv6->ip_src.s6_addr32[3],
+			ipv6->ip_dst.s6_addr32[0],
+			ipv6->ip_dst.s6_addr32[1],
+			ipv6->ip_dst.s6_addr32[2],
+			ipv6->ip_dst.s6_addr32[3]);
+	}
+	else 
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_WARNING,
+			"acl_table_pure_ip_lookup:!...\r\n");	
+		return NULL;	
+	}
 	rule = CASTPTR(rule_item_t, cvmx_scratch_read64(CVM_SCR_ACL_CACHE_PTR));
 
 	/* add for coverity by wangjian */
@@ -65,8 +91,20 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 		if(head_rule->valid_entries == 0)
 		{
 			head_rule->rules.time_stamp = get_sec(); 
-			head_rule->rules.dip = ip->ip_dst;
-			head_rule->rules.sip = ip->ip_src;
+
+			if (CVM_IP_IPVERSION == ip->ip_v)
+			{
+				head_rule->rules.ipv4_dip = ip->ip_dst;
+				head_rule->rules.ipv4_sip = ip->ip_src;	
+			} 
+			else if (CVM_IP_IPVERSION_V6 == ip->ip_v)
+			{
+				head_rule->rules.ipv6_dip64[0] = ipv6->ip_dst.s6_addr64[0];
+				head_rule->rules.ipv6_dip64[1] = ipv6->ip_dst.s6_addr64[1];
+				head_rule->rules.ipv6_sip64[0] = ipv6->ip_src.s6_addr64[0];
+				head_rule->rules.ipv6_sip64[1] = ipv6->ip_src.s6_addr64[1];
+				head_rule->rules.ipv6_flag = 1;
+			}
 			head_rule->rules.rule_state = RULE_IS_LEARNING;
 			head_rule->rules.action_type = FLOW_ACTION_TOLINUX;
 			head_rule->valid_entries++;
@@ -109,10 +147,27 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 			return NULL;
 		}
 
-		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
-				"acl_table_pure_ip_lookup: current Rule info: dip=%d.%d.%d.%d, sip=%d.%d.%d.%d \r\n",
-				IP_FMT(rule->rules.dip),IP_FMT(rule->rules.sip));
-
+		if (CVM_IP_IPVERSION == rule->rules.ipv6_flag)
+		{
+			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+					"acl_table_pure_ip_lookup: current Rule info: dip=%d.%d.%d.%d, sip=%d.%d.%d.%d \r\n",
+					IP_FMT(rule->rules.ipv4_dip),IP_FMT(rule->rules.ipv4_sip));
+		}
+		else if (CVM_IP_IPVERSION_V6 == rule->rules.ipv6_flag)
+		{
+			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+				"acl_table_pure_ip_lookup: current Rule info: %x:%x:%x:%x => %x:%x:%x:%x \n",
+				rule->rules.ipv6_sip32[0],
+				rule->rules.ipv6_sip32[1],
+				rule->rules.ipv6_sip32[2],
+				rule->rules.ipv6_sip32[3],
+				rule->rules.ipv6_dip32[0],
+				rule->rules.ipv6_dip32[1],
+				rule->rules.ipv6_dip32[2],
+				rule->rules.ipv6_dip32[3]);
+		}
+		
+		
 		/************************aging first*****************************/
 		if((acl_aging_check(&(rule->rules)) > 0) && (rule->rules.rule_state != RULE_IS_STATIC))
 		{   
@@ -147,8 +202,19 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 					}
 
 					free_rule->rules.time_stamp = get_sec(); 
-					free_rule->rules.dip = ip->ip_dst;
-					free_rule->rules.sip = ip->ip_src;
+					if (CVM_IP_IPVERSION == ip->ip_v)
+					{
+						free_rule->rules.ipv4_dip = ip->ip_dst;
+						free_rule->rules.ipv4_sip = ip->ip_src;	
+					}
+					else if (CVM_IP_IPVERSION_V6 == ip->ip_v)
+					{
+						free_rule->rules.ipv6_dip64[0] = ipv6->ip_dst.s6_addr64[0];
+						free_rule->rules.ipv6_dip64[1] = ipv6->ip_dst.s6_addr64[1];
+						free_rule->rules.ipv6_sip64[0] = ipv6->ip_src.s6_addr64[0];
+						free_rule->rules.ipv6_sip64[1] = ipv6->ip_src.s6_addr64[1];
+						free_rule->rules.ipv6_flag = 1;
+					}
 					free_rule->rules.rule_state = RULE_IS_LEARNING;
 					free_rule->rules.action_type = FLOW_ACTION_TOLINUX;
 					head_rule->valid_entries++; /* ---------- modify by zhaohan ----------- */
@@ -173,7 +239,8 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 			}
 		}
 		/************************aging end*****************************/
-		if((rule->rules.dip == ip->ip_dst) && (rule->rules.sip == ip->ip_src)) 
+		if (((0 == rule->rules.ipv6_flag) && (CVM_IP_IPVERSION == ip->ip_v) && (rule->rules.ipv4_sip == ip->ip_src) && (rule->rules.ipv4_dip == ip->ip_dst)) || 
+			((1 == rule->rules.ipv6_flag) && (CVM_IP_IPVERSION_V6 == ip->ip_v) && IPV6_CMP(rule->rules.ipv6_sip, ipv6->ip_src) && IPV6_CMP(rule->rules.ipv6_dip, ipv6->ip_dst)))   
 		{		
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"acl_table_pure_ip_lookup: Find the rule=0x%p\n",rule);
@@ -240,8 +307,10 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
                             printf("head_rule->valid_entries = %d\n", head_rule->valid_entries);
                             printf("head_rule->rules.rule_state=%d\n", head_rule->rules.rule_state);
                             printf("header rule info: dip=%d.%d.%d.%d, sip=%d.%d.%d.%d.  \r\n",
-                                            IP_FMT(head_rule->rules.dip),IP_FMT(head_rule->rules.sip));
-                            return NULL;
+                                            IP_FMT(head_rule->rules.ipv4_dip),IP_FMT(head_rule->rules.ipv4_sip));
+							FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
+								"acl_table_pure_ip_lookup: Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
+							return NULL;
                         }
 
 						/* find the first none-static rule */
@@ -277,10 +346,23 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
                         if((head_rule->valid_entries == acl_bucket_max_entries)&&(head_rule->next == NULL))
                         {
                             printf("Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
+							FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
+								"acl_table_pure_ip_lookup: Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
                         }
 						replace_rule->rules.time_stamp = get_sec();
-						replace_rule->rules.dip = ip->ip_dst;
-						replace_rule->rules.sip = ip->ip_src;
+						if (CVM_IP_IPVERSION == ip->ip_v)
+						{
+							replace_rule->rules.ipv4_dip = ip->ip_dst;
+							replace_rule->rules.ipv4_sip = ip->ip_src;	
+						}
+						else if (CVM_IP_IPVERSION_V6 == ip->ip_v)
+						{
+							replace_rule->rules.ipv6_dip64[0] = ipv6->ip_dst.s6_addr64[0];
+							replace_rule->rules.ipv6_dip64[1] = ipv6->ip_dst.s6_addr64[1];
+							replace_rule->rules.ipv6_sip64[0] = ipv6->ip_src.s6_addr64[0];
+							replace_rule->rules.ipv6_sip64[1] = ipv6->ip_src.s6_addr64[1];
+							replace_rule->rules.ipv6_flag = 1;
+						}
 						replace_rule->rules.rule_state = RULE_IS_LEARNING;
 						replace_rule->rules.action_type = FLOW_ACTION_TOLINUX;
 						cvmx_spinlock_unlock(head_lock);
@@ -304,8 +386,19 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 				}
 
 				free_rule->rules.time_stamp = get_sec(); 
-				free_rule->rules.dip = ip->ip_dst;
-				free_rule->rules.sip = ip->ip_src;
+				if (CVM_IP_IPVERSION == ip->ip_v)
+				{
+					free_rule->rules.ipv4_dip = ip->ip_dst;
+					free_rule->rules.ipv4_sip = ip->ip_src;	
+				}
+				else if (CVM_IP_IPVERSION_V6 == ip->ip_v)
+				{
+					free_rule->rules.ipv6_dip64[0] = ipv6->ip_dst.s6_addr64[0];
+					free_rule->rules.ipv6_dip64[1] = ipv6->ip_dst.s6_addr64[1];
+					free_rule->rules.ipv6_sip64[0] = ipv6->ip_src.s6_addr64[0];
+					free_rule->rules.ipv6_sip64[1] = ipv6->ip_src.s6_addr64[1];
+					free_rule->rules.ipv6_flag = 1;
+				}
 				free_rule->rules.rule_state = RULE_IS_LEARNING;
 				free_rule->rules.action_type = FLOW_ACTION_TOLINUX;
 				head_rule->valid_entries++;
@@ -339,15 +432,27 @@ inline uint32_t pure_ip_get(cvm_common_ip_hdr_t **true_ip, cvm_common_tcp_hdr_t 
 {
 	cvm_common_udp_hdr_t *uh = NULL;
 	cvm_common_ip_hdr_t *ip = NULL;
+	cvm_common_ipv6_hdr_t *ipv6 = NULL;
 
 	ip = *true_ip;
+	ipv6 = (cvm_common_ipv6_hdr_t *)ip;
 	
-	if (CVM_COMMON_IPPROTO_UDP == ip->ip_p) 
+	/* if ext ipv6 nexthdr is not udp capwap need support parse*/
+	if (((CVM_IP_IPVERSION == ip->ip_v) && (FUNC_ENABLE == pure_ip_forward_enable) && (CVM_COMMON_IPPROTO_UDP == ip->ip_p)) || 
+		((CVM_IP_IPVERSION_V6 == ip->ip_v) && (FUNC_ENABLE == pure_ipv6_forward_enable) && (CVM_COMMON_IPPROTO_UDP == ipv6->ip_nexthdr))) 
 	{
 		uint32_t len;
 		int32_t tmp;
-		uh = ( cvm_common_udp_hdr_t*)((uint32_t *)ip + ip->ip_hl);
-        
+
+		if (CVM_IP_IPVERSION == ip->ip_v)
+		{
+			uh = (cvm_common_udp_hdr_t*)((uint32_t *)ip + ip->ip_hl);
+		}
+		else if (CVM_IP_IPVERSION_V6 == ip->ip_v)
+		{
+			uh = (cvm_common_udp_hdr_t*)((uint8_t *)ip + IPV6_H_LEN);
+		}
+		
 		/* destination port of 0 is illegal, based on RFC768. */
 		/* port dont need judge */
 		
@@ -363,7 +468,7 @@ inline uint32_t pure_ip_get(cvm_common_ip_hdr_t **true_ip, cvm_common_tcp_hdr_t 
 		 */
 		len = cvm_common_ntohs((uint16_t)uh->uh_ulen);
 
-		if (ip->ip_len != len) 
+		if ((CVM_IP_IPVERSION == ip->ip_v) && (ip->ip_len != len)) 
 		{
 			if (len > ip->ip_len || len < sizeof(cvm_common_udp_hdr_t)) 
 			{
@@ -387,7 +492,7 @@ inline uint32_t pure_ip_get(cvm_common_ip_hdr_t **true_ip, cvm_common_tcp_hdr_t 
 
 		if (PACKET_TYPE_CAPWAP_802_3 == tmp)
 		{
-			if (cw_802_3_decap(uh, true_ip, true_th) != 0) 
+			if (cw_802_3_decap(uh, true_ip, true_th) != RETURN_OK) 
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
 						"Warning]: recv capwap 802.3 packet, decap capwap failed\n");
@@ -396,17 +501,18 @@ inline uint32_t pure_ip_get(cvm_common_ip_hdr_t **true_ip, cvm_common_tcp_hdr_t 
 		}
 		else if (PACKET_TYPE_CAPWAP_802_11 == tmp)
 		{
-			if (cw_802_11_decap(uh, true_ip, true_th) != 0) 
+			if (cw_802_11_decap(uh, true_ip, true_th) != RETURN_OK) 
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
 						"Warning]: recv capwap packet, decap capwap failed\n");
 				return FLOW_ACTION_TOLINUX;			
 			}
 		}	
-
-		ip = *true_ip;
 		
-		if (CVM_COMMON_IPPROTO_UDP == ip->ip_p) 
+		ip = *true_ip;
+		ipv6 = (cvm_common_ipv6_hdr_t *)ip;
+		
+		if ((CVM_IP_IPVERSION == ip->ip_v) && (CVM_COMMON_IPPROTO_UDP == ip->ip_p)) 
 		{
 			uh = ( cvm_common_udp_hdr_t*)((uint32_t *)ip + ip->ip_hl);
 		
@@ -416,6 +522,17 @@ inline uint32_t pure_ip_get(cvm_common_ip_hdr_t **true_ip, cvm_common_tcp_hdr_t 
 				return FLOW_ACTION_DROP;
 			}
 		}
+		else if ((CVM_IP_IPVERSION_V6 == ip->ip_v) && (CVM_COMMON_IPPROTO_UDP == ipv6->ip_nexthdr))
+		{
+			uh = ( cvm_common_udp_hdr_t*)((uint8_t *)ipv6 + IPV6_H_LEN);
+		
+			if (uh->uh_dport == 0)
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_UDP_BAD_DPORT, 1);
+				return FLOW_ACTION_DROP;
+			}
+		}
+		
 	}
 	else
 	{
@@ -440,7 +557,7 @@ inline uint32_t pure_ip_get(cvm_common_ip_hdr_t **true_ip, cvm_common_tcp_hdr_t 
  */
 int32_t acl_self_learn_pure_ip_rule(rule_param_t *rule_para, capwap_cache_t *cw_cache)
 {
-	rule_item_t  *rule ;
+	rule_item_t  *rule = NULL;
 	rule_item_t  *head_rule=NULL ;
 	rule_item_t  *free_rule  = NULL; /*the first free bucket position*/
 	cvmx_spinlock_t          *head_lock = NULL;
@@ -448,20 +565,54 @@ int32_t acl_self_learn_pure_ip_rule(rule_param_t *rule_para, capwap_cache_t *cw_
 	if((NULL == rule_para) || (NULL == cw_cache))
 	{
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_WARNING,
-				"acl_self_learn_rule: Invalid argument\n");
+				"acl_self_learn_pure_ip_rule: Invalid argument\n");
 		return RETURN_ERROR;
 	}
 
-	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
-			"acl_self_learn_rule: packet-fiveTuple----dip=%d.%d.%d.%d, sip=%d.%d.%d.%d. l2 type=0x%x, tag=0x%x \r\n",
-			IP_FMT(rule_para->dip), IP_FMT(rule_para->sip), rule_para->out_ether_type,rule_para->out_tag);
+	if ((0 == rule_para->ipv6_flag) && (FUNC_ENABLE == pure_ip_forward_enable))
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+				"acl_self_learn_pure_ip_rule: packet-fiveTuple----dip=%d.%d.%d.%d, sip=%d.%d.%d.%d. l2 type=0x%x, tag=0x%x \r\n",
+				IP_FMT(rule_para->ipv4_dip), IP_FMT(rule_para->ipv4_sip), rule_para->out_ether_type,rule_para->out_tag);
 
-    /* get user table idx, store to rule */
-    fwd_get_user_idx(rule_para);
+	    /* get user table idx, store to rule */
+	    fwd_get_user_idx(rule_para);
 
-	/*look up ACL Table and get the bucket*/
-	cvm_two_tupe_hash_lookup(rule_para->dip, rule_para->sip);
+		/*look up ACL Table and get the bucket*/
+		cvm_two_tupe_hash_lookup(rule_para->ipv4_dip, rule_para->ipv4_sip);
+	}
+	else if ((1 == rule_para->ipv6_flag) && (FUNC_ENABLE == pure_ipv6_forward_enable))
+	{
+		hash_v6_pure_ip(rule_para->ipv6_dip64[0], rule_para->ipv6_dip64[1],rule_para->ipv6_sip64[0], rule_para->ipv6_sip64[1]);
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+			"acl_self_learn_pure_ip_rule: packet-fiveTuple----%x:%x:%x:%x => %x:%x:%x:%x \r\n",
+			rule_para->ipv6_sip32[0],
+			rule_para->ipv6_sip32[1],
+			rule_para->ipv6_sip32[2],
+			rule_para->ipv6_sip32[3],
+			rule_para->ipv6_dip32[0],
+			rule_para->ipv6_dip32[1],
+			rule_para->ipv6_dip32[2],
+			rule_para->ipv6_dip32[3]);
+	}
+	else
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+				"acl_self_learn_pure_ip_rule: pure ip forward not open.\n");
+
+		return RETURN_ERROR;
+	}
+
+	
 	rule = CASTPTR(rule_item_t, cvmx_scratch_read64(CVM_SCR_ACL_CACHE_PTR));
+
+	if (NULL == rule)
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+			"acl_self_learn_pure_ip_rule: rule == NULL!\r\n");
+			
+		return RETURN_ERROR;
+	}
 
 	head_rule = rule;
 	cvmx_spinlock_lock(&rule->lock);
@@ -502,8 +653,8 @@ int32_t acl_self_learn_pure_ip_rule(rule_param_t *rule_para, capwap_cache_t *cw_
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 				"acl_self_learn_rule: lookup the table, rule=0x%p.\r\n",rule);   
 
-		if ((rule->rules.dip == rule_para->dip) && 
-				(rule->rules.sip == rule_para->sip))             
+		if (((0 == rule_para->ipv6_flag) && (rule->rules.ipv4_dip == rule_para->ipv4_dip) && (rule->rules.ipv4_sip == rule_para->ipv4_sip))
+			|| ((1 == rule_para->ipv6_flag) && IPV6_CMP(rule->rules.ipv6_sip, rule_para->ipv6_sip) && IPV6_CMP(rule->rules.ipv6_dip, rule_para->ipv6_dip)))             
 		{
 			if(rule->rules.rule_state == RULE_IS_LEARNING)
 			{

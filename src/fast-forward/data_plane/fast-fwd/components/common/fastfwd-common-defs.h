@@ -63,6 +63,7 @@
 
 #define CVM_ETH_P_8021Q	0x8100
 #define CVM_ETH_P_IP	0x0800	
+#define CVM_ETH_P_IPV6	0x86dd
 #define VLAN_TAG_LEN    4
 
 
@@ -344,7 +345,8 @@ static inline uint64_t ulmin(uint64_t a, uint64_t b)
 #define ETH_H_LEN			14
 #define ETH_T_LEN			2
 #define CW_H_LEN			16
-#define IP_H_LEN				20
+#define IP_H_LEN			20
+#define IPV6_H_LEN			40
 #define UDP_H_LEN			8
 #define VLAN_PROTO_LEN		2
 #define VLAN_HLEN	4  
@@ -369,6 +371,8 @@ typedef struct vlan_eth_hdr_s {
  * Per RFC 791, September 1981.
  */
 #define	CVM_IP_IPVERSION	4
+#define	CVM_IP_IPVERSION_V6	6
+
 
 /*
  * Definitions for  fragment flag.
@@ -379,6 +383,8 @@ typedef struct vlan_eth_hdr_s {
 #define	CVM_IP_IP_OFFMASK 0x1fff	/**< mask for fragmenting bits */
 
 #define DEFAULT_TTL							128
+#define DEFAULT_TTL_IPV6					64
+
 
 /*
  * Definitions for options.
@@ -420,6 +426,42 @@ typedef enum cvm_ip_ret_val{
         CVM_IP_REASS_PKT_RCVD,
         CVM_IP_PKT_BAD,
 } cvm_ip_ret_val_t;
+
+/*
+ *	IPv6 address structure
+ */
+struct cvm_ip6_in6_addr
+{
+	union 
+	{
+		uint8_t			u6_addr8[16];
+		uint16_t		u6_addr16[8];
+		uint32_t		u6_addr32[4];
+		uint64_t		u6_addr64[2];
+	} in6_u;
+#define s6_addr			in6_u.u6_addr8
+#define s6_addr16		in6_u.u6_addr16
+#define s6_addr32		in6_u.u6_addr32
+#define s6_addr64		in6_u.u6_addr64
+};
+
+
+
+/*
+ * Structure of IP header (IPV6)
+ */
+typedef struct cvm_common_ipv6_hdr 
+{
+    uint32_t ip_v:4;			
+    uint32_t ip_traffic_class:8;
+    uint32_t ip_flow_label:20;	
+    uint32_t ip_payload_len:16;	
+    uint32_t ip_nexthdr:8;		
+    uint32_t ip_hop_limit:8;	
+	struct	cvm_ip6_in6_addr	ip_src;
+	struct	cvm_ip6_in6_addr	ip_dst;
+} cvm_common_ipv6_hdr_t;
+
 
 /*
  * Structure of IP header (IPV4)
@@ -486,7 +528,7 @@ typedef struct cvm_common_udp_hdr {
 #define CVM_COMMON_IPPROTO_ICMP     1
 #define CVM_COMMON_IPPROTO_TCP	    6
 #define CVM_COMMON_IPPROTO_UDP	   17
-#define CVM_COMMON_IPPROTO_IPV6 41
+#define CVM_COMMON_IPPROTO_IPV6    41
 #define CVM_COMMON_IPPROTO_RAW	  255
 
 /*

@@ -32,6 +32,7 @@
 //#include "cvmx.h"
 //#include "cvmx-fpa.h"
 //#include "cvm-enet.h"
+#include "fastfwd-common-defs.h"
 
 /* Standard well-known ports.  */
 enum
@@ -230,5 +231,84 @@ slow_cksum_calc:
 
    goto return_from_slow_cksum_calc;
 }
+
+/**
+ * Function to calculate IPv6 UDP header checksum.
+ * 
+ * @param saddr IPv6 header src ip
+ *             daddr  IPv6 header dest ip
+ *		   len   IPv6 udp len
+ *		   proto  UDP
+ *		   uh  pointer to the beginning of IPv6 udp header
+ * 
+ * @return 16-bit one's complement IPv6 checksum.
+ *
+ */
+static inline uint16_t  cvm_ipv6_calculate_udp_header_checksum(struct cvm_ip6_in6_addr saddr,
+					  struct cvm_ip6_in6_addr daddr,
+					  uint16_t len, uint8_t proto,
+					  cvm_common_udp_hdr_t *uh)
+{
+	uint64_t sum = 0;
+	uint16_all_alias *ptr = NULL;
+	uint8_all_alias *bptr = NULL;
+
+	sum	= saddr.s6_addr16[0];		
+	sum	+= saddr.s6_addr16[1];	
+	sum += saddr.s6_addr16[2];	
+	sum += saddr.s6_addr16[3];	
+	sum	+= saddr.s6_addr16[4];	
+	sum += saddr.s6_addr16[5];	
+	sum += saddr.s6_addr16[6];	
+	sum += saddr.s6_addr16[7];	
+	sum	+= daddr.s6_addr16[0];		
+	sum	+= daddr.s6_addr16[1];	
+	sum += daddr.s6_addr16[2];	
+	sum += daddr.s6_addr16[3];	
+	sum	+= daddr.s6_addr16[4];	
+	sum += daddr.s6_addr16[5];	
+	sum += daddr.s6_addr16[6];	
+	sum += daddr.s6_addr16[7];
+
+	sum += len;
+
+	sum += proto;
+
+	sum += uh->uh_sport;
+	sum += uh->uh_dport;
+	sum += uh->uh_ulen;
+
+	/* DATA checksum,every 16 bit once, not enough  16 bit On the right side of zero padding */
+	ptr = (uint16_all_alias *)((uint8_t *)uh + 8);
+	bptr = (uint8_all_alias *)((uint8_t *)uh + 8);
+	{
+	   int32_t len = (uh->uh_ulen - UDP_H_LEN);
+	
+		while (len > 0) 
+		{
+	   		if (len > 1)
+	   		{
+				sum += *ptr++;
+				bptr++;
+				bptr++;
+			}
+			else if (1 == len)
+			{
+				sum += (*bptr << 8);
+			}
+			
+		 	len--;
+		 	len--;
+	   }
+	}
+	ptr = NULL;
+	bptr = NULL;
+
+
+	sum = (uint16_t) sum + (sum >> 16);
+	sum = (uint16_t) sum + (sum >> 16);
+	return ((uint16_t) (sum ^ 0xffff));
+}
+
 
 #endif /* __CVM_IP_IN_H__ */

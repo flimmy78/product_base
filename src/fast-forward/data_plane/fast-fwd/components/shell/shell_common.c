@@ -2048,7 +2048,7 @@ static void print_icmp_rule(rule_item_t* rule)
 		return;
 	}
 	printf("  five tuple: %d.%d.%d.%d => %d.%d.%d.%d    icmp\n",
-			IP_FMT(rule->rules.sip), IP_FMT(rule->rules.dip));
+			IP_FMT(rule->rules.ipv4_sip), IP_FMT(rule->rules.ipv4_dip));
 
 	switch(rule->rules.action_type)
 	{
@@ -2099,14 +2099,30 @@ static void print_rule(rule_item_t* rule)
 	if(cvm_ip_only_enable == FUNC_ENABLE)
 	{
 		printf("  five tuple: any-ip:any-port => %d.%d.%d.%d:any-port   any(tcp|udp)\n",
-				IP_FMT(rule->rules.dip));
+				IP_FMT(rule->rules.ipv4_dip));
 	}
-	else
+	else if (0 == rule->rules.ipv6_flag)
 	{
 		printf("  five tuple: %d.%d.%d.%d:%d => %d.%d.%d.%d:%d    %s\n",
-				IP_FMT(rule->rules.sip), rule->rules.sport,
-				IP_FMT(rule->rules.dip), rule->rules.dport, PROTO_STR(rule->rules.protocol));	
+				IP_FMT(rule->rules.ipv4_sip), rule->rules.sport,
+				IP_FMT(rule->rules.ipv4_dip), rule->rules.dport, PROTO_STR(rule->rules.protocol));	
 	}
+	else if (1 == rule->rules.ipv6_flag)
+	{
+		printf("  five tuple: %x.%x.%x.%x:%d => %x.%x.%x.%x:%d    %s\n",
+				rule->rules.ipv6_sip32[0], 
+				rule->rules.ipv6_sip32[1], 
+				rule->rules.ipv6_sip32[2], 
+				rule->rules.ipv6_sip32[3], 
+				rule->rules.sport,
+				rule->rules.ipv6_dip32[0],
+				rule->rules.ipv6_dip32[1],
+				rule->rules.ipv6_dip32[2],
+				rule->rules.ipv6_dip32[3],
+				rule->rules.dport, 
+				PROTO_STR(rule->rules.protocol));	
+	}
+	
 
 	if(rule->rules.rule_state == RULE_IS_LEARNING)
 	{
@@ -2146,10 +2162,28 @@ static void print_rule(rule_item_t* rule)
 		case FLOW_ACTION_RPA_CAP802_3_FORWARD:
 			printf("    tunnel_index: %d\n", rule->rules.tunnel_index);
 			printf("    capwap use_num = %d\n", capwap_cache_bl[rule->rules.tunnel_index].use_num);
-			printf("    capwap tunnel: %d.%d.%d.%d:%d => %d.%d.%d.%d:%d  tos = 0x%02x\n",
-					IP_FMT(capwap_cache_bl[rule->rules.tunnel_index].sip), capwap_cache_bl[rule->rules.tunnel_index].sport,
-					IP_FMT(capwap_cache_bl[rule->rules.tunnel_index].dip), capwap_cache_bl[rule->rules.tunnel_index].dport,  
+			if (ETH_P_IP == rule->rules.ether_type)
+			{
+				printf("    capwap tunnel: %d.%d.%d.%d:%d => %d.%d.%d.%d:%d  tos = 0x%02x\n",
+					IP_FMT(capwap_cache_bl[rule->rules.tunnel_index].cw_sip), capwap_cache_bl[rule->rules.tunnel_index].sport,
+					IP_FMT(capwap_cache_bl[rule->rules.tunnel_index].cw_dip), capwap_cache_bl[rule->rules.tunnel_index].dport,  
 					capwap_cache_bl[rule->rules.tunnel_index].tos);
+			}
+			else if (ETH_P_IPV6 == rule->rules.ether_type)
+			{
+				printf("    capwap tunnel: %x.%x.%x.%x:%d => %x.%x.%x.%x:%d  \n",
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip32[0], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip32[1],
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip32[2],
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip32[3], 
+					capwap_cache_bl[rule->rules.tunnel_index].sport,
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip32[0], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip32[1], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip32[2], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip32[3], 
+					capwap_cache_bl[rule->rules.tunnel_index].dport);
+			}
+			
 			if(rule->rules.action_type == FLOW_ACTION_CAP802_3_FORWARD)
 			{
 				printf("  action_type = FLOW_ACTION_CAP802_3_FORWARD\n");
@@ -2165,10 +2199,28 @@ static void print_rule(rule_item_t* rule)
 			
 			printf("    tunnel_index: %d\n", rule->rules.tunnel_index);
 			printf("    capwap use_num = %d\n", capwap_cache_bl[rule->rules.tunnel_index].use_num);
-			printf("    capwap tunnel: %d.%d.%d.%d:%d => %d.%d.%d.%d:%d  tos = 0x%02x\n",
-					IP_FMT(capwap_cache_bl[rule->rules.tunnel_index].sip), capwap_cache_bl[rule->rules.tunnel_index].sport,
-					IP_FMT(capwap_cache_bl[rule->rules.tunnel_index].dip), capwap_cache_bl[rule->rules.tunnel_index].dport,  
+			if (ETH_P_IP == rule->rules.ether_type)
+			{
+				printf("    capwap tunnel: %d.%d.%d.%d:%d => %d.%d.%d.%d:%d  tos = 0x%02x\n",
+					IP_FMT(capwap_cache_bl[rule->rules.tunnel_index].cw_sip), capwap_cache_bl[rule->rules.tunnel_index].sport,
+					IP_FMT(capwap_cache_bl[rule->rules.tunnel_index].cw_dip), capwap_cache_bl[rule->rules.tunnel_index].dport,  
 					capwap_cache_bl[rule->rules.tunnel_index].tos);
+			}
+			else if (ETH_P_IPV6 == rule->rules.ether_type)
+			{
+				printf("    capwap tunnel: %x.%x.%x.%x:%d => %x.%x.%x.%x:%d  \n",
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip32[0], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip32[1],
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip32[2],
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip32[3], 
+					capwap_cache_bl[rule->rules.tunnel_index].sport,
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip32[0], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip32[1], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip32[2], 
+					capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip32[3], 
+					capwap_cache_bl[rule->rules.tunnel_index].dport);
+			}
+
 			if(rule->rules.action_type == FLOW_ACTION_CAPWAP_FORWARD)
 			{
 				printf("  action_type = FLOW_ACTION_CAPWAP_FORWARD\n");
@@ -2374,8 +2426,8 @@ int32_t cmd_acl_show_match_rule(
 		}
 		else
 		{
-			if((rule->rules.sip == ip_src) && 
-					(rule->rules.dip == ip_dst) &&
+			if((rule->rules.ipv4_sip == ip_src) && 
+					(rule->rules.ipv4_dip == ip_dst) &&
 					(rule->rules.sport == th_sport) && 
 					(rule->rules.dport == th_dport) &&
 					(rule->rules.protocol == ip_p))
@@ -2390,8 +2442,8 @@ int32_t cmd_acl_show_match_rule(
 
 		while(rule != NULL)
 		{
-			if((rule->rules.sip == ip_src) && 
-					(rule->rules.dip == ip_dst) &&
+			if((rule->rules.ipv4_sip == ip_src) && 
+					(rule->rules.ipv4_dip == ip_dst) &&
 					(rule->rules.sport == th_sport) && 
 					(rule->rules.dport == th_dport) &&
 					(rule->rules.protocol == ip_p))
@@ -2810,13 +2862,33 @@ static void cmd_acl_show_cw()
 			if(quit_flag == 0)
 			{
 				printf("idx = %d    use_number = %d\n", i,  capwap_cache_bl[i].use_num);
-				printf("sip=0x%x, dip=0x%x, sport=0x%x, dport=0x%x, tos=0x%x\n", 
-						capwap_cache_bl[i].sip, 
-						capwap_cache_bl[i].dip,
+
+				/*ipv6 capwap*/
+				if (0 != capwap_cache_bl[i].cw_ipv6_sip32[3])
+				{
+					printf("    capwap tunnel: %x.%x.%x.%x:%d => %x.%x.%x.%x:%d  \n",
+						capwap_cache_bl[i].cw_ipv6_sip32[0], 
+						capwap_cache_bl[i].cw_ipv6_sip32[1],
+						capwap_cache_bl[i].cw_ipv6_sip32[2],
+						capwap_cache_bl[i].cw_ipv6_sip32[3], 
+						capwap_cache_bl[i].sport,
+						capwap_cache_bl[i].cw_ipv6_dip32[0], 
+						capwap_cache_bl[i].cw_ipv6_dip32[1], 
+						capwap_cache_bl[i].cw_ipv6_dip32[2], 
+						capwap_cache_bl[i].cw_ipv6_dip32[3], 
+						capwap_cache_bl[i].dport);
+				}
+				/* ipv6 address == 0 ,mean is ipv4 capwap*/
+				else
+				{
+					printf("sip=0x%x, dip=0x%x, sport=0x%x, dport=0x%x, tos=0x%x\n", 
+						capwap_cache_bl[i].cw_sip, 
+						capwap_cache_bl[i].cw_dip,
 						capwap_cache_bl[i].sport,
 						capwap_cache_bl[i].dport,
 						capwap_cache_bl[i].tos);
-
+				}
+				
 				printf("capwap header:\n");
 				for(j = 0; j < CW_H_LEN; j++)
 				{
@@ -2891,8 +2963,8 @@ int32_t fill_rule(
 	}
 
 	/* L3-4 header, the HASH key */
-	rule->rules.dip = tuple->ip_dst;
-	rule->rules.sip = tuple->ip_src;
+	rule->rules.ipv4_dip = tuple->ip_dst;
+	rule->rules.ipv4_sip = tuple->ip_src;
 	rule->rules.protocol= tuple->ip_p;
 	rule->rules.dport= tuple->th_dport;
 	rule->rules.sport= tuple->th_sport;
@@ -2958,8 +3030,8 @@ int32_t fill_rule(
 				capwap_cache_bl[cw_idx].use_num++;
 				rule->rules.tunnel_index = cw_idx;
 
-				capwap_cache_bl[cw_idx].dip = 0x0a01496f;
-				capwap_cache_bl[cw_idx].sip = 0x0a014964;
+				capwap_cache_bl[cw_idx].cw_dip = 0x0a01496f;
+				capwap_cache_bl[cw_idx].cw_sip = 0x0a014964;
 				capwap_cache_bl[cw_idx].dport = 0x8001;
 				capwap_cache_bl[cw_idx].sport = 0x147f;
 				capwap_cache_bl[cw_idx].tos = 0x00;
@@ -3067,8 +3139,8 @@ int32_t cmd_acl_insert_rule(
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 				"acl_insert_static_rule: lookup the table, rule=0x%p.\r\n",rule);	
 
-		if ((rule->rules.dip == ip_dst) && 
-				(rule->rules.sip == ip_src) &&
+		if ((rule->rules.ipv4_dip == ip_dst) && 
+				(rule->rules.ipv4_sip == ip_src) &&
 				(rule->rules.dport == th_dport) &&
 				(rule->rules.sport == th_sport) &&
 				(rule->rules.protocol == ip_p)) 
@@ -3154,7 +3226,6 @@ int32_t cmd_acl_delete_rule(uint32_t ip_src, uint32_t ip_dst, uint16_t th_sport,
 	//rule_item_t  *free_rule  = NULL; /*the first free bucket position*/
 	cvmx_spinlock_t          *head_lock;
 
-
 	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 			"acl_cmd_delete_rule: packet-fiveTuple----dip=0x%x, sip=0x%x,dport=%d, sport=%d,proto=%d.  \r\n",
 			ip_dst,ip_src,th_dport,th_sport,ip_p);
@@ -3178,7 +3249,7 @@ int32_t cmd_acl_delete_rule(uint32_t ip_src, uint32_t ip_dst, uint16_t th_sport,
 
 	while(1)
 	{		   
-		if((rule->rules.dip == ip_dst) && (rule->rules.sip == ip_src) &&
+		if((rule->rules.ipv4_dip == ip_dst) && (rule->rules.ipv4_sip == ip_src) &&
 				(rule->rules.dport == th_dport) &&(rule->rules.sport == th_sport) &&(rule->rules.protocol == ip_p)) 
 		{
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,

@@ -64,6 +64,7 @@ extern CVMX_SHARED uint32_t debug_tag_val;    /* for test */
 #endif
 
 CVMX_SHARED cvmx_spinlock_t gl_wait_lock;
+CVMX_SHARED int cvm_ipv6_enable = FUNC_DISABLE;
 CVMX_SHARED int cvm_ip_pppoe_enable = FUNC_DISABLE;
 CVMX_SHARED int cvm_ip_icmp_enable = FUNC_DISABLE;
 CVMX_SHARED int cvm_car_enable = FUNC_DISABLE;
@@ -92,7 +93,8 @@ CVMX_SHARED	int fpa_packet_log_pool_count = 0;
 CVMX_SHARED	int flow_sequence_enable = FUNC_DISABLE;
 CVMX_SHARED	int wait_linux_buffer_count = 100;
 
-#define DEFAULT_DOWNLINK_MTU    1442    /* eth=>capwap */
+//#define DEFAULT_DOWNLINK_MTU    1442    /* eth=>capwap */
+#define DEFAULT_DOWNLINK_MTU    1422    /* eth=>capwap ipv6*/
 CVMX_SHARED uint32_t downlink_mtu = DEFAULT_DOWNLINK_MTU;
 
 
@@ -107,7 +109,7 @@ CVMX_SHARED uint64_t linux_sec = 0;
 CVMX_SHARED uint64_t fwd_sec = 0;
 
 CVMX_SHARED int pure_ip_forward_enable = FUNC_DISABLE;
-
+CVMX_SHARED int pure_ipv6_forward_enable = FUNC_DISABLE;
 CVMX_SHARED int standalone_fwd_enable = FUNC_ENABLE;
 
 
@@ -742,11 +744,13 @@ static inline void encap_pppoe(cvmx_wqe_t *work, rule_item_t *rule, uint8_t **pk
 }
 
 
+
+
 /*
  * Encapsulate Eth type packet by ipfwd rule.
  * offset: the offset of the ip address from the begining of the packet
  */
-static inline void encap_eth_packet(cvmx_wqe_t *work, rule_item_t *rule, cvm_common_ip_hdr_t *ip)
+static inline void encap_eth_packet_v4(cvmx_wqe_t *work, rule_item_t *rule, cvm_common_ip_hdr_t *ip)
 {
 	uint8_t *pkt_ptr = NULL;
 	uint8_t vlan_flag = 0;
@@ -858,11 +862,134 @@ static inline void encap_eth_packet(cvmx_wqe_t *work, rule_item_t *rule, cvm_com
 	return;
 }
 
+
+/*
+ * Encapsulate Eth type packet by ipfwd rule.
+ * offset: the offset of the ip address from the begining of the packet
+ */
+static inline void encap_eth_packet_v6(cvmx_wqe_t *work, rule_item_t *rule, cvm_common_ip_hdr_t *ip)
+{
+	uint8_t *pkt_ptr = NULL;
+	uint8_t vlan_flag = 0;
+	uint32_t offset = 0;
+	cvm_common_ipv6_hdr_t *ipv6 = NULL;
+
+	if((work == NULL) || (rule == NULL) || (ip == NULL))
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_WARNING,
+				"encap_eth_packet_v6: work or rule is Null!\r\n");
+		return;
+	}	
+
+	pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+	offset = (uint8_t *)ip - (uint8_t *)pkt_ptr;
+	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) - offset);
+	ipv6 = (cvm_common_ipv6_hdr_t *)ip;
+
+	/* add by yin for fwd nat *//*wangjian_nat*/
+	if(CVM_IP_IPVERSION_V6 != ip->ip_v) 
+        return;
+
+	ipv6->ip_hop_limit--;
+
+	
+	pkt_ptr = (uint8_t *)ip;
+	if (1 == rule->rules.pppoe_flag)
+	{
+		/* different process by flag */
+		encap_pppoe(work, rule, &pkt_ptr);
+		cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_ETH_PPPOE, 1);
+	}
+	
+	/* [DMAC-6][SMAC-6][DSA-8][TAG1-4][TAG4][TYPE-2]*/    /*µ¹Ðò¸³Öµ*/
+	/*add by wangjian for support pppoe 2013-3-12*/
+	pkt_ptr = (uint8_t *)pkt_ptr - 2;
+	/*add by wangjian for support pppoe 2013-3-14 type 0x8864? */
+	*(uint16_t *)pkt_ptr = rule->rules.ether_type;
+	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + 2);
+
+	if(rule->rules.in_tag) 
+	{
+		pkt_ptr = (uint8_t *)pkt_ptr - 2;
+		*(uint16_t *)pkt_ptr = rule->rules.in_tag;
+
+		pkt_ptr = (uint8_t *)pkt_ptr - 2;
+		*(uint16_t *)pkt_ptr = rule->rules.in_ether_type;
+
+		vlan_flag = 1;
+		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + 4);		
+	}
+
+	if(rule->rules.out_tag) 
+	{
+		pkt_ptr = (uint8_t *)pkt_ptr - 2;
+		*(uint16_t *)pkt_ptr = rule->rules.out_tag;
+
+		pkt_ptr = (uint8_t *)pkt_ptr - 2;
+		*(uint16_t *)pkt_ptr = rule->rules.out_ether_type;
+
+		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + 4);	
+		if (vlan_flag)
+		{
+			cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_QINQ, 1);
+		}
+		else
+		{
+			cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_8021Q, 1);
+		}
+	}
+
+	if(rule->rules.dsa_info) 
+	{
+		pkt_ptr = (uint8_t *)pkt_ptr - PACKET_DSA_HEADER_LEN;
+		*(uint64_t *)pkt_ptr = rule->rules.dsa_info;
+		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + PACKET_DSA_HEADER_LEN);	
+	}
+	/*add for coverity by wangjian*/
+	pkt_ptr = pkt_ptr - 6;
+	memcpy(pkt_ptr, rule->rules.ether_shost, 6);
+	pkt_ptr = pkt_ptr - 6;
+	memcpy(pkt_ptr, rule->rules.ether_dhost, 6);
+	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + 12);
+	work->packet_ptr.s.addr = cvmx_ptr_to_phys(pkt_ptr);
+	work->packet_ptr.s.back   = CVM_COMMON_CALC_BACK(work->packet_ptr);
+
+	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+			"encap_eth_packet_v6: back is %d, addr at 0x%llx\r\n",work->packet_ptr.s.back,(unsigned long long)work->packet_ptr.s.addr);
+
+#ifdef OCTEON_DEBUG_LEVEL
+	if((fastfwd_common_debug_level == FASTFWD_COMMON_DBG_LVL_INFO) &&((1 << cvmx_get_core_num() ) & (core_mask) ))
+	{
+		fwd_debug_dump_packet(work);
+	}
+#endif
+
+	return;
+}
+
+
+static inline void encap_eth_packet(cvmx_wqe_t *work, rule_item_t *rule, cvm_common_ip_hdr_t *ip)
+{
+	if((work == NULL) || (rule == NULL) || (ip == NULL))
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_WARNING,
+				"encap_eth_packet: work or rule is Null!\r\n");
+		return;
+	}
+
+	if(CVM_IP_IPVERSION == ip->ip_v) 
+        encap_eth_packet_v4(work, rule, ip);
+	else if(CVM_IP_IPVERSION_V6 == ip->ip_v) 
+        encap_eth_packet_v6(work, rule, ip);
+}
+
+
+
 /**
  * Encapsulate 802.11 capwap type packet by ipfwd rule.
  * offset: the offset of the rule(internal) ip address from the begining of the packet
  */
-static inline void encap_802_11_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, cvm_common_ip_hdr_t *ip)
+static inline void encap_802_11_cw_packet_v4(cvmx_wqe_t *work, rule_item_t *rule, cvm_common_ip_hdr_t *ip)
 {
 	uint8_t *pkt_ptr = NULL;
 	uint8_t *pkt_ptr_tmp = NULL;
@@ -875,6 +1002,7 @@ static inline void encap_802_11_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, c
 	uint8_t vlan_flag = 0;
 	uint8_t is_qos = 0;
 	uint32_t offset = 0;
+	cvm_common_ipv6_hdr_t *ext_ipv6 = NULL;
 
 	if((work == NULL) || (rule == NULL) || (ip == NULL))
 	{
@@ -1019,23 +1147,60 @@ static inline void encap_802_11_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, c
 	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + UDP_H_LEN);
 
 	/* Encap external IP */
-	ext_ip = (cvm_common_ip_hdr_t*)((uint8_t*)ext_uh - IP_H_LEN);
-	ext_ip->ip_v = 4;
-	ext_ip->ip_hl = 5;
-	ext_ip->ip_tos = capwap_cache_bl[rule->rules.tunnel_index].tos;
-	ext_ip->ip_len = ext_uh->uh_ulen + IP_H_LEN;
-	ext_ip->ip_id = 0;
-	ext_ip->ip_off = 0x4000;
-	ext_ip->ip_ttl = DEFAULT_TTL;
-	ext_ip->ip_p = CVM_COMMON_IPPROTO_UDP;
-	ext_ip->ip_src = capwap_cache_bl[rule->rules.tunnel_index].sip;
-	ext_ip->ip_dst = capwap_cache_bl[rule->rules.tunnel_index].dip;
-	ext_ip->ip_sum = 0;
-	ext_ip->ip_sum = cvm_ip_calculate_ip_header_checksum(ext_ip);
-	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + IP_H_LEN);
+	if (CVM_ETH_P_IP == rule->rules.ether_type) /* capwap tunnel is ipv4 */
+	{
+		ext_ip = (cvm_common_ip_hdr_t*)((uint8_t*)ext_uh - IP_H_LEN);
+		ext_ip->ip_v = CVM_IP_IPVERSION;
+		ext_ip->ip_hl = 5;
+		ext_ip->ip_tos = capwap_cache_bl[rule->rules.tunnel_index].tos;
+		ext_ip->ip_len = ext_uh->uh_ulen + IP_H_LEN;
+		ext_ip->ip_id = 0;
+
+		ext_ip->ip_off = 0x4000;
+		ext_ip->ip_ttl = DEFAULT_TTL;
+
+
+		ext_ip->ip_p = CVM_COMMON_IPPROTO_UDP;
+		ext_ip->ip_src = capwap_cache_bl[rule->rules.tunnel_index].cw_sip;
+		ext_ip->ip_dst = capwap_cache_bl[rule->rules.tunnel_index].cw_dip;
+		ext_ip->ip_sum = 0;
+		ext_ip->ip_sum = cvm_ip_calculate_ip_header_checksum(ext_ip);
+		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + IP_H_LEN);
+	}
+	else if (CVM_ETH_P_IPV6 == rule->rules.ether_type)  /* capwap tunnel is ipv6 */
+	{
+		ext_ipv6 = (cvm_common_ipv6_hdr_t*)((uint8_t*)ext_uh - IPV6_H_LEN);
+		ext_ipv6->ip_flow_label = 0;
+		ext_ipv6->ip_hop_limit = DEFAULT_TTL_IPV6;  /*???default */
+		ext_ipv6->ip_nexthdr = CVM_COMMON_IPPROTO_UDP;
+		ext_ipv6->ip_v = CVM_IP_IPVERSION_V6;
+		ext_ipv6->ip_dst.s6_addr64[0] = capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip64[0];
+		ext_ipv6->ip_dst.s6_addr64[1] = capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip64[1];
+		ext_ipv6->ip_src.s6_addr64[0] = capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip64[0];
+		ext_ipv6->ip_src.s6_addr64[1] = capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip64[1];
+		ext_ipv6->ip_payload_len = ext_uh->uh_ulen;  /*????what*/
+		ext_ipv6->ip_traffic_class = 0; /*default is 0 ????*/
+		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + IPV6_H_LEN);
+
+		/* if ipv6 ipv6header have no checksum udp sum can 0 ?this need calculate the checksum */
+		ext_uh->uh_sum = cvm_ipv6_calculate_udp_header_checksum(ext_ipv6->ip_src,
+						ext_ipv6->ip_dst,
+						ext_uh->uh_ulen, CVM_COMMON_IPPROTO_UDP,
+						ext_uh);
+		
+	}
 
 	/* [DMAC-6][SMAC-6][DSA-8][TAG1-4][TAG4][TYPE-2]*/    /*µ¹Ðò¸³Öµ*/	
-	pkt_ptr = (uint8_t *)ext_ip - 2;
+
+	if (CVM_ETH_P_IP == rule->rules.ether_type)
+	{
+		pkt_ptr = (uint8_t *)ext_ip - 2;
+	}
+	else if (CVM_ETH_P_IPV6 == rule->rules.ether_type)
+	{
+		pkt_ptr = (uint8_t *)ext_ipv6 - 2;
+	}
+
 	*(uint16_t *)pkt_ptr = rule->rules.ether_type;
 	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + 2);
 
@@ -1100,11 +1265,306 @@ static inline void encap_802_11_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, c
 	return;
 }
 
+
+
+/**
+ * Encapsulate 802.11 capwap type packet by ipfwd rule.
+ * offset: the offset of the rule(internal) ip address from the begining of the packet
+ */
+static inline void encap_802_11_cw_packet_v6(cvmx_wqe_t *work, rule_item_t *rule, cvm_common_ip_hdr_t *ip)
+{
+	uint8_t *pkt_ptr = NULL;
+	uint8_t *pkt_ptr_tmp = NULL;
+	struct ieee80211_llc *llc_hdr = NULL;
+	struct ieee80211_frame *ieee80211_hdr = NULL;
+	union capwap_hd *cw_hdr = NULL;
+	cvm_common_udp_hdr_t *ext_uh = NULL;
+	cvm_common_ip_hdr_t *ext_ip = NULL;
+	uint32_t in_ip_totlen = 0, ieee80211_len = 0;
+	uint8_t vlan_flag = 0;
+	uint8_t is_qos = 0;
+	uint32_t offset = 0;
+	cvm_common_ipv6_hdr_t *ipv6 = NULL;
+	cvm_common_ipv6_hdr_t *ext_ipv6 = NULL;
+
+	if((work == NULL) || (rule == NULL) || (ip == NULL))
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_WARNING,
+				"encap_cw_packet: work or rule is Null!\r\n");
+		return ;
+	}
+
+	ipv6 = (cvm_common_ipv6_hdr_t *)ip;
+	
+	if ( cvm_qos_enable || (rule->rules.acl_tunnel_wifi_header_fc[0] & IEEE80211_FC0_QOS_MASK))
+		is_qos = 1;
+
+	pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+	offset = (uint8_t *)ip - (uint8_t *)pkt_ptr;
+	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) - offset);
+
+	/* add by yin for fwd nat *//*wangjian_nat*/
+	if (CVM_IP_IPVERSION_V6 != ip->ip_v) 
+	{
+	    return;
+	}
+
+
+	ipv6->ip_hop_limit--;
+	in_ip_totlen = ipv6->ip_payload_len + IPV6_H_LEN;   /* this length include what */
+
+	/*
+	   CAPWAP frame format:
+
+	   Ethernet II header
+	   IP header (External IP header)
+	   UDP header (External UDP header)
+	   CAPWAP header
+	   IEEE802.11 header
+	   LLC header
+	   (PPPOE header)
+	   IP header (Internal IP header)
+	   TCP/UDP header (Internal TCP/UDP header)
+	   payload
+	 */
+
+
+	pkt_ptr_tmp = (uint8_t *)ip;
+	if (1 == rule->rules.pppoe_flag)
+	{
+		encap_pppoe(work, rule, &pkt_ptr_tmp);
+		cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP_PPPOE, 1);
+	}
+	/* Encap LLC */	
+
+	/*add by wangjian for support pppoe 2013-3-14*/
+	if (1 == rule->rules.pppoe_flag)
+	{	
+		llc_hdr = (struct ieee80211_llc *)(pkt_ptr + offset - LLC_H_LEN - PPPOE_H_LEN); 	
+		llc_hdr->llc_ether_type[0] = 0x88;
+		llc_hdr->llc_ether_type[1] = 0x64;
+	}
+	else if (CVM_IP_IPVERSION_V6 == ip->ip_v)
+	{
+		llc_hdr = (struct ieee80211_llc *)(pkt_ptr + offset - LLC_H_LEN); 	
+		llc_hdr->llc_ether_type[0] = 0x86;
+		llc_hdr->llc_ether_type[1] = 0xdd;
+	}
+	
+	/*add by wangjian for support pppoe 2013-3-14*/
+	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + LLC_H_LEN);
+	llc_hdr->llc_dsap = 0xaa;
+	llc_hdr->llc_ssap = 0xaa;
+	llc_hdr->llc_cmd = 0x03;
+	llc_hdr->llc_org_code[0] = 0;
+	llc_hdr->llc_org_code[1] = 0;
+	llc_hdr->llc_org_code[2] = 0;
+	
+	
+	
+	/* Encap IEEE802.11 */
+	if (is_qos == 0) 
+	{
+		ieee80211_len = IEEE80211_H_LEN;
+		ieee80211_hdr = (struct ieee80211_frame*)((uint8_t*)llc_hdr - IEEE80211_H_LEN);	
+	}	
+	else 
+	{
+		ieee80211_len = IEEE80211_QOS_H_LEN;
+		ieee80211_hdr = (struct ieee80211_frame*)((uint8_t*)llc_hdr - IEEE80211_QOS_H_LEN);
+	}
+
+	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + ieee80211_len);
+	ieee80211_hdr->i_fc[0] = rule->rules.acl_tunnel_wifi_header_fc[0];
+	ieee80211_hdr->i_fc[1] = rule->rules.acl_tunnel_wifi_header_fc[1];
+	if (cvmx_unlikely(is_qos)) 
+	{
+		ieee80211_hdr->i_fc[0] |= IEEE80211_FC0_QOS_MASK;
+		((struct ieee80211_qosframe*)ieee80211_hdr)->i_qos[0] = rule->rules.acl_tunnel_wifi_header_qos[0];
+		((struct ieee80211_qosframe*)ieee80211_hdr)->i_qos[1] = rule->rules.acl_tunnel_wifi_header_qos[1];
+		unsigned char *pchNull = NULL;
+		/*add for coverity by wangjian dont need modify*/
+		pchNull = ((struct ieee80211_qosframe*)ieee80211_hdr)->i_qos + 2;
+
+		*pchNull = 0x00;
+		pchNull += 1;
+		*pchNull = 0x00;
+	}	
+	ieee80211_hdr->i_dur[0] = 0;
+	ieee80211_hdr->i_dur[1] = 0;
+
+	/*add for coverity by wangjian dont need modify*/
+	memcpy(ieee80211_hdr->i_addr1, &rule->rules.acl_tunnel_wifi_header_addr[0], MAC_LEN * 3);
+
+	ieee80211_hdr->i_seq[0] = (((uint16_t)gbl_80211_id) << 4) & 0xf0;
+	ieee80211_hdr->i_seq[1] = (((uint16_t)gbl_80211_id) >> 4) & 0xff;
+	cvmx_atomic_add32_nosync(&gbl_80211_id,1);
+	if(gbl_80211_id >= 4096)
+	{
+		gbl_80211_id = 0;
+	}
+
+	/* Encap CAPWAP */
+	cw_hdr = (union capwap_hd*)((uint8_t*)ieee80211_hdr - CW_H_LEN);
+	memcpy(cw_hdr, capwap_cache_bl[rule->rules.tunnel_index].cw_hd, CW_H_LEN);
+	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + CW_H_LEN);
+
+	/* Encap externel UDP */
+	ext_uh =  (cvm_common_udp_hdr_t*)((uint8_t*)cw_hdr - UDP_H_LEN);
+	ext_uh->uh_sport = capwap_cache_bl[rule->rules.tunnel_index].sport;
+	ext_uh->uh_dport = capwap_cache_bl[rule->rules.tunnel_index].dport;
+	if (1 == rule->rules.pppoe_flag)
+	{
+		ext_uh->uh_ulen = in_ip_totlen +  LLC_H_LEN + ieee80211_len + CW_H_LEN + UDP_H_LEN + PPPOE_H_LEN;
+	}
+	else
+	{
+		ext_uh->uh_ulen = in_ip_totlen +  LLC_H_LEN + ieee80211_len + CW_H_LEN + UDP_H_LEN;
+	}
+	ext_uh->uh_sum= 0;
+
+	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + UDP_H_LEN);
+
+	/* Encap external IP */
+	if (CVM_ETH_P_IP == rule->rules.ether_type) /* capwap tunnel is ipv4 */
+	{
+		ext_ip = (cvm_common_ip_hdr_t*)((uint8_t*)ext_uh - IP_H_LEN);
+		ext_ip->ip_v = CVM_IP_IPVERSION;
+		ext_ip->ip_hl = 5;
+		ext_ip->ip_tos = capwap_cache_bl[rule->rules.tunnel_index].tos;
+		ext_ip->ip_len = ext_uh->uh_ulen + IP_H_LEN;
+		ext_ip->ip_id = 0;
+
+        /* for ipv6 */
+		ext_ip->ip_off = 0;
+		ext_ip->ip_ttl = DEFAULT_TTL_IPV6;
+
+		ext_ip->ip_p = CVM_COMMON_IPPROTO_UDP;
+		ext_ip->ip_src = capwap_cache_bl[rule->rules.tunnel_index].cw_sip;
+		ext_ip->ip_dst = capwap_cache_bl[rule->rules.tunnel_index].cw_dip;
+		ext_ip->ip_sum = 0;
+		ext_ip->ip_sum = cvm_ip_calculate_ip_header_checksum(ext_ip);
+		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + IP_H_LEN);
+	}
+	else if (CVM_ETH_P_IPV6 == rule->rules.ether_type)  /* capwap tunnel is ipv6 */
+	{
+		ext_ipv6 = (cvm_common_ipv6_hdr_t*)((uint8_t*)ext_uh - IPV6_H_LEN);
+		ext_ipv6->ip_flow_label = 0;
+		ext_ipv6->ip_hop_limit = DEFAULT_TTL_IPV6;  /*???default */
+		ext_ipv6->ip_nexthdr = CVM_COMMON_IPPROTO_UDP;
+		ext_ipv6->ip_v = CVM_IP_IPVERSION_V6;
+		ext_ipv6->ip_dst.s6_addr64[0] = capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip64[0];
+		ext_ipv6->ip_dst.s6_addr64[1] = capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip64[1];
+		ext_ipv6->ip_src.s6_addr64[0] = capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip64[0];
+		ext_ipv6->ip_src.s6_addr64[1] = capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip64[1];
+		ext_ipv6->ip_payload_len = ext_uh->uh_ulen;  /*????what*/
+		ext_ipv6->ip_traffic_class = 0; /*default is 0 ????*/
+		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + IPV6_H_LEN);
+
+		/* if ipv6 ipv6header have no checksum udp sum can 0 ?this need calculate the checksum */
+		ext_uh->uh_sum = cvm_ipv6_calculate_udp_header_checksum(ext_ipv6->ip_src,
+						ext_ipv6->ip_dst,
+						ext_uh->uh_ulen, CVM_COMMON_IPPROTO_UDP,
+						ext_uh);
+		
+	}
+
+	/* [DMAC-6][SMAC-6][DSA-8][TAG1-4][TAG4][TYPE-2]*/    /*µ¹Ðò¸³Öµ*/	
+	if (CVM_ETH_P_IP == rule->rules.ether_type)
+	{
+		pkt_ptr = (uint8_t *)ext_ip - 2;
+	}
+	else if (CVM_ETH_P_IPV6 == rule->rules.ether_type)
+	{
+		pkt_ptr = (uint8_t *)ext_ipv6 - 2;
+	}
+	*(uint16_t *)pkt_ptr = rule->rules.ether_type;
+	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + 2);
+
+	if(rule->rules.in_tag) 
+	{
+		pkt_ptr = (uint8_t *)pkt_ptr - 2;
+		*(uint16_t *)pkt_ptr = rule->rules.in_tag;
+
+		pkt_ptr = (uint8_t *)pkt_ptr - 2;
+		*(uint16_t *)pkt_ptr = rule->rules.in_ether_type;
+
+		vlan_flag = 1;
+		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + 4);
+	}
+
+	if(rule->rules.out_tag) 
+	{
+		pkt_ptr = (uint8_t *)pkt_ptr - 2;
+		*(uint16_t *)pkt_ptr = rule->rules.out_tag;
+
+		pkt_ptr = (uint8_t *)pkt_ptr - 2;
+		*(uint16_t *)pkt_ptr = rule->rules.out_ether_type;
+
+		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + 4);
+		if (vlan_flag)
+		{
+			cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_QINQ, 1);
+		}
+		else
+		{
+			cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_8021Q, 1);
+		}
+	}
+
+	if(rule->rules.dsa_info) 
+	{
+		pkt_ptr = (uint8_t *)pkt_ptr - PACKET_DSA_HEADER_LEN;
+		*(uint64_t *)pkt_ptr = rule->rules.dsa_info;
+		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + PACKET_DSA_HEADER_LEN);
+	}
+
+	/*add for coverity by wangjian*/
+	pkt_ptr = pkt_ptr - 6;
+	memcpy(pkt_ptr, rule->rules.ether_shost, 6);
+	pkt_ptr = pkt_ptr - 6;
+	memcpy(pkt_ptr, rule->rules.ether_dhost, 6);
+	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + 12);
+	work->packet_ptr.s.addr = cvmx_ptr_to_phys(pkt_ptr);
+	work->packet_ptr.s.back   = CVM_COMMON_CALC_BACK(work->packet_ptr);
+
+	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+			"encap_cw_packet: back is %d, addr at 0x%llx\r\n",work->packet_ptr.s.back,(unsigned long long)work->packet_ptr.s.addr);
+
+#ifdef OCTEON_DEBUG_LEVEL
+	if((fastfwd_common_debug_level == FASTFWD_COMMON_DBG_LVL_INFO) &&((1 << cvmx_get_core_num() ) & (core_mask) ))
+	{
+		//cvmx_dump_128_packet(work);
+		fwd_debug_dump_packet(work);
+	}
+#endif
+
+	return;
+}
+
+
+static inline void encap_802_11_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, cvm_common_ip_hdr_t *ip)
+{
+	if((work == NULL) || (rule == NULL) || (ip == NULL))
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_WARNING,
+				"encap_802_11_cw_packet: work or rule or ip is Null!\r\n");
+		return ;
+	}
+
+	if(CVM_IP_IPVERSION == ip->ip_v) 
+        encap_802_11_cw_packet_v4(work, rule, ip);
+	else if(CVM_IP_IPVERSION_V6 == ip->ip_v) 
+        encap_802_11_cw_packet_v6(work, rule, ip);
+}
+
+
+
 /**
  * Encapsulate 802.3 capwap type packet by ipfwd rule.
  * offset: the offset of the rule(internal) ip address from the begining of the packet
  */
-static inline void encap_802_3_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, cvm_common_ip_hdr_t *ip)
+static inline void encap_802_3_cw_packet_v4(cvmx_wqe_t *work, rule_item_t *rule, cvm_common_ip_hdr_t *ip)
 {
 	uint8_t *pkt_ptr = NULL;
 	union capwap_hd *cw_hdr = NULL;
@@ -1113,6 +1573,7 @@ static inline void encap_802_3_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, cv
 	uint32_t in_ip_totlen = 0;
 	uint8_t vlan_flag = 0;
 	uint32_t offset = 0;
+	cvm_common_ipv6_hdr_t *ext_ipv6 = NULL;
 
 	if((work == NULL) || (rule == NULL) || (ip == NULL))
 	{
@@ -1198,23 +1659,58 @@ static inline void encap_802_3_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, cv
 	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + UDP_H_LEN);
 
 	/* Encap external IP */
-	ext_ip = (cvm_common_ip_hdr_t*)((uint8_t*)ext_uh - IP_H_LEN);
-	ext_ip->ip_v = 4;
-	ext_ip->ip_hl = 5;
-	ext_ip->ip_tos = capwap_cache_bl[rule->rules.tunnel_index].tos;
-	ext_ip->ip_len = ext_uh->uh_ulen + IP_H_LEN;
-	ext_ip->ip_id = 0;
-	ext_ip->ip_off = 0x4000;
-	ext_ip->ip_ttl = DEFAULT_TTL;
-	ext_ip->ip_p= CVM_COMMON_IPPROTO_UDP;
-	ext_ip->ip_src= capwap_cache_bl[rule->rules.tunnel_index].sip;
-	ext_ip->ip_dst = capwap_cache_bl[rule->rules.tunnel_index].dip;
-	ext_ip->ip_sum = 0;
-	ext_ip->ip_sum = cvm_ip_calculate_ip_header_checksum(ext_ip);
-	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + IP_H_LEN);
+	if (CVM_ETH_P_IP == rule->rules.ether_type)
+	{
+		ext_ip = (cvm_common_ip_hdr_t*)((uint8_t*)ext_uh - IP_H_LEN);
+		ext_ip->ip_v = CVM_IP_IPVERSION;
+		ext_ip->ip_hl = 5;
+		ext_ip->ip_tos = capwap_cache_bl[rule->rules.tunnel_index].tos;
+		ext_ip->ip_len = ext_uh->uh_ulen + IP_H_LEN;
+		ext_ip->ip_id = 0;
+
+		ext_ip->ip_off = 0x4000;
+		ext_ip->ip_ttl = DEFAULT_TTL;
+
+		ext_ip->ip_p= CVM_COMMON_IPPROTO_UDP;
+		ext_ip->ip_src= capwap_cache_bl[rule->rules.tunnel_index].cw_sip;
+		ext_ip->ip_dst = capwap_cache_bl[rule->rules.tunnel_index].cw_dip;
+		ext_ip->ip_sum = 0;
+		ext_ip->ip_sum = cvm_ip_calculate_ip_header_checksum(ext_ip);
+		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + IP_H_LEN);
+	}
+	else if (CVM_ETH_P_IPV6 == rule->rules.ether_type)
+	{
+		ext_ipv6 = (cvm_common_ipv6_hdr_t*)((uint8_t*)ext_uh - IPV6_H_LEN);
+		ext_ipv6->ip_flow_label = 0;
+		ext_ipv6->ip_hop_limit = DEFAULT_TTL;  /*???default */
+		ext_ipv6->ip_nexthdr = CVM_COMMON_IPPROTO_UDP;
+		ext_ipv6->ip_v = CVM_IP_IPVERSION_V6;
+		ext_ipv6->ip_dst.s6_addr64[0] = capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip64[0];
+		ext_ipv6->ip_dst.s6_addr64[1] = capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip64[1];
+		ext_ipv6->ip_src.s6_addr64[0] = capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip64[0];
+		ext_ipv6->ip_src.s6_addr64[1] = capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip64[1];
+		ext_ipv6->ip_payload_len = ext_uh->uh_ulen;  /*????what*/
+		ext_ipv6->ip_traffic_class = 0; /*default is 0 ????*/
+		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + IPV6_H_LEN);
+
+		/*This need calculate check sum */
+		ext_uh->uh_sum = cvm_ipv6_calculate_udp_header_checksum(ext_ipv6->ip_src,
+				ext_ipv6->ip_dst,
+				ext_uh->uh_ulen, CVM_COMMON_IPPROTO_UDP,
+				ext_uh);
+	}
+	
 
 	/* [DMAC-6][SMAC-6][DSA-8][TAG1-4][TAG4][TYPE-2]*/    /*µ¹Ðò¸³Öµ*/	
-	pkt_ptr = (uint8_t *)ext_ip - 2;
+	if (CVM_ETH_P_IP == rule->rules.ether_type)
+	{
+		pkt_ptr = (uint8_t *)ext_ip - 2;
+	}
+	if (CVM_ETH_P_IPV6 == rule->rules.ether_type)
+	{
+		pkt_ptr = (uint8_t *)ext_ipv6 - 2;
+	}
+	
 	*(uint16_t *)pkt_ptr = rule->rules.ether_type;
 	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + 2);
 
@@ -1278,6 +1774,237 @@ static inline void encap_802_3_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, cv
 	return;
 }
 
+
+
+/**
+ * Encapsulate 802.3 capwap type packet by ipfwd rule.
+ * offset: the offset of the rule(internal) ip address from the begining of the packet
+ */
+static inline void encap_802_3_cw_packet_v6(cvmx_wqe_t *work, rule_item_t *rule, cvm_common_ip_hdr_t *ip)
+{
+	uint8_t *pkt_ptr = NULL;
+	union capwap_hd *cw_hdr = NULL;
+	cvm_common_udp_hdr_t *ext_uh = NULL;
+	cvm_common_ip_hdr_t *ext_ip = NULL;
+	uint32_t in_ip_totlen = 0;
+	uint8_t vlan_flag = 0;
+	uint32_t offset = 0;
+	cvm_common_ipv6_hdr_t *ipv6 = NULL;
+	cvm_common_ipv6_hdr_t *ext_ipv6 = NULL;
+
+	if((work == NULL) || (rule == NULL) || (ip == NULL))
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_WARNING,
+				"encap_cw_packet: work or rule is Null!\r\n");
+		return ;
+	}
+
+	ipv6 = (cvm_common_ipv6_hdr_t *)ip;
+	pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
+	offset = (uint8_t *)ip - (uint8_t *)pkt_ptr;
+	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) - offset);
+
+	/* add by yin for fwd nat *//*wangjian_nat*/
+	if (CVM_IP_IPVERSION_V6 != ip->ip_v) 
+	{
+	    return;
+	}
+
+
+	ipv6->ip_hop_limit--;
+	in_ip_totlen = ipv6->ip_payload_len + IPV6_H_LEN;   /* this length include what */
+
+	
+	/*
+	   CAPWAP 802.3 frame format:
+
+	   Ethernet II header
+	   IP header (External IP header)
+	   UDP header (External UDP header)
+	   CAPWAP header
+	   Ethernet II header
+	   IP header (Internal IP header)
+	   TCP/UDP header (Internal TCP/UDP header)
+	   payload
+	 */
+
+	/*add by wangjian for support pppoe 2013-3-12*/
+	pkt_ptr = (uint8_t *)ip;
+	if (1 == rule->rules.pppoe_flag)
+	{
+		encap_pppoe(work, rule, &pkt_ptr);
+		cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP_PPPOE, 1);
+	}
+	/*add by wangjian for support pppoe 2013-3-12*/
+	cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP, 1);
+
+	/* Encap internal MAC head */	
+	/*add by wangjian for support pppoe 2013-3-12*/
+	pkt_ptr = (uint8_t *)pkt_ptr - 2;
+	*(uint16_t *)pkt_ptr = rule->rules.acl_tunnel_eth_header_ether;   /* add by wangjian for support pppoe 2013-3-14 0x8864? */
+
+	/*add for coverity by wangjian*/
+	pkt_ptr = pkt_ptr - 6;
+	memcpy(pkt_ptr, rule->rules.acl_tunnel_eth_header_smac, 6);
+	pkt_ptr = pkt_ptr - 6;
+	memcpy(pkt_ptr, rule->rules.acl_tunnel_eth_header_dmac, 6);
+	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + ETH_H_LEN);
+
+	/* Encap CAPWAP */
+	cw_hdr = (union capwap_hd*)(pkt_ptr - CW_H_LEN);
+	memcpy(cw_hdr, capwap_cache_bl[rule->rules.tunnel_index].cw_hd, CW_H_LEN);	
+	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + CW_H_LEN);
+
+	/* Encap externel UDP */
+	ext_uh = (cvm_common_udp_hdr_t*)((uint8_t*)cw_hdr - UDP_H_LEN);
+	ext_uh->uh_sport = capwap_cache_bl[rule->rules.tunnel_index].sport;
+	ext_uh->uh_dport = capwap_cache_bl[rule->rules.tunnel_index].dport;
+	if (1 == rule->rules.pppoe_flag)
+	{
+		ext_uh->uh_ulen= in_ip_totlen +  ETH_H_LEN  + CW_H_LEN + UDP_H_LEN + PPPOE_H_LEN;
+	}
+	else
+	{
+		ext_uh->uh_ulen= in_ip_totlen +  ETH_H_LEN  + CW_H_LEN + UDP_H_LEN;
+	}
+	ext_uh->uh_sum= 0;
+	
+	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + UDP_H_LEN);
+
+	/* Encap external IP */
+	if (CVM_ETH_P_IP == rule->rules.ether_type)
+	{
+		ext_ip = (cvm_common_ip_hdr_t*)((uint8_t*)ext_uh - IP_H_LEN);
+		ext_ip->ip_v = CVM_IP_IPVERSION;
+		ext_ip->ip_hl = 5;
+		ext_ip->ip_tos = capwap_cache_bl[rule->rules.tunnel_index].tos;
+		ext_ip->ip_len = ext_uh->uh_ulen + IP_H_LEN;
+		ext_ip->ip_id = 0;
+
+		ext_ip->ip_off = 0;
+		ext_ip->ip_ttl = DEFAULT_TTL_IPV6;
+
+		ext_ip->ip_p= CVM_COMMON_IPPROTO_UDP;
+		ext_ip->ip_src= capwap_cache_bl[rule->rules.tunnel_index].cw_sip;
+		ext_ip->ip_dst = capwap_cache_bl[rule->rules.tunnel_index].cw_dip;
+		ext_ip->ip_sum = 0;
+		ext_ip->ip_sum = cvm_ip_calculate_ip_header_checksum(ext_ip);
+		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + IP_H_LEN);
+	}
+	else if (CVM_ETH_P_IPV6 == rule->rules.ether_type)
+	{
+		ext_ipv6 = (cvm_common_ipv6_hdr_t*)((uint8_t*)ext_uh - IPV6_H_LEN);
+		ext_ipv6->ip_flow_label = 0;
+		ext_ipv6->ip_hop_limit = DEFAULT_TTL;  /*???default */
+		ext_ipv6->ip_nexthdr = CVM_COMMON_IPPROTO_UDP;
+		ext_ipv6->ip_v = CVM_IP_IPVERSION_V6;
+		ext_ipv6->ip_dst.s6_addr64[0] = capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip64[0];
+		ext_ipv6->ip_dst.s6_addr64[1] = capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_dip64[1];
+		ext_ipv6->ip_src.s6_addr64[0] = capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip64[0];
+		ext_ipv6->ip_src.s6_addr64[1] = capwap_cache_bl[rule->rules.tunnel_index].cw_ipv6_sip64[1];
+		ext_ipv6->ip_payload_len = ext_uh->uh_ulen;  /*????what*/
+		ext_ipv6->ip_traffic_class = 0; /*default is 0 ????*/
+		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + IPV6_H_LEN);
+
+		/*This need calculate check sum */
+		ext_uh->uh_sum= 0;
+		ext_uh->uh_sum = cvm_ipv6_calculate_udp_header_checksum(ext_ipv6->ip_src,
+				ext_ipv6->ip_dst,
+				ext_uh->uh_ulen, CVM_COMMON_IPPROTO_UDP,
+				ext_uh);
+	}
+
+	/* [DMAC-6][SMAC-6][DSA-8][TAG1-4][TAG4][TYPE-2]*/    /*µ¹Ðò¸³Öµ*/	
+	if (CVM_ETH_P_IP == rule->rules.ether_type)
+	{
+		pkt_ptr = (uint8_t *)ext_ip - 2;
+	}
+	if (CVM_ETH_P_IPV6 == rule->rules.ether_type)
+	{
+		pkt_ptr = (uint8_t *)ext_ipv6 - 2;
+	}
+	
+	*(uint16_t *)pkt_ptr = rule->rules.ether_type;
+	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + 2);
+
+	if(rule->rules.in_tag) 
+	{
+		pkt_ptr = (uint8_t *)pkt_ptr - 2;
+		*(uint16_t *)pkt_ptr = rule->rules.in_tag;
+
+		pkt_ptr = (uint8_t *)pkt_ptr - 2;
+		*(uint16_t *)pkt_ptr = rule->rules.in_ether_type;
+
+		vlan_flag = 1;
+		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + 4);
+	}
+
+	if(rule->rules.out_tag) 
+	{
+		pkt_ptr = (uint8_t *)pkt_ptr - 2;
+		*(uint16_t *)pkt_ptr = rule->rules.out_tag;
+
+		pkt_ptr = (uint8_t *)pkt_ptr - 2;
+		*(uint16_t *)pkt_ptr = rule->rules.out_ether_type;
+
+		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + 4);
+		if (vlan_flag)
+		{
+			cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_QINQ, 1);
+		}
+		else
+		{
+			cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_PACKETS_8021Q, 1);
+		}
+	}
+
+	if(rule->rules.dsa_info) 
+	{
+		pkt_ptr = (uint8_t *)pkt_ptr - PACKET_DSA_HEADER_LEN;
+		*(uint64_t *)pkt_ptr = rule->rules.dsa_info;
+		CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + PACKET_DSA_HEADER_LEN);
+	}
+	/*add for coverity by wangjian*/
+	pkt_ptr = pkt_ptr - 6;
+	memcpy(pkt_ptr, rule->rules.ether_shost, 6);
+	pkt_ptr = pkt_ptr - 6;
+	memcpy(pkt_ptr, rule->rules.ether_dhost, 6);
+	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) + 12);
+	work->packet_ptr.s.addr = cvmx_ptr_to_phys(pkt_ptr);
+	work->packet_ptr.s.back   = CVM_COMMON_CALC_BACK(work->packet_ptr);
+
+	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+			"encap_cw_packet: back is %d, addr at 0x%llx\r\n",work->packet_ptr.s.back,(unsigned long long)work->packet_ptr.s.addr);
+
+#ifdef OCTEON_DEBUG_LEVEL
+	if((fastfwd_common_debug_level == FASTFWD_COMMON_DBG_LVL_INFO) &&((1 << cvmx_get_core_num() ) & (core_mask) ))
+	{
+		//cvmx_dump_128_packet(work);
+		fwd_debug_dump_packet(work);
+	}
+#endif
+
+	return;
+}
+
+
+static inline void encap_802_3_cw_packet(cvmx_wqe_t *work, rule_item_t *rule, cvm_common_ip_hdr_t *ip)
+{
+	if((work == NULL) || (rule == NULL) || (ip == NULL))
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_WARNING,
+				"encap_802_3_cw_packet: work or rule or ip is Null!\r\n");
+		return ;
+	}
+
+	if(CVM_IP_IPVERSION == ip->ip_v) 
+        encap_802_3_cw_packet_v4(work, rule, ip);
+	else if(CVM_IP_IPVERSION_V6 == ip->ip_v) 
+        encap_802_3_cw_packet_v6(work, rule, ip);
+}
+
+
+
 /**
  * Description:
  * Decap received frame Lay2 header and get IP header offset.
@@ -1312,7 +2039,7 @@ inline int8_t rx_l2hdr_decap( uint8_t* eth_head,cvm_common_ip_hdr_t **ip_head, u
 	tmp_eth_head = (uint8_t*)eth_head;
 	protocol =*(uint16_t*)(tmp_eth_head + MAC_LEN*2);
 
-	if(CVM_ETH_P_IP == protocol)
+	if((CVM_ETH_P_IP == protocol) || (CVM_ETH_P_IPV6 == protocol))
 	{
 		*ip_head = (cvm_common_ip_hdr_t*)(tmp_eth_head + ETH_H_LEN);
 		return RETURN_OK;
@@ -1323,7 +2050,7 @@ inline int8_t rx_l2hdr_decap( uint8_t* eth_head,cvm_common_ip_hdr_t **ip_head, u
 		if(protocol == CVM_ETH_P_8021Q)
 		{
 			protocol = *(uint16_t*)(tmp_eth_head + ETH_H_LEN + VLAN_TAG_LEN + VLAN_PROTO_LEN);
-			if(CVM_ETH_P_IP == protocol)
+			if((CVM_ETH_P_IP == protocol) || (CVM_ETH_P_IPV6 == protocol))
 			{
 				*ip_head = (cvm_common_ip_hdr_t*)(tmp_eth_head + ETH_H_LEN + VLAN_TAG_LEN*2);
 				return RETURN_OK;
@@ -1352,7 +2079,7 @@ inline int8_t rx_l2hdr_decap( uint8_t* eth_head,cvm_common_ip_hdr_t **ip_head, u
 				return RETURN_ERROR;
 			}
 		}
-		else if (CVM_ETH_P_IP == protocol)
+		else if ((CVM_ETH_P_IP == protocol) || (CVM_ETH_P_IPV6 == protocol))
 		{
 			*ip_head = (cvm_common_ip_hdr_t*)(tmp_eth_head + ETH_H_LEN + VLAN_TAG_LEN);
 			return RETURN_OK;
@@ -1435,6 +2162,7 @@ inline int8_t cw_802_11_decap(cvm_common_udp_hdr_t *ex_uh,
 	struct ieee80211_llc *llc_hdr = NULL;
 	uint16_t len = 0;
 	uint8_t is_pppoe = 0;
+	cvm_common_ipv6_hdr_t *ipv6 = NULL;
 	
 	if((ex_uh == NULL) || (in_ip == NULL) || (in_th == NULL))
 	{
@@ -1469,7 +2197,9 @@ inline int8_t cw_802_11_decap(cvm_common_udp_hdr_t *ex_uh,
 	llc_hdr = (struct ieee80211_llc*)((uint8_t*)ieee80211_hdr + len);
 
 	/* IP */
-	if ((llc_hdr->llc_ether_type[1] == 0x0) && (llc_hdr->llc_ether_type[0] == 0x08))
+	/* add by wangjian for support ipv6 2013-8-2 */
+	if (((llc_hdr->llc_ether_type[1] == 0x0) && (llc_hdr->llc_ether_type[0] == 0x08))
+		|| ((llc_hdr->llc_ether_type[1] == 0xdd) && (llc_hdr->llc_ether_type[0] == 0x86)))
 	{
 		*in_ip = (cvm_common_ip_hdr_t*)((uint8_t*)llc_hdr + LLC_H_LEN);
 	}
@@ -1493,50 +2223,83 @@ inline int8_t cw_802_11_decap(cvm_common_udp_hdr_t *ex_uh,
 		cvmx_fau_atomic_add64(CVM_FAU_CW_NOIP_PACKETS,1);
 		return RETURN_ERROR;
 	}
+
+	if (CVM_IP_IPVERSION == (*in_ip)->ip_v)
+	{
+		/*add by wangjian for support pppoe 2013-3-14*/
+		
+		if (SPE_IP_ADDR((*in_ip)->ip_src, (*in_ip)->ip_dst) || SPE_IP_HDR(*in_ip))
+		{
+			cvmx_fau_atomic_add64(CVM_FAU_CW_SPE_PACKETS,1);
+			return RETURN_ERROR;
+		}
+	    /* filter frag */
+		if(FRAG_IP_PKT(*in_ip))
+		{
+			cvmx_fau_atomic_add64(CVM_FAU_CW_FRAG_PACKETS,1);
+			return RETURN_ERROR;
+		}
+
+
+		if (1 == is_pppoe)
+		{
+			*in_th = (cvm_common_tcp_hdr_t*)((uint8_t*)llc_hdr + LLC_H_LEN + IP_H_LEN + PPPOE_H_LEN);
+		}
+		else 
+		{
+			*in_th = (cvm_common_tcp_hdr_t*)((uint8_t*)llc_hdr + LLC_H_LEN + IP_H_LEN);
+		}
+
+		
+		/* decap tcp */
+		if ((*in_ip)->ip_p == CVM_COMMON_IPPROTO_TCP)
+		{
+		    /* modify for NAT requirement. zhaohan 2012-12-14 */		
+	        if (SPE_TCP_HDR(*in_th)) 
+	        {
+	            cvmx_fau_atomic_add64(CVM_FAU_CW_SPE_TCP_HDR, 1);
+	            return RETURN_ERROR;
+	        }  
+		}
+
+	    /* decap icmp */
+	    if((*in_ip)->ip_p == CVM_COMMON_IPPROTO_ICMP)
+	    {
+	        cvmx_fau_atomic_add64(CVM_FAU_CAPWAP_ICMP, 1);
+	    }
+	}
+	else if (CVM_IP_IPVERSION_V6 == (*in_ip)->ip_v)
+	{
+
+		/* decap tcp */
+		ipv6 = (cvm_common_ipv6_hdr_t *)(*in_ip);
+
+		if (1 == is_pppoe)
+		{
+			*in_th = (cvm_common_tcp_hdr_t*)((uint8_t*)llc_hdr + LLC_H_LEN + IPV6_H_LEN + PPPOE_H_LEN);
+		}
+		else 
+		{
+			*in_th = (cvm_common_tcp_hdr_t*)((uint8_t*)llc_hdr + LLC_H_LEN + IPV6_H_LEN);
+		}
+		
+		if (ipv6->ip_nexthdr == CVM_COMMON_IPPROTO_TCP)
+		{
+		    /* modify for NAT requirement. zhaohan 2012-12-14 */		
+	        if (SPE_TCP_HDR(*in_th)) 
+	        {
+	            cvmx_fau_atomic_add64(CVM_FAU_CW_SPE_TCP_HDR, 1);
+	            return RETURN_ERROR;
+	        }  
+		}
+		else if ((FUNC_DISABLE == pure_ipv6_forward_enable) && (ipv6->ip_nexthdr != CVM_COMMON_IPPROTO_UDP))
+		{	
+			/*ipv6 not tcp udp dont support expand head temporary*/
+			cvmx_fau_atomic_add64(CVM_FAU_CW_SPE_TCP_HDR, 1);
+	        return RETURN_ERROR;
+		}
+	}
 	
-	/*add by wangjian for support pppoe 2013-3-14*/
-	
-	if (SPE_IP_ADDR((*in_ip)->ip_src, (*in_ip)->ip_dst) || SPE_IP_HDR(*in_ip))
-	{
-		cvmx_fau_atomic_add64(CVM_FAU_CW_SPE_PACKETS,1);
-		return RETURN_ERROR;
-	}
-    /* filter frag */
-	if(FRAG_IP_PKT(*in_ip))
-	{
-		cvmx_fau_atomic_add64(CVM_FAU_CW_FRAG_PACKETS,1);
-		return RETURN_ERROR;
-	}
-
-
-	if (1 == is_pppoe)
-	{
-		*in_th = (cvm_common_tcp_hdr_t*)((uint8_t*)llc_hdr + LLC_H_LEN + IP_H_LEN + PPPOE_H_LEN);
-	}
-	else 
-	{
-		*in_th = (cvm_common_tcp_hdr_t*)((uint8_t*)llc_hdr + LLC_H_LEN + IP_H_LEN);
-	}
-
-
-	/* decap tcp */
-	if ((*in_ip)->ip_p == CVM_COMMON_IPPROTO_TCP)
-	{
-	    /* modify for NAT requirement. zhaohan 2012-12-14 */		
-        if (SPE_TCP_HDR(*in_th)) 
-        {
-            cvmx_fau_atomic_add64(CVM_FAU_CW_SPE_TCP_HDR, 1);
-            return RETURN_ERROR;
-        }  
-	}
-
-
-    /* decap icmp */
-    if((*in_ip)->ip_p == CVM_COMMON_IPPROTO_ICMP)
-    {
-        cvmx_fau_atomic_add64(CVM_FAU_CAPWAP_ICMP, 1);
-    }
-
 	return RETURN_OK;
 }
 
@@ -1561,6 +2324,7 @@ inline int8_t cw_802_3_decap(cvm_common_udp_hdr_t *ex_uh,
 {
     eth_hdr* eth_header = NULL;
 	uint8_t is_pppoe = 0;
+	cvm_common_ipv6_hdr_t *ipv6 = NULL;
 
 	if((NULL == ex_uh) || (NULL == in_ip) || (NULL == in_th))
 	{
@@ -1574,7 +2338,7 @@ inline int8_t cw_802_3_decap(cvm_common_udp_hdr_t *ex_uh,
 
 
 	
-	if (ETH_P_IP == eth_header->h_vlan_proto)
+	if ((ETH_P_IP == eth_header->h_vlan_proto) || (ETH_P_IPV6 == eth_header->h_vlan_proto))
 	{
 		*in_ip = (cvm_common_ip_hdr_t*)((uint8_t*)ex_uh + UDP_H_LEN + CW_H_LEN + ETH_H_LEN);
 	} 
@@ -1597,47 +2361,78 @@ inline int8_t cw_802_3_decap(cvm_common_udp_hdr_t *ex_uh,
 		return RETURN_ERROR;
 	}
 
-    /* filter special ip header/address */
-	if (SPE_IP_ADDR((*in_ip)->ip_src, (*in_ip)->ip_dst) || SPE_IP_HDR(*in_ip))
+	if (CVM_IP_IPVERSION == (*in_ip)->ip_v)
 	{
-	    cvmx_fau_atomic_add64(CVM_FAU_CW_SPE_PACKETS,1);
-		return RETURN_ERROR;
-	}
-    /* filter frag */
-    if(FRAG_IP_PKT(*in_ip))
-    {
-        cvmx_fau_atomic_add64(CVM_FAU_CW_FRAG_PACKETS,1);
-        return RETURN_ERROR;
-    }
+	    /* filter special ip header/address */
+		if (SPE_IP_ADDR((*in_ip)->ip_src, (*in_ip)->ip_dst) || SPE_IP_HDR(*in_ip))
+		{
+		    cvmx_fau_atomic_add64(CVM_FAU_CW_SPE_PACKETS,1);
+			return RETURN_ERROR;
+		}
+	    /* filter frag */
+	    if(FRAG_IP_PKT(*in_ip))
+	    {
+	        cvmx_fau_atomic_add64(CVM_FAU_CW_FRAG_PACKETS,1);
+	        return RETURN_ERROR;
+	    }
 
+		if (1 == is_pppoe)
+		{
+			*in_th = (cvm_common_tcp_hdr_t*)((uint8_t*)*in_ip + IP_H_LEN + PPPOE_H_LEN);
+		}
+		else
+		{
+			*in_th = (cvm_common_tcp_hdr_t*)((uint8_t*)*in_ip + IP_H_LEN);
+		}
+		
+	    /* decap tcp */
+	    if ((*in_ip)->ip_p == CVM_COMMON_IPPROTO_TCP)
+	    {
+	        /* modify for NAT requirement. zhaohan 2012-12-14 */        
+	        if (SPE_TCP_HDR(*in_th)) 
+	        {
+	            cvmx_fau_atomic_add64(CVM_FAU_CW_SPE_TCP_HDR, 1);
+	            return RETURN_ERROR;
+	        }  
+	    }
 
-	if (1 == is_pppoe)
-	{
-		*in_th = (cvm_common_tcp_hdr_t*)((uint8_t*)*in_ip + IP_H_LEN + PPPOE_H_LEN);
+	    /* decap icmp */
+	    if((*in_ip)->ip_p == CVM_COMMON_IPPROTO_ICMP)
+	    {
+	        cvmx_fau_atomic_add64(CVM_FAU_CAPWAP_ICMP, 1);
+	    }
 	}
-	else
+	else if (CVM_IP_IPVERSION_V6 == (*in_ip)->ip_v)
 	{
-		*in_th = (cvm_common_tcp_hdr_t*)((uint8_t*)*in_ip + IP_H_LEN);
+		/* decap tcp */
+		ipv6 = (cvm_common_ipv6_hdr_t *)(*in_ip);
+
+		if (1 == is_pppoe)
+		{
+			*in_th = (cvm_common_tcp_hdr_t*)((uint8_t*)*in_ip + IPV6_H_LEN + PPPOE_H_LEN);
+		}
+		else 
+		{
+			*in_th = (cvm_common_tcp_hdr_t*)((uint8_t*)*in_ip + IPV6_H_LEN);
+		}
+		
+		if (ipv6->ip_nexthdr == CVM_COMMON_IPPROTO_TCP)
+		{
+		    /* modify for NAT requirement. zhaohan 2012-12-14 */		
+	        if (SPE_TCP_HDR(*in_th)) 
+	        {
+	            cvmx_fau_atomic_add64(CVM_FAU_CW_SPE_TCP_HDR, 1);
+	            return RETURN_ERROR;
+	        }  
+		}
+		else if ((FUNC_DISABLE == pure_ipv6_forward_enable) && (ipv6->ip_nexthdr != CVM_COMMON_IPPROTO_UDP))
+		{	
+			/*ipv6 not tcp udp dont support expand head temporary*/
+			cvmx_fau_atomic_add64(CVM_FAU_CW_SPE_TCP_HDR, 1);
+	        return RETURN_ERROR;
+		}
 	}
 	
-    /* decap tcp */
-    if ((*in_ip)->ip_p == CVM_COMMON_IPPROTO_TCP)
-    {
-        /* modify for NAT requirement. zhaohan 2012-12-14 */        
-        if (SPE_TCP_HDR(*in_th)) 
-        {
-            cvmx_fau_atomic_add64(CVM_FAU_CW_SPE_TCP_HDR, 1);
-            return RETURN_ERROR;
-        }  
-    }
-
-
-    /* decap icmp */
-    if((*in_ip)->ip_p == CVM_COMMON_IPPROTO_ICMP)
-    {
-        cvmx_fau_atomic_add64(CVM_FAU_CAPWAP_ICMP, 1);
-    }
-
     return RETURN_OK;
 }
 
@@ -2327,6 +3122,8 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 	cvm_common_udp_hdr_t *uh = NULL;
 	uint16_t pko_ip_offset = 0;
 	uint8_t *pkt_ptr = NULL;
+	cvm_common_ipv6_hdr_t *ipv6 = NULL;
+	cvm_common_ipv6_hdr_t *true_ipv6 = NULL;
 	
 	if(work == NULL)
 	{
@@ -2335,6 +3132,9 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 		return;
 	}
 
+	ipv6 = (cvm_common_ipv6_hdr_t *)ip;
+	true_ipv6 = (cvm_common_ipv6_hdr_t *)true_ip;
+	
 	if(prule == NULL) /*Get action info from action_type*/
 	{
 		/*Drop the packets*/
@@ -2439,14 +3239,18 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 			prule->rules.packet_wait++;
 			CVMX_SYNC;
 		
-			if(CVM_COMMON_IPPROTO_UDP == ip->ip_p)
+			if(((CVM_IP_IPVERSION == ip->ip_v) && (CVM_COMMON_IPPROTO_UDP == ip->ip_p))
+				|| ((CVM_IP_IPVERSION_V6 == ip->ip_v) && (CVM_COMMON_IPPROTO_UDP == ipv6->ip_nexthdr)))
 			{
-				uh = (cvm_common_udp_hdr_t *)th;
-				if((uh->uh_dport == PORTAL_PORT) || (uh->uh_sport == PORTAL_PORT) ||\
-				(uh->uh_dport == ACCESS_RADUIS_PORT) || (uh->uh_sport == ACCESS_RADUIS_PORT)||\
-				(uh->uh_dport == ACCOUNT_RADUIS_PORT) || (uh->uh_sport == ACCOUNT_RADUIS_PORT))
+				if (NULL != th)
 				{
-					CVM_WQE_SET_QOS(work,0);
+					uh = (cvm_common_udp_hdr_t *)th;
+					if((uh->uh_dport == PORTAL_PORT) || (uh->uh_sport == PORTAL_PORT) ||\
+					(uh->uh_dport == ACCESS_RADUIS_PORT) || (uh->uh_sport == ACCESS_RADUIS_PORT)||\
+					(uh->uh_dport == ACCOUNT_RADUIS_PORT) || (uh->uh_sport == ACCOUNT_RADUIS_PORT))
+					{
+						CVM_WQE_SET_QOS(work,0);
+					}
 				}
 			}
 			
@@ -2491,7 +3295,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 
 
 				
-				if (1 == prule->rules.nat_flag)
+				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (1 == prule->rules.nat_flag))
 				{
 					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -2528,7 +3332,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
 				}
 				
-				if (1 == prule->rules.nat_flag)
+				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (1 == prule->rules.nat_flag))
 				{
 					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -2565,7 +3369,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
 				}
 				
-				if (1 == prule->rules.nat_flag)
+				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (1 == prule->rules.nat_flag))
 				{
 					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -2619,7 +3423,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 				}
 				
-				if (1 == prule->rules.nat_flag)
+				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (1 == prule->rules.nat_flag))
 				{
 					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -2655,7 +3459,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 				}
 								
-				if (1 == prule->rules.nat_flag)
+				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (1 == prule->rules.nat_flag))
 				{
 					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -2698,7 +3502,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 				}
 				
-				if (1 == prule->rules.nat_flag)
+				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (1 == prule->rules.nat_flag))
 				{
 					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -2734,7 +3538,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 				}
 				
-				if (1 == prule->rules.nat_flag)
+				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (1 == prule->rules.nat_flag))
 				{
 					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -2769,7 +3573,6 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 }
 
 
-
 /**
  * Description:
  *  return fccp packet to linux
@@ -2791,6 +3594,8 @@ int32_t return_fccp(cvmx_wqe_t* work, uint32_t ret_val, control_cmd_t* fccp_cmd,
 		printf("send_debug_fccp: invalid args\n");
 		return RETURN_ERROR;
 	}
+
+
 	
 	/* swap mac addr */  
 	eth = (eth_hdr*)((uint8_t*)fccp_cmd - ETH_H_LEN);
@@ -2803,6 +3608,9 @@ int32_t return_fccp(cvmx_wqe_t* work, uint32_t ret_val, control_cmd_t* fccp_cmd,
 	fccp_cmd->src_module = fccp_cmd->dest_module;
 	fccp_cmd->dest_module = tmp_module;
 	fccp_cmd->ret_val = ret_val;
+	
+	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+					"return_fccp: fccp->cmd_opcode = %d.dmodule=%d.smodule=%d.\r\n", fccp_cmd->cmd_opcode, fccp_cmd->dest_module, fccp_cmd->src_module);
 
 	/* make wqe */
 	CVM_WQE_SET_UNUSED(work, FCCP_WQE_TYPE);
@@ -2851,7 +3659,7 @@ static inline int acl_cache_flow(cvmx_wqe_t* work, control_cmd_t * fccp_cmd)
 		if(rule_para->rule_state == RULE_IS_LEARNED)
 		{
 			/* add by wangjian for pure ip forward 2013-5-7  */
-			if (FUNC_ENABLE == pure_ip_forward_enable)
+			if (((0 == rule_para->ipv6_flag) && (FUNC_ENABLE == pure_ip_forward_enable)) || ((1 == rule_para->ipv6_flag) && (FUNC_ENABLE == pure_ipv6_forward_enable)))
 			{
 				/*hash ,compare need change,fwd_pure_ip.c add*/
 				if(acl_self_learn_pure_ip_rule(rule_para, cw_cache) != RETURN_OK)
@@ -2881,6 +3689,7 @@ static inline int acl_cache_flow(cvmx_wqe_t* work, control_cmd_t * fccp_cmd)
 				return_fccp(work, FCCP_RETURN_ERROR, fccp_cmd, product_info.to_linux_fccp_group);
 				return RETURN_ERROR;
 			}
+
 			return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
 		}
 		else
@@ -3206,23 +4015,35 @@ static inline int acl_cache_flow(cvmx_wqe_t* work, control_cmd_t * fccp_cmd)
 	else if(fccp_cmd->cmd_opcode == FCCP_CMD_CONFIG_TAG_TYPE)
 	{
 	    if(RETURN_ERROR == fastfwd_config_tag_type(fccp_cmd))
+	    {
 	        return_fccp(work, FCCP_RETURN_ERROR, fccp_cmd, product_info.to_linux_fccp_group);
-        else
+	    }
+		else
+		{
             return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
+		}
 	}
 	else if(fccp_cmd->cmd_opcode == FCCP_CMD_GET_TAG_TYPE)
 	{
 	    if(RETURN_ERROR == fastfwd_get_tag_type(fccp_cmd))
+	    {
 	        return_fccp(work, FCCP_RETURN_ERROR, fccp_cmd, product_info.to_linux_fccp_group);
-        else
+	    }
+		else
+		{
             return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
+		}
 	}
 	else if(fccp_cmd->cmd_opcode == FCCP_CMD_SHOW_FAU64)
 	{
 	    if(RETURN_ERROR == fastfwd_show_fau64(&fccp_cmd->fccp_data.fau64_info))
+	    {
 	        return_fccp(work, FCCP_RETURN_ERROR, fccp_cmd, product_info.to_linux_fccp_group);
-        else
+	    }
+		else
+		{
             return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
+		}
 	}
 	else if(fccp_cmd->cmd_opcode == FCCP_CMD_CLEAR_FAU64)
 	{
@@ -3239,9 +4060,13 @@ static inline int acl_cache_flow(cvmx_wqe_t* work, control_cmd_t * fccp_cmd)
 	else if(fccp_cmd->cmd_opcode == FCCP_CMD_SHOW_PART_FAU64)
 	{
 	    if(RETURN_ERROR == fastfwd_show_part_fau64(&fccp_cmd->fccp_data.fau64_part_info))
+	    {
 	        return_fccp(work, FCCP_RETURN_ERROR, fccp_cmd, product_info.to_linux_fccp_group);
-        else
+	    }
+		else
+		{
             return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
+		}
 	}
 	else if(fccp_cmd->cmd_opcode == FCCP_CMD_CLEAR_PART_FAU64)
 	{
@@ -3258,23 +4083,35 @@ static inline int acl_cache_flow(cvmx_wqe_t* work, control_cmd_t * fccp_cmd)
 	else if(fccp_cmd->cmd_opcode == FCCP_CMD_SHOW_ETH_FAU64)
 	{
 	    if(RETURN_ERROR == fastfwd_show_eth_fau64(&fccp_cmd->fccp_data.fau64_eth_info))
+	    {
 	        return_fccp(work, FCCP_RETURN_ERROR, fccp_cmd, product_info.to_linux_fccp_group);
-        else
+	    }
+		else
+		{
             return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
+		}
 	}
 	else if(fccp_cmd->cmd_opcode == FCCP_CMD_SHOW_CAPWAP_FAU64)
 	{
 	    if(RETURN_ERROR == fastfwd_show_capwap_fau64(&fccp_cmd->fccp_data.fau64_capwap_info))
+	    {
 	        return_fccp(work, FCCP_RETURN_ERROR, fccp_cmd, product_info.to_linux_fccp_group);
-        else
+	    }
+		else
+		{
             return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
+		}
 	}
 	else if(fccp_cmd->cmd_opcode == FCCP_CMD_SHOW_RPA_FAU64)
 	{
 	    if(RETURN_ERROR == fastfwd_show_rpa_fau64(&fccp_cmd->fccp_data.fau64_rpa_info))
+	    {
 	        return_fccp(work, FCCP_RETURN_ERROR, fccp_cmd, product_info.to_linux_fccp_group);
-        else
+	    }
+		else
+		{
             return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
+		}
 	}
 	else if(fccp_cmd->cmd_opcode == FCCP_CMD_SHOW_FPA_BUFF)
 	{   
@@ -3306,6 +4143,47 @@ static inline int acl_cache_flow(cvmx_wqe_t* work, control_cmd_t * fccp_cmd)
 	else if(fccp_cmd->cmd_opcode == FCCP_CMD_GET_PURE_IP_STATE)
 	{
 		fccp_cmd->fccp_data.module_enable = pure_ip_forward_enable;
+		return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
+	}
+	/* pure ipv6 forward enable/disable */
+	else if(fccp_cmd->cmd_opcode == FCCP_CMD_ENABLE_PURE_IPV6)
+	{
+		if((fccp_cmd->fccp_data.module_enable != FUNC_ENABLE) && 
+				(fccp_cmd->fccp_data.module_enable != FUNC_DISABLE))
+		{
+			printf("acl_cache_flow : set pure ipv6 enable/disable error, module = %d\n", fccp_cmd->fccp_data.module_enable);
+			return_fccp(work, FCCP_RETURN_ERROR, fccp_cmd, product_info.to_linux_fccp_group);
+			return RETURN_ERROR;
+		}
+		disable_fastfwd();
+		pure_ipv6_forward_enable = fccp_cmd->fccp_data.module_enable;
+		acl_clear_rule();
+		enable_fastfwd();
+		return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
+	}
+	/* show pure ipv6 state */
+	else if(fccp_cmd->cmd_opcode == FCCP_CMD_GET_PURE_IPV6_STATE)
+	{
+		fccp_cmd->fccp_data.module_enable = pure_ipv6_forward_enable;
+		return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
+	}
+	/* ipv6 enable/disable */
+	else if(fccp_cmd->cmd_opcode == FCCP_CMD_ENABLE_IPV6)
+	{
+		if((fccp_cmd->fccp_data.module_enable != FUNC_ENABLE) && 
+				(fccp_cmd->fccp_data.module_enable != FUNC_DISABLE))
+		{
+			printf("acl_cache_flow : set ipv6 enable/disable error, module = %d\n", fccp_cmd->fccp_data.module_enable);
+			return_fccp(work, FCCP_RETURN_ERROR, fccp_cmd, product_info.to_linux_fccp_group);
+			return RETURN_ERROR;
+		}
+		cvm_ipv6_enable = fccp_cmd->fccp_data.module_enable;
+		return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
+	}
+	/* show ipv6 state */
+	else if(fccp_cmd->cmd_opcode == FCCP_CMD_GET_IPV6_STATE)
+	{
+		fccp_cmd->fccp_data.module_enable = cvm_ipv6_enable;
 		return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
 	}
 	else
@@ -3490,6 +4368,13 @@ uint32_t  fwd_filter_large_pkts(rule_item_t  *rule, cvmx_wqe_t* work)
 {
     if((rule == NULL) || (work == NULL))
         return RETURN_OK;
+
+	/* IPV6 dont filter large pkts */
+	/*if (1 == rule->rules.ipv6_flag)
+	{
+		return RETURN_OK;
+	}
+	*/
 	
     /* if packet len > downlink mtu, send to linux */
     if((rule->rules.action_type == FLOW_ACTION_CAPWAP_FORWARD) 
@@ -3564,6 +4449,8 @@ static void application_main_loop(unsigned int coremask_data)
 	cvm_common_tcp_hdr_t *in_th = NULL;  
 	cvm_common_ip_hdr_t *true_ip = NULL; /* capwap pkt: true_ip = in_ip, eth pkt: true_ip = ip */
 	cvm_common_tcp_hdr_t *true_th = NULL;
+	cvm_common_ipv6_hdr_t *ipv6 = NULL;
+
 	uint8_t *pkt_ptr = NULL;	
 	uint32_t action_type =0;
 	rule_item_t  *rule = NULL;
@@ -3574,6 +4461,7 @@ static void application_main_loop(unsigned int coremask_data)
 	pko_command.u64 = 0;
 	uint8_t input_rpa = 0;
 	uint8_t input_pppoe = 0;
+	int8_t ipv6_flag = 0;  /*0 :ipv4, 1:ipv6*/
 
 	if(cvmx_coremask_first_core(coremask_data)) 
 	{
@@ -3707,7 +4595,7 @@ static void application_main_loop(unsigned int coremask_data)
             goto scheme_execute; 
         }
 
-		CVM_WQE_SET_UNUSED(work, PACKET_TYPE_UNKNOW);
+		//CVM_WQE_SET_UNUSED(work, PACKET_TYPE_UNKNOW);
 		uint16_t tmp_proto;
 		eth_hdr* tmp_eth_header = NULL;
 
@@ -3747,7 +4635,8 @@ static void application_main_loop(unsigned int coremask_data)
 				work->word2.s.ip_offset = ((uint8_t*)ip - pkt_ptr);
 				/*be careful work->word2.s.ip_offset can change?*/
 				input_pppoe = 1;
-				if((ip->ip_off&0x3f) != 0)/*frag ip*/
+				//if((ip->ip_off&0x3f) != 0)/*frag ip*/
+				if((CVM_IP_IPVERSION == ip->ip_v) && (ip->ip_off&0x3f) != 0)/*frag ip*/   /* add by wangjian for support ipv6 2013-8-2 ipv4 check the frag ip */
 				{		
 					FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 							"Receive the frag IP packets\r\n");
@@ -3813,65 +4702,242 @@ static void application_main_loop(unsigned int coremask_data)
 			action_type = FLOW_ACTION_TOLINUX;			
 			goto scheme_execute; 
 		}
-		
-		if(cvmx_unlikely(CVM_WQE_GET_LEN(work) < (int)(sizeof( cvm_common_ip_hdr_t)))) {
-			cvmx_fau_atomic_add64(CVM_FAU_IP_SHORT_PACKETS, 1);
-			action_type = FLOW_ACTION_DROP;			
-			goto scheme_execute; 
-		}
-
-		if(cvmx_unlikely(ip->ip_v != CVM_IP_IPVERSION)) {
-			cvmx_fau_atomic_add64(CVM_FAU_IP_BAD_VERSION, 1);
-			action_type = FLOW_ACTION_TOLINUX;			
-			goto scheme_execute; 
-		}
-		
-		if(cvmx_unlikely(ip->ip_hl != 5)) {     /* ip has option */
-		    cvmx_fau_atomic_add64(CVM_FAU_IP_BAD_HDR_LEN, 1);
-			action_type = FLOW_ACTION_TOLINUX;			
-			goto scheme_execute; 
-		}
-
-		hlen = ip->ip_hl << 2;
-		if (cvmx_unlikely(hlen < sizeof(cvm_common_ip_hdr_t))) { /* minimum header length */
-			cvmx_fau_atomic_add64(CVM_FAU_IP_BAD_HDR_LEN, 1);
-			action_type = FLOW_ACTION_DROP;			
-			goto scheme_execute; 
-		}
-
-		if(cvmx_unlikely(ip->ip_len < hlen)) {
-			cvmx_fau_atomic_add64(CVM_FAU_IP_BAD_LEN, 1);
-			action_type = FLOW_ACTION_DROP;			
-			goto scheme_execute; 
-		}
-
-		if (SPE_IP_ADDR(ip->ip_src, ip->ip_dst)) /* skip specail IP address */
-		{
-			cvmx_fau_atomic_add64(CVM_FAU_IP_SKIP_ADDR, 1);
-			action_type = FLOW_ACTION_TOLINUX;			
-			goto scheme_execute; 
-		}
-
-		/* 169.254.0.0 to linux with high qos */
-		if(IP_IN_MANAGE(ip->ip_src) || IP_IN_MANAGE(ip->ip_dst))
-		{
-			cvmx_fau_atomic_add64(CVM_FAU_IP_SKIP_ADDR, 1);
-			CVM_WQE_SET_QOS(work, 0);
-			action_type = FLOW_ACTION_TOLINUX;			
-			goto scheme_execute; 
-		}
 
         /* set true_ip = ip first. when capwap pkt,change it */
         true_ip = ip;
-		
+		ipv6 = (cvm_common_ipv6_hdr_t *)ip;
+
+		/* add by wangjian for support ipv6 2013-7-29 */
+		if (CVM_IP_IPVERSION == ip->ip_v)
+		{
+			if(cvmx_unlikely(CVM_WQE_GET_LEN(work) < (int)(sizeof( cvm_common_ip_hdr_t)))) {
+				cvmx_fau_atomic_add64(CVM_FAU_IP_SHORT_PACKETS, 1);
+				action_type = FLOW_ACTION_DROP;			
+				goto scheme_execute; 
+			}
+
+			if(cvmx_unlikely(ip->ip_v != CVM_IP_IPVERSION)) {
+				cvmx_fau_atomic_add64(CVM_FAU_IP_BAD_VERSION, 1);
+				action_type = FLOW_ACTION_TOLINUX;			
+				goto scheme_execute; 
+			}
+			
+			if(cvmx_unlikely(ip->ip_hl != 5)) {     /* ip has option */
+			    cvmx_fau_atomic_add64(CVM_FAU_IP_BAD_HDR_LEN, 1);
+				action_type = FLOW_ACTION_TOLINUX;			
+				goto scheme_execute; 
+			}
+
+			hlen = ip->ip_hl << 2;
+			if (cvmx_unlikely(hlen < sizeof(cvm_common_ip_hdr_t))) { /* minimum header length */
+				cvmx_fau_atomic_add64(CVM_FAU_IP_BAD_HDR_LEN, 1);
+				action_type = FLOW_ACTION_DROP;			
+				goto scheme_execute; 
+			}
+
+			if(cvmx_unlikely(ip->ip_len < hlen)) {
+				cvmx_fau_atomic_add64(CVM_FAU_IP_BAD_LEN, 1);
+				action_type = FLOW_ACTION_DROP;			
+				goto scheme_execute; 
+			}
+
+			if (SPE_IP_ADDR(ip->ip_src, ip->ip_dst)) /* skip specail IP address */
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_IP_SKIP_ADDR, 1);
+				action_type = FLOW_ACTION_TOLINUX;			
+				goto scheme_execute; 
+			}
+
+			/* 169.254.0.0 to linux with high qos */
+			if(IP_IN_MANAGE(ip->ip_src) || IP_IN_MANAGE(ip->ip_dst))
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_IP_SKIP_ADDR, 1);
+				CVM_WQE_SET_QOS(work, 0);
+				action_type = FLOW_ACTION_TOLINUX;			
+				goto scheme_execute; 
+			}
+
+			if (FUNC_ENABLE == pure_ip_forward_enable)
+			{
+				ipv6_flag = 0;
+				goto pure_ip_process;
+			}
+			
+			/**************************************************
+			 * Parse the icmp packets. zhaohan add
+			 ***************************************************/  
+			if(ip->ip_p == CVM_COMMON_IPPROTO_ICMP)
+			{
+				CVM_WQE_SET_UNUSED(work, PACKET_TYPE_ICMP);
+				cvmx_fau_atomic_add64(CVM_FAU_IP_ICMP, 1);
+				if(cvm_ip_icmp_enable == FUNC_DISABLE)
+				{
+					action_type = FLOW_ACTION_TOLINUX;  
+					goto scheme_execute; 
+				}
+			}
+
+			/**************************************************
+			 * Parse the packets l4 information and check too. lutao add
+			 ***************************************************/        
+			else if (ip->ip_p == CVM_COMMON_IPPROTO_TCP) 
+			{
+				th = (cvm_common_tcp_hdr_t *)((uint32_t *)ip + ip->ip_hl);
+				true_th = th;
+#if 1	/* modify for NAT requirement. zhaohan 2012-12-14 */		
+				/* Defense syn flood */
+	            if (SPE_TCP_HDR(th)) 
+	            {
+	                FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+	                "Forward the TCP syn,rst,fin flag packet to Linux\r\n");
+	                cvmx_fau_atomic_add64(CVM_FAU_SPE_TCP_HDR, 1);
+	                action_type = FLOW_ACTION_TOLINUX;			
+	                goto scheme_execute; 
+	            }
+#endif			 
+				CVM_WQE_SET_UNUSED(work, PACKET_TYPE_ETH_IP);
+			}
+			else if (ip->ip_p == CVM_COMMON_IPPROTO_UDP) 
+			{
+				uint32_t len;
+				int32_t tmp;
+				uh = (cvm_common_udp_hdr_t*)((uint32_t *)ip + ip->ip_hl);
+				th = (cvm_common_tcp_hdr_t*)uh;
+	            true_th = th;
+
+				/* destination port of 0 is illegal, based on RFC768. */
+				if (uh->uh_dport == 0)
+				{
+					action_type = FLOW_ACTION_DROP;
+					cvmx_fau_atomic_add64(CVM_FAU_UDP_BAD_DPORT, 1);
+					goto scheme_execute; 
+				}
+
+				/*
+				 * Make data length reflect UDP length.
+				 * If not enough data to reflect UDP length, drop.
+				 */
+				len = cvm_common_ntohs((uint16_t)uh->uh_ulen);
+
+				if (ip->ip_len != len) 
+				{
+					if (len > ip->ip_len || len < sizeof(cvm_common_udp_hdr_t)) 
+					{
+						FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
+								"The UDP length is ERROR: udp len=%d, ip->ip_len=%d\r\n",len,ip->ip_len);		  
+
+						cvmx_fau_atomic_add64(CVM_FAU_UDP_BAD_LEN, 1);
+						action_type = FLOW_ACTION_DROP;			
+						goto scheme_execute; 
+					}
+				}
+
+				if ((tmp = rx_udp_decap(uh)) == PACKET_TYPE_UNKNOW)
+				{
+					FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+							"UDP is special CAPWAP frame, trap to linux.\n");
+					cvmx_fau_atomic_add64(CVM_FAU_UDP_TO_LINUX, 1);
+					action_type = FLOW_ACTION_TOLINUX;			
+					goto scheme_execute; 
+				}
+				CVM_WQE_SET_UNUSED(work, tmp);		
+				goto capwap_decap;
+			}
+			else /*not support other proto type yet*/
+			{
+				cvmx_fau_atomic_add64(CVM_FAU_IP_PROTO_ERROR, 1);
+				action_type = FLOW_ACTION_TOLINUX;			
+				goto scheme_execute; 	
+			}
+		}
+		else if (CVM_IP_IPVERSION_V6 == ip->ip_v)
+		{
+			if (cvm_ipv6_enable == FUNC_DISABLE)
+			{
+				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+						"IPV6 packet but ipv6 switch disable,trap to linux.\n");
+				action_type = FLOW_ACTION_TOLINUX;			
+				goto scheme_execute; 
+			}
+			
+			/* ipv6 check hear 1.address 2... tag */
+
+			/* braodcast address filter,how identify anycast address ,need filter?tag */
+			if (0xFF == ipv6->ip_dst.s6_addr[0])
+			{
+				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+						"IPV6 packet but broadcast address,trap to linux.\n");
+				action_type = FLOW_ACTION_TOLINUX;			
+				goto scheme_execute; 	
+			}
+			
+			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+    					"Receive the IPV6 packets !\r\n");
+
+			if (FUNC_ENABLE == pure_ipv6_forward_enable)
+			{
+				ipv6_flag = 1;
+				goto pure_ip_process;
+			}
+			
+			/* only tcp udp process ,other proto and expand head dont support  temporary */
+			if (CVM_COMMON_IPPROTO_TCP == ipv6->ip_nexthdr) 
+			{
+				th = (cvm_common_tcp_hdr_t *)((uint8_t *)ipv6 + IPV6_H_LEN);
+				true_th = th;
+
+				CVM_WQE_SET_UNUSED(work, PACKET_TYPE_ETH_IP);
+				goto table_lookup;
+			}
+			else if (CVM_COMMON_IPPROTO_UDP == ipv6->ip_nexthdr)
+			{
+				uh = (cvm_common_udp_hdr_t *)((uint8_t *)ipv6 + IPV6_H_LEN);
+				th = (cvm_common_tcp_hdr_t*)uh;
+				true_th = (cvm_common_tcp_hdr_t *)uh;
+				int32_t tmp;
+				if ((tmp = rx_udp_decap(uh)) == PACKET_TYPE_UNKNOW)
+				{
+					FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+							"UDP is special CAPWAP frame, trap to linux.\n");
+					cvmx_fau_atomic_add64(CVM_FAU_UDP_TO_LINUX, 1);
+					action_type = FLOW_ACTION_TOLINUX;			
+					goto scheme_execute; 
+				}
+
+				CVM_WQE_SET_UNUSED(work, tmp);	
+
+				goto capwap_decap;
+			}
+			/*not tcp udp ipv6 dont support ,maybe support later*/
+			else
+			{
+				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+						"IPV6 packet but next header not tcpudp,trap to linux.\n");
+				action_type = FLOW_ACTION_TOLINUX;			
+    			goto scheme_execute;
+			}
+
+		}
+		else
+		{
+			cvmx_fau_atomic_add64(CVM_FAU_IP_BAD_VERSION, 1);
+			action_type = FLOW_ACTION_TOLINUX;			
+				goto scheme_execute; 
+		}
+
+pure_ip_process:
 		/* add by wangjian for pure ip forward 2013-5-7 */
-		th = (cvm_common_tcp_hdr_t *)((uint32_t *)ip + ip->ip_hl);
-		if (FUNC_ENABLE == pure_ip_forward_enable)
+		if (((0 == ipv6_flag) && (FUNC_ENABLE == pure_ip_forward_enable)) || ((1 == ipv6_flag) && (FUNC_ENABLE == pure_ipv6_forward_enable)))
 		{
 			/* get true_ip consider capwap  CVM_WQE_SET_UNUSED to work  ,fwd_pure_ip.c add */
 			if ((action_type = pure_ip_get(&true_ip, &true_th, work)) <= FLOW_ACTION_TOLINUX)
 			{
 				goto scheme_execute;
+			}
+			if ((CVM_IP_IPVERSION_V6 == true_ip->ip_v) && (cvm_ipv6_enable == FUNC_DISABLE))
+			{
+				action_type = FLOW_ACTION_TOLINUX;			
+				goto scheme_execute; 
 			}
 			else
 			{
@@ -3880,100 +4946,14 @@ static void application_main_loop(unsigned int coremask_data)
 			}
 		}
 		
-
-		/**************************************************
-		 * Parse the icmp packets. zhaohan add
-		 ***************************************************/  
-		if(ip->ip_p == CVM_COMMON_IPPROTO_ICMP)
-		{
-			CVM_WQE_SET_UNUSED(work, PACKET_TYPE_ICMP);
-			cvmx_fau_atomic_add64(CVM_FAU_IP_ICMP, 1);
-			if(cvm_ip_icmp_enable == FUNC_DISABLE)
-			{
-				action_type = FLOW_ACTION_TOLINUX;  
-				goto scheme_execute; 
-			}
-		}
-
-		/**************************************************
-		 * Parse the packets l4 information and check too. lutao add
-		 ***************************************************/        
-		else if (ip->ip_p == CVM_COMMON_IPPROTO_TCP) 
-		{
-			th = (cvm_common_tcp_hdr_t *)((uint32_t *)ip + ip->ip_hl);
-			true_th = th;
-#if 1	/* modify for NAT requirement. zhaohan 2012-12-14 */		
-			/* Defense syn flood */
-            if (SPE_TCP_HDR(th)) 
-            {
-                FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
-                "Forward the TCP syn,rst,fin flag packet to Linux\r\n");
-                cvmx_fau_atomic_add64(CVM_FAU_SPE_TCP_HDR, 1);
-                action_type = FLOW_ACTION_TOLINUX;			
-                goto scheme_execute; 
-            }
-#endif			 
-			CVM_WQE_SET_UNUSED(work, PACKET_TYPE_ETH_IP);
-		}
-		else if (ip->ip_p == CVM_COMMON_IPPROTO_UDP) 
-		{
-			uint32_t len;
-			int32_t tmp;
-			uh = ( cvm_common_udp_hdr_t*)((uint32_t *)ip + ip->ip_hl);
-			th = ( cvm_common_tcp_hdr_t*)uh;
-            true_th = th;
-
-			/* destination port of 0 is illegal, based on RFC768. */
-			if (uh->uh_dport == 0)
-			{
-				action_type = FLOW_ACTION_DROP;
-				cvmx_fau_atomic_add64(CVM_FAU_UDP_BAD_DPORT, 1);
-				goto scheme_execute; 
-			}
-
-			/*
-			 * Make data length reflect UDP length.
-			 * If not enough data to reflect UDP length, drop.
-			 */
-			len = cvm_common_ntohs((uint16_t)uh->uh_ulen);
-
-			if (ip->ip_len != len) 
-			{
-				if (len > ip->ip_len || len < sizeof(cvm_common_udp_hdr_t)) 
-				{
-					FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
-							"The UDP length is ERROR: udp len=%d, ip->ip_len=%d\r\n",len,ip->ip_len);		  
-
-					cvmx_fau_atomic_add64(CVM_FAU_UDP_BAD_LEN, 1);
-					action_type = FLOW_ACTION_DROP;			
-					goto scheme_execute; 
-				}
-			}
-
-			if ((tmp = rx_udp_decap(uh)) == PACKET_TYPE_UNKNOW)
-			{
-				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
-						"UDP is special CAPWAP frame, trap to linux.\n");
-				cvmx_fau_atomic_add64(CVM_FAU_UDP_TO_LINUX, 1);
-				action_type = FLOW_ACTION_TOLINUX;			
-				goto scheme_execute; 
-			}
-
-			CVM_WQE_SET_UNUSED(work, tmp);		
-		}
-		else /*not support other proto type yet*/
-		{
-			cvmx_fau_atomic_add64(CVM_FAU_IP_PROTO_ERROR, 1);
-			action_type = FLOW_ACTION_TOLINUX;			
-			goto scheme_execute; 	
-		}
-
+/* add by wangjian for support ipv6 2013-8-2 */
+capwap_decap:
 		/***********************************************************************
 		 * capwap pkts decap.
 		 ***********************************************************************/
 		if(CVM_WQE_GET_UNUSED(work) == PACKET_TYPE_CAPWAP_802_11)
 		{
-			if (cw_802_11_decap(uh, &in_ip, &in_th) != 0) 
+			if (cw_802_11_decap(uh, &in_ip, &in_th) != RETURN_OK) 
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
 						"Warning]: recv capwap packet, decap capwap failed\n");
@@ -3985,7 +4965,7 @@ static void application_main_loop(unsigned int coremask_data)
 		}
 		else if(CVM_WQE_GET_UNUSED(work) == PACKET_TYPE_CAPWAP_802_3)
 		{
-			if (cw_802_3_decap(uh, &in_ip, &in_th) != 0) 
+			if (cw_802_3_decap(uh, &in_ip, &in_th) != RETURN_OK) 
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
 						"Warning]: recv capwap 802.3 packet, decap capwap failed\n");
@@ -3996,7 +4976,8 @@ static void application_main_loop(unsigned int coremask_data)
 			true_th = in_th;
 		}
 
-		if (true_ip->ip_p == CVM_COMMON_IPPROTO_UDP)
+		ipv6 = (cvm_common_ipv6_hdr_t *)true_ip;
+		if ((CVM_IP_IPVERSION == true_ip->ip_v) && true_ip->ip_p == CVM_COMMON_IPPROTO_UDP)
 		{
 			uh = ( cvm_common_udp_hdr_t*)((uint32_t *)true_ip + true_ip->ip_hl);	
 			/* destination port of 0 is illegal, based on RFC768. */
@@ -4007,12 +4988,32 @@ static void application_main_loop(unsigned int coremask_data)
 				goto scheme_execute; 
 			}
 		}
+		else if ((CVM_IP_IPVERSION_V6 == true_ip->ip_v) && (FUNC_DISABLE == cvm_ipv6_enable))
+		{
+			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+				"IPV6 In Capwap packet but ipv6 switch disable,trap to linux.\n");
+			action_type = FLOW_ACTION_TOLINUX;
+			goto scheme_execute; 
+		}
+		else if ((CVM_IP_IPVERSION_V6 == true_ip->ip_v) && (CVM_COMMON_IPPROTO_UDP == ipv6->ip_nexthdr))
+		{
+			uh = ( cvm_common_udp_hdr_t*)((uint8_t *)true_ip + IPV6_H_LEN);	
+			/* destination port of 0 is illegal, based on RFC768. */
+			if (uh->uh_dport == 0)
+			{
+				action_type = FLOW_ACTION_DROP;
+				cvmx_fau_atomic_add64(CVM_FAU_UDP_BAD_DPORT, 1);
+				goto scheme_execute; 
+			}
+		}
+
 
 table_lookup:
 		/***********************************************************************
 		 * packet parse end, based on the result, handle the flow lookup, etc. lutao add
 		 ***********************************************************************/
-		if (FUNC_ENABLE == pure_ip_forward_enable)  /* add by wangjian for pure ip forward 2013-5-7 */
+		if (((FUNC_ENABLE == pure_ip_forward_enable) && (CVM_IP_IPVERSION == true_ip->ip_v)) 
+			|| ((FUNC_ENABLE == pure_ipv6_forward_enable) && (CVM_IP_IPVERSION_V6 == true_ip->ip_v)))  /* add by wangjian for pure ip forward 2013-5-7 */
 		{
 			/*fwd_pure_ip.c add */
 			rule = acl_table_pure_ip_lookup(true_ip, &first_lock);
@@ -4025,7 +5026,7 @@ table_lookup:
 				goto scheme_execute; 					
 			}
 		}
-		else if(true_ip->ip_p == CVM_COMMON_IPPROTO_ICMP)
+		else if((CVM_IP_IPVERSION == true_ip->ip_v) && (true_ip->ip_p == CVM_COMMON_IPPROTO_ICMP))
 		{
 			rule = acl_table_icmp_lookup(true_ip);
 			if(rule == NULL)
@@ -4065,6 +5066,7 @@ scheme_execute:
             (CVM_WQE_GET_UNUSED(work) == PACKET_TYPE_CAPWAP_802_3) ||
             (CVM_WQE_GET_UNUSED(work) == PACKET_TYPE_ICMP))
         {
+       
             user_flow_statistics_process(work,rule,true_ip);
         }
 
@@ -4089,6 +5091,9 @@ scheme_execute:
 		in_th = NULL;
 		input_rpa = 0;
 		input_pppoe = 0;
+		ipv6 = NULL;
+		ipv6_flag = 0;
+
 	}
 }
 

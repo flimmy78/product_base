@@ -270,7 +270,7 @@ int acl_table_init()
 }
 
 
-static inline int32_t acl_find_or_insert_cw(uint16_t* p_idx, capwap_cache_t* cw_cache)
+static inline int32_t acl_find_or_insert_cw(uint16_t* p_idx, capwap_cache_t* cw_cache, uint8_t ipv6_flag)
 {
 	uint16_t idx = 0;
 	int16_t free_idx = -1;
@@ -302,11 +302,11 @@ static inline int32_t acl_find_or_insert_cw(uint16_t* p_idx, capwap_cache_t* cw_
 			uint64_t *fccp_cw_h = (uint64_t*)(cw_cache->cw_hd);
 
 			/* match a cache */
-			if((capwap_cache_bl[idx].dip == cw_cache->dip) &&
-					(capwap_cache_bl[idx].sip == cw_cache->sip) &&
+			if((((0 == ipv6_flag) && (capwap_cache_bl[idx].tos== cw_cache->tos) && (capwap_cache_bl[idx].cw_dip == cw_cache->cw_dip) && (capwap_cache_bl[idx].cw_sip == cw_cache->cw_sip)) || 
+					//((1 == ipv6_flag) && (capwap_cache_bl[idx].cw_ipv6_sip64[0] == cw_cache->cw_ipv6_sip64[0]) && (capwap_cache_bl[idx].cw_ipv6_sip64[1] == cw_cache->cw_ipv6_sip64[1]) && (capwap_cache_bl[idx].cw_ipv6_dip64[0] == cw_cache->cw_ipv6_dip64[0]) && (capwap_cache_bl[idx].cw_ipv6_dip64[1] == cw_cache->cw_ipv6_dip64[1]))) &&
+					((1 == ipv6_flag) && IPV6_CMP(capwap_cache_bl[idx].cw_ipv6_sip, cw_cache->cw_ipv6_sip) && IPV6_CMP(capwap_cache_bl[idx].cw_ipv6_dip, cw_cache->cw_ipv6_dip)))&&
 					(capwap_cache_bl[idx].dport == cw_cache->dport) &&
 					(capwap_cache_bl[idx].sport == cw_cache->sport) &&
-					(capwap_cache_bl[idx].tos== cw_cache->tos) &&
 					(cache_cw_h[0] == fccp_cw_h[0]) &&
 					(cache_cw_h[1] == fccp_cw_h[1]))
 			{
@@ -324,11 +324,24 @@ static inline int32_t acl_find_or_insert_cw(uint16_t* p_idx, capwap_cache_t* cw_
 		uint64_t *fccp_cw_h = (uint64_t*)(cw_cache->cw_hd);
 
 		/* fill the free cache */
-		capwap_cache_bl[free_idx].dip = cw_cache->dip;
-		capwap_cache_bl[free_idx].sip = cw_cache->sip;
+		
+		if (0 == ipv6_flag)
+		{
+			capwap_cache_bl[free_idx].cw_dip = cw_cache->cw_dip;
+			capwap_cache_bl[free_idx].cw_sip = cw_cache->cw_sip;
+			capwap_cache_bl[free_idx].tos = cw_cache->tos;
+		}
+		else if (1 == ipv6_flag)
+		{
+			capwap_cache_bl[free_idx].cw_ipv6_sip64[0] = cw_cache->cw_ipv6_sip64[0];
+			capwap_cache_bl[free_idx].cw_ipv6_sip64[1] = cw_cache->cw_ipv6_sip64[1];
+			capwap_cache_bl[free_idx].cw_ipv6_dip64[0] = cw_cache->cw_ipv6_dip64[0];
+			capwap_cache_bl[free_idx].cw_ipv6_dip64[1] = cw_cache->cw_ipv6_dip64[1];
+		}
+		
 		capwap_cache_bl[free_idx].dport = cw_cache->dport;
 		capwap_cache_bl[free_idx].sport = cw_cache->sport;
-		capwap_cache_bl[free_idx].tos = cw_cache->tos;
+		
 		cache_cw_h[0] = fccp_cw_h[0]; /* fill in 64 bit */
 		cache_cw_h[1] = fccp_cw_h[1];
 		atomic_add32_nosync(&( capwap_cache_bl[free_idx].use_num));
@@ -345,6 +358,7 @@ static inline int32_t acl_find_or_insert_cw(uint16_t* p_idx, capwap_cache_t* cw_
 inline int32_t acl_fill_rule(rule_param_t* dst_rule_para, rule_param_t* src_rule_para, capwap_cache_t* cw_cache)
 {
 	int32_t ret = 0;
+	uint8_t ipv6_flag = 0;
 
 	if((NULL == dst_rule_para) || (NULL == src_rule_para) || (NULL == cw_cache))
 	{
@@ -356,6 +370,11 @@ inline int32_t acl_fill_rule(rule_param_t* dst_rule_para, rule_param_t* src_rule
 		return RETURN_ERROR;
 	}
 
+	if (CVM_ETH_P_IPV6 == src_rule_para->ether_type)
+	{
+		ipv6_flag = 1;
+	}
+	
 	/* fill capwap first */
 	if((src_rule_para->action_type == FLOW_ACTION_CAPWAP_FORWARD) || 
 			(src_rule_para->action_type == FLOW_ACTION_CAP802_3_FORWARD) ||
@@ -364,7 +383,7 @@ inline int32_t acl_fill_rule(rule_param_t* dst_rule_para, rule_param_t* src_rule
 	{
 		/* find a empty cache and fill it, or find a same cache */
 		cvmx_spinlock_lock(&capwap_cache_bl_lock);
-		ret = acl_find_or_insert_cw(&(dst_rule_para->tunnel_index), cw_cache);
+		ret = acl_find_or_insert_cw(&(dst_rule_para->tunnel_index), cw_cache, ipv6_flag);
 		cvmx_spinlock_unlock(&capwap_cache_bl_lock);
 		if(ret == RETURN_ERROR)
 		{
@@ -395,9 +414,21 @@ inline int32_t acl_fill_rule(rule_param_t* dst_rule_para, rule_param_t* src_rule
 
 	if(src_rule_para->rule_state == RULE_IS_STATIC)
 	{
+		
 		/* five tuple */
-		dst_rule_para->sip = src_rule_para->sip;
-		dst_rule_para->dip = src_rule_para->dip;
+		if (0 == src_rule_para->ipv6_flag)
+		{
+			dst_rule_para->ipv4_sip = src_rule_para->ipv4_sip;
+			dst_rule_para->ipv4_dip = src_rule_para->ipv4_dip;
+		}
+		else if (1 == src_rule_para->ipv6_flag)
+		{
+			dst_rule_para->ipv6_flag = src_rule_para->ipv6_flag;
+			dst_rule_para->ipv6_sip64[0] = src_rule_para->ipv6_sip64[0];
+			dst_rule_para->ipv6_sip64[1] = src_rule_para->ipv6_sip64[1];
+			dst_rule_para->ipv6_dip64[0] = src_rule_para->ipv6_dip64[0];
+			dst_rule_para->ipv6_dip64[1] = src_rule_para->ipv6_dip64[1];
+		}
 		dst_rule_para->sport = src_rule_para->sport;
 		dst_rule_para->dport = src_rule_para->dport;
 		dst_rule_para->protocol = src_rule_para->protocol;
@@ -492,7 +523,7 @@ int32_t acl_cmd_delete_rule(five_tuple_t* five_tuple)
 
 	while(1)
 	{		   
-		if((rule->rules.dip == five_tuple->ip_dst) && (rule->rules.sip == five_tuple->ip_src) &&
+		if((rule->rules.ipv4_dip == five_tuple->ip_dst) && (rule->rules.ipv4_sip == five_tuple->ip_src) &&
 				(rule->rules.dport == five_tuple->th_dport) &&(rule->rules.sport == five_tuple->th_sport) &&(rule->rules.protocol == five_tuple->ip_p)) 
 		{
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
@@ -593,10 +624,10 @@ int32_t acl_insert_static_rule(rule_param_t *rule_para, capwap_cache_t *cw_cache
 
 	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 			"acl_insert_static_rule: packet-fiveTuple----dip=%d.%d.%d.%d, sip=%d.%d.%d.%d,dport=%d, sport=%d,proto=%d.  \r\n",
-			IP_FMT(rule_para->dip), IP_FMT(rule_para->sip), rule_para->dport,rule_para->sport,rule_para->protocol);
+			IP_FMT(rule_para->ipv4_dip), IP_FMT(rule_para->ipv4_sip), rule_para->dport,rule_para->sport,rule_para->protocol);
 
 	/*look up ACL Table and get the bucket*/
-	hash(rule_para->dip, rule_para->sip, rule_para->protocol, rule_para->dport, rule_para->sport);
+	hash(rule_para->ipv4_dip, rule_para->ipv4_sip, rule_para->protocol, rule_para->dport, rule_para->sport);
 	rule = CASTPTR(rule_item_t, cvmx_scratch_read64(CVM_SCR_ACL_CACHE_PTR));
 
 	head_rule = rule;
@@ -648,8 +679,8 @@ int32_t acl_insert_static_rule(rule_param_t *rule_para, capwap_cache_t *cw_cache
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 				"acl_insert_static_rule: lookup the table, rule=0x%p.\r\n",rule);	
 
-		if ((rule->rules.dip == rule_para->dip) && 
-				(rule->rules.sip == rule_para->sip) &&
+		if ((rule->rules.ipv4_dip == rule_para->ipv4_dip) && 
+				(rule->rules.ipv4_sip == rule_para->ipv4_sip) &&
 				(rule->rules.dport == rule_para->dport) &&
 				(rule->rules.sport == rule_para->sport) &&
 				(rule->rules.protocol == rule_para->protocol)) 
@@ -833,12 +864,12 @@ inline int32_t fwd_get_user_idx(rule_param_t *rule_param)
         return RETURN_ERROR;
     }
 
-	if(fwd_find_user_idx(rule_param->sip, &sip_usr_idx, &sip_usr_link_idx) == RETURN_OK)
+	if(fwd_find_user_idx(rule_param->ipv4_sip, &sip_usr_idx, &sip_usr_link_idx) == RETURN_OK)
 	{
 		sip_user_flag = 1;
 	}
 
-	if(fwd_find_user_idx(rule_param->dip, &dip_usr_idx, &dip_usr_link_idx) == RETURN_OK)
+	if(fwd_find_user_idx(rule_param->ipv4_dip, &dip_usr_idx, &dip_usr_link_idx) == RETURN_OK)
 	{
 		dip_user_flag = 1;
 	}
@@ -885,7 +916,7 @@ inline int32_t fwd_get_user_idx(rule_param_t *rule_param)
 /* add by zhaohan */
 int32_t acl_self_learn_rule(rule_param_t *rule_para, capwap_cache_t *cw_cache)
 {
-	rule_item_t  *rule ;
+	rule_item_t  *rule = NULL;
 	rule_item_t  *head_rule=NULL ;
 	rule_item_t  *free_rule  = NULL; /*the first free bucket position*/
 	cvmx_spinlock_t          *head_lock = NULL;
@@ -897,22 +928,47 @@ int32_t acl_self_learn_rule(rule_param_t *rule_para, capwap_cache_t *cw_cache)
 		return RETURN_ERROR;
 	}
 
-	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
-			"acl_self_learn_rule: packet-fiveTuple----dip=%d.%d.%d.%d, sip=%d.%d.%d.%d,dport=%d, sport=%d,proto=%d. l2 type=0x%x, tag=0x%x \r\n",
-			IP_FMT(rule_para->dip), IP_FMT(rule_para->sip), rule_para->dport,rule_para->sport,rule_para->protocol,rule_para->out_ether_type,rule_para->out_tag);
+	if (0 == rule_para->ipv6_flag)
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+				"acl_self_learn_rule: packet-fiveTuple----dip=%d.%d.%d.%d, sip=%d.%d.%d.%d,dport=%d, sport=%d,proto=%d. l2 type=0x%x, tag=0x%x \r\n",
+				IP_FMT(rule_para->ipv4_dip), IP_FMT(rule_para->ipv4_sip), rule_para->dport,rule_para->sport,rule_para->protocol,rule_para->out_ether_type,rule_para->out_tag);
 
-    /* get user table idx, store to rule */
-    fwd_get_user_idx(rule_para);
+	    /* get user table idx, store to rule */
+	    fwd_get_user_idx(rule_para);
 
-	/*look up ACL Table and get the bucket*/
-	hash(rule_para->dip, rule_para->sip, rule_para->protocol, rule_para->dport, rule_para->sport);
+		/*look up ACL Table and get the bucket*/
+		hash(rule_para->ipv4_dip, rule_para->ipv4_sip, rule_para->protocol, rule_para->dport, rule_para->sport);
+	}
+	else if (1 == rule_para->ipv6_flag)
+	{
+		hash_v6(rule_para->ipv6_dip64[0], rule_para->ipv6_dip64[1], rule_para->ipv6_sip64[0], rule_para->ipv6_sip64[1], rule_para->protocol, rule_para->dport, rule_para->sport);
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+			"acl_self_learn_rule: packet-fiveTuple----%x.%x.%x.%x:%u => %x.%x.%x.%x:%u proto=%d\n",
+			//IPV6_FMT(rule_para->ipv6_sip64[0]),
+			//IPV6_FMT(rule_para->ipv6_sip64[1]),
+			rule_para->ipv6_sip32[0],
+			rule_para->ipv6_sip32[1],
+			rule_para->ipv6_sip32[2],
+			rule_para->ipv6_sip32[3],
+			rule_para->sport,
+			rule_para->ipv6_dip32[0],
+			rule_para->ipv6_dip32[1],
+			rule_para->ipv6_dip32[2],
+			rule_para->ipv6_dip32[3],
+			rule_para->dport,
+			rule_para->protocol);
+	}
+	
 	rule = CASTPTR(rule_item_t, cvmx_scratch_read64(CVM_SCR_ACL_CACHE_PTR));
 
 	head_rule = rule;
 	cvmx_spinlock_lock(&rule->lock);
 	head_lock = &rule->lock;
 
-
+	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+					"acl_self_learn_rule: Find the rule= hash head rule 0x%p\n",rule);
+	
 	/*if the first bucket is empty and there are no more buckets, then insert current flow*/
 	if(head_rule->rules.rule_state == RULE_IS_EMPTY)
 	{
@@ -947,11 +1003,14 @@ int32_t acl_self_learn_rule(rule_param_t *rule_para, capwap_cache_t *cw_cache)
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 				"acl_self_learn_rule: lookup the table, rule=0x%p.\r\n",rule);   
 
-		if ((rule->rules.dip == rule_para->dip) && 
-				(rule->rules.sip == rule_para->sip) &&
-				(rule->rules.dport == rule_para->dport) &&
-				(rule->rules.sport == rule_para->sport) &&
-				(rule->rules.protocol == rule_para->protocol))             
+
+
+
+		if ((((0 == rule_para->ipv6_flag) && (rule->rules.ipv4_dip == rule_para->ipv4_dip) && (rule->rules.ipv4_sip == rule_para->ipv4_sip)) || 
+			((1 == rule_para->ipv6_flag) && IPV6_CMP(rule->rules.ipv6_sip, rule_para->ipv6_sip) && IPV6_CMP(rule->rules.ipv6_dip, rule_para->ipv6_dip)) )&&
+			(rule->rules.dport == rule_para->dport) &&
+			(rule->rules.sport == rule_para->sport) &&
+			(rule->rules.protocol == rule_para->protocol))             
 		{
 			if(rule->rules.rule_state == RULE_IS_LEARNING)
 			{
@@ -1273,13 +1332,13 @@ int32_t acl_self_learn_icmp_rule(rule_param_t *rule_para, capwap_cache_t *cw_cac
 
 	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 			"acl_self_learn_icmp_rule: packet-Three Tuple----dip=%d.%d.%d.%d, sip=%d.%d.%d.%d, proto=%d.  \r\n",
-			IP_FMT(rule_para->dip), IP_FMT(rule_para->sip), rule_para->protocol);
+			IP_FMT(rule_para->ipv4_dip), IP_FMT(rule_para->ipv4_sip), rule_para->protocol);
 
     /* get user table idx, store to rule */
     fwd_get_user_idx(rule_para);
 
 	/*look up ACL Table and get the bucket*/
-	cvm_three_tupe_hash_lookup(rule_para->dip, rule_para->sip, rule_para->protocol);
+	cvm_three_tupe_hash_lookup(rule_para->ipv4_dip, rule_para->ipv4_sip, rule_para->protocol);
 	rule = CASTPTR(rule_item_t, cvmx_scratch_read64(CVM_SCR_ACL_CACHE_PTR));
 
 	head_rule = rule;
@@ -1321,8 +1380,8 @@ int32_t acl_self_learn_icmp_rule(rule_param_t *rule_para, capwap_cache_t *cw_cac
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 				"acl_self_learn_rule: lookup the table, rule=0x%p.\r\n",rule);   
 
-		if ((rule->rules.dip == rule_para->dip) && 
-				(rule->rules.sip == rule_para->sip) &&
+		if ((rule->rules.ipv4_dip == rule_para->ipv4_dip) && 
+				(rule->rules.ipv4_sip == rule_para->ipv4_sip) &&
 				(rule->rules.protocol == rule_para->protocol)) 
 		{
 			if(rule->rules.rule_state == RULE_IS_LEARNING)
@@ -1435,10 +1494,10 @@ int32_t acl_one_tuple_self_learn_rule(rule_param_t *rule_para, capwap_cache_t *c
 
 	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 			"acl_one_tuple_self_learn_rule: packet-oneTuple----dip=%d.%d.%d.%d  \r\n",
-			IP_FMT(rule_para->dip));
+			IP_FMT(rule_para->ipv4_dip));
 
 	/*look up ACL Table and get the bucket*/
-	cvm_ip_hash_lookup(rule_para->dip);
+	cvm_ip_hash_lookup(rule_para->ipv4_dip);
 	rule = CASTPTR(rule_item_t, cvmx_scratch_read64(CVM_SCR_ACL_CACHE_PTR));
 
 	head_rule = rule;
@@ -1480,7 +1539,7 @@ int32_t acl_one_tuple_self_learn_rule(rule_param_t *rule_para, capwap_cache_t *c
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 				"acl_self_learn_rule: lookup the table, rule=0x%p.\r\n",rule);   
 
-		if (rule->rules.dip == rule_para->dip) 
+		if (rule->rules.ipv4_dip == rule_para->ipv4_dip) 
 		{
 			if(rule->rules.rule_state == RULE_IS_LEARNING)
 			{
@@ -1967,6 +2026,13 @@ void user_flow_statistics_process
 	{
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 				"user_flow_statistics_process: true_ip is NULL!\n");
+		return;
+	}
+
+	if (CVM_IP_IPVERSION_V6 == true_ip->ip_v)
+	{
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+				"user_flow_statistics_process: true_ip is ipv6 dont flow statistics!\n");
 		return;
 	}
 

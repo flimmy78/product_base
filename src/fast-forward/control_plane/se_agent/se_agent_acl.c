@@ -61,8 +61,12 @@ int  read_capwap(se_interative_t *se_buf,capwap_cache_t *capwap)
 	if(NULL == se_buf || NULL == capwap)
 		return SE_AGENT_RETURN_FAIL;
 	se_buf->fccp_cmd.fccp_data.rule_info.cw_cache.use_num = capwap->use_num;
-	se_buf->fccp_cmd.fccp_data.rule_info.cw_cache.dip = capwap->dip;
-	se_buf->fccp_cmd.fccp_data.rule_info.cw_cache.sip = capwap->sip;
+	//se_buf->fccp_cmd.fccp_data.rule_info.cw_cache.cw_dip = capwap->cw_dip;
+	//se_buf->fccp_cmd.fccp_data.rule_info.cw_cache.cw_sip = capwap->cw_sip;
+	se_buf->fccp_cmd.fccp_data.rule_info.cw_cache.cw_ipv6_dip64[0] = capwap->cw_ipv6_dip64[0];
+	se_buf->fccp_cmd.fccp_data.rule_info.cw_cache.cw_ipv6_dip64[1] = capwap->cw_ipv6_dip64[1];
+	se_buf->fccp_cmd.fccp_data.rule_info.cw_cache.cw_ipv6_sip64[0] = capwap->cw_ipv6_sip64[0];
+	se_buf->fccp_cmd.fccp_data.rule_info.cw_cache.cw_ipv6_sip64[1] = capwap->cw_ipv6_sip64[1];
 	se_buf->fccp_cmd.fccp_data.rule_info.cw_cache.dport = capwap->dport;
 	se_buf->fccp_cmd.fccp_data.rule_info.cw_cache.sport = capwap->sport;
 	se_buf->fccp_cmd.fccp_data.rule_info.cw_cache.tos = capwap->tos;
@@ -82,8 +86,20 @@ int read_specified_rule(rule_param_t *dst_rule,rule_item_t *src_rule)
 	dst_rule->in_tag = src_rule->rules.in_tag;
 	dst_rule->ether_type = src_rule->rules.ether_type;
 	
-	dst_rule->sip = src_rule->rules.sip;
-	dst_rule->dip = src_rule->rules.dip;
+	if (0 == src_rule->rules.ipv6_flag)
+	{
+		dst_rule->ipv4_sip = src_rule->rules.ipv4_sip;
+		dst_rule->ipv4_dip = src_rule->rules.ipv4_dip;
+	}
+	else if (1 == src_rule->rules.ipv6_flag)
+	{
+		dst_rule->ipv6_sip64[0] = src_rule->rules.ipv6_sip64[0];
+		dst_rule->ipv6_sip64[1] = src_rule->rules.ipv6_sip64[1];
+		dst_rule->ipv6_dip64[0] = src_rule->rules.ipv6_dip64[0];
+		dst_rule->ipv6_dip64[1] = src_rule->rules.ipv6_dip64[1];
+		dst_rule->ipv6_flag = src_rule->rules.ipv6_flag;
+	}
+
 	dst_rule->sport = src_rule->rules.sport;
 	dst_rule->dport = src_rule->rules.dport;
 	dst_rule->protocol = src_rule->rules.protocol;
@@ -208,7 +224,7 @@ void se_agent_show_specified_rule(char *buf,struct sockaddr_tipc *client_addr,un
 		goto NO_RULE_ERR;
 	while(1)
 	{ 		 
-		if((rule->rules.dip == se_buf->fccp_cmd.fccp_data.rule_tuple.ip_dst) && (rule->rules.sip == se_buf->fccp_cmd.fccp_data.rule_tuple.ip_src) &&
+		if((rule->rules.ipv4_dip == se_buf->fccp_cmd.fccp_data.rule_tuple.ip_dst) && (rule->rules.ipv4_sip == se_buf->fccp_cmd.fccp_data.rule_tuple.ip_src) &&
 				(rule->rules.dport == se_buf->fccp_cmd.fccp_data.rule_tuple.th_dport) &&(rule->rules.sport == se_buf->fccp_cmd.fccp_data.rule_tuple.th_sport) &&
 				(rule->rules.protocol == se_buf->fccp_cmd.fccp_data.rule_tuple.ip_p)) 
 		{
@@ -453,7 +469,6 @@ void se_agent_clear_rule_all(char *buf,struct sockaddr_tipc *client_addr,unsigne
 void se_agent_show_capwap_rule(char *buf,struct sockaddr_tipc *client_addr,unsigned int len)
 {
 	se_interative_t *se_buf=NULL;
-	struct timeval  overtime;
 	union capwap_hd* cw_hdr=NULL;
 	uint32_t i=0, j=0;
 	uint32_t total_count=0;
@@ -474,7 +489,7 @@ void se_agent_show_capwap_rule(char *buf,struct sockaddr_tipc *client_addr,unsig
 		goto SEND_DCLI;
 	}
 	index=se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_index;
-	if(index == 0)
+	if(index == 0xFFFFFFFF)
 	{
 		for(loop = 0; loop < capwap_cache_tbl_size; loop++)
 		{ 
@@ -489,7 +504,7 @@ void se_agent_show_capwap_rule(char *buf,struct sockaddr_tipc *client_addr,unsig
 			}
 		}
 		se_buf->cmd_result=AGENT_RETURN_OK;
-		se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_index=cw_cache_index+1;
+		se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_index=cw_cache_index;
 		se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_use_cnt=total_count;
 		goto SEND_DCLI;
 	}
@@ -500,11 +515,21 @@ void se_agent_show_capwap_rule(char *buf,struct sockaddr_tipc *client_addr,unsig
 			if(capwap_cache_tbl[loop].use_num != 0)
 			{
 				se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_rule.use_num = capwap_cache_tbl[loop].use_num;
-				se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_rule.dip = capwap_cache_tbl[loop].dip;
-				se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_rule.sip = capwap_cache_tbl[loop].sip;
+				if ((0 != capwap_cache_tbl[loop].cw_ipv6_dip64[1]) || (0 != capwap_cache_tbl[loop].cw_ipv6_sip64[1]))
+				{
+					se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_rule.cw_ipv6_dip64[0] = capwap_cache_tbl[loop].cw_ipv6_dip64[0];
+					se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_rule.cw_ipv6_dip64[1] = capwap_cache_tbl[loop].cw_ipv6_dip64[1];
+					se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_rule.cw_ipv6_sip64[0] = capwap_cache_tbl[loop].cw_ipv6_sip64[0];
+					se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_rule.cw_ipv6_sip64[1] = capwap_cache_tbl[loop].cw_ipv6_sip64[1];
+				}
+				else
+				{
+					se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_rule.cw_dip = capwap_cache_tbl[loop].cw_dip;
+					se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_rule.cw_sip = capwap_cache_tbl[loop].cw_sip;
+					se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_rule.tos = capwap_cache_tbl[loop].tos;
+				}
 				se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_rule.dport = capwap_cache_tbl[loop].dport;
 				se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_rule.sport = capwap_cache_tbl[loop].sport;
-				se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_rule.tos = capwap_cache_tbl[loop].tos;
 				memcpy(se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_rule.cw_hd,capwap_cache_tbl[loop].cw_hd,CW_H_LEN);
 				se_buf->fccp_cmd.fccp_data.cw_cache_info.cw_cache_index=loop+1;
 				se_buf->cmd_result=AGENT_RETURN_OK;
@@ -527,7 +552,6 @@ SEND_DCLI:
 void se_agent_show_learned_acl(char *buf,struct sockaddr_tipc *client_addr,unsigned int len)
 {
 	se_interative_t *se_buf=NULL;
-	struct timeval  overtime;
 	rule_item_t 	*rule	= NULL;
 	int ret=0;
 	uint32_t i = 0;
@@ -714,7 +738,6 @@ SEND_DCLI:
 void se_agent_show_learning_acl(char *buf,struct sockaddr_tipc *client_addr,unsigned int len)
 {
 	se_interative_t *se_buf=NULL;
-	struct timeval  overtime;
 	rule_item_t 	*rule	= NULL;
 	int ret=0;
 	uint32_t i = 0;
@@ -1038,9 +1061,9 @@ void se_agent_show_user_rule_stats(char *buf,struct sockaddr_tipc *client_addr,u
 		}
 		else
 		{
-			if((s_tbl_rule->rules.sip == user_ip) || (s_tbl_rule->rules.dip == user_ip))
+			if((s_tbl_rule->rules.ipv4_sip == user_ip) || (s_tbl_rule->rules.ipv4_dip == user_ip))
 			{
-				if(s_tbl_rule->rules.sip == user_ip)
+				if(s_tbl_rule->rules.ipv4_sip == user_ip)
 					s_tbl_uplink_rule++;
 				else
 					s_tbl_downlink_rule++;
@@ -1072,9 +1095,9 @@ void se_agent_show_user_rule_stats(char *buf,struct sockaddr_tipc *client_addr,u
 		{
 			d_tbl_rule = cvmx_phys_to_ptr((uint64_t)d_tbl_rule);
 
-			if((d_tbl_rule->rules.sip == user_ip) || (d_tbl_rule->rules.dip == user_ip))
+			if((d_tbl_rule->rules.ipv4_sip == user_ip) || (d_tbl_rule->rules.ipv4_dip == user_ip))
 			{
-				if(d_tbl_rule->rules.sip == user_ip)
+				if(d_tbl_rule->rules.ipv4_sip == user_ip)
 					d_tbl_uplink_rule++;
 				else
 					d_tbl_downlink_rule++;
@@ -1190,14 +1213,10 @@ void se_agent_clear_rule_ip(char *buf,struct sockaddr_tipc *client_addr,unsigned
 }
 
 
-
-
-
 /*wangjian 2012.07.09 add ip */
 void se_agent_show_rule_ip(char *buf,struct sockaddr_tipc *client_addr,unsigned int len)
 {
 	se_interative_t *se_buf=NULL;
-	struct timeval  overtime;
 	rule_item_t 	*rule	= NULL;
 	int ret=0;
 	uint32_t i = 0;
@@ -1209,8 +1228,12 @@ void se_agent_show_rule_ip(char *buf,struct sockaddr_tipc *client_addr,unsigned 
 	uint32_t first_static = 1;
 	uint32_t static_loop=0;
 	uint32_t static_index=0;
-	
 	uint32_t rule_ip=0;
+	struct cvm_ip6_in6_addr rule_ipv6;
+	int flag = 0; /*0:ipv4 1:ipv6*/
+
+	memset(&rule_ipv6,0,sizeof(rule_ipv6));
+	
 	if(NULL==buf || NULL==client_addr || 0==len)
 	{
 		se_agent_syslog_err("se_agent_show_rule_ip param error\n");
@@ -1224,7 +1247,19 @@ void se_agent_show_rule_ip(char *buf,struct sockaddr_tipc *client_addr,unsigned 
 		se_buf->cmd_result = AGENT_RETURN_FAIL;
 		goto SEND_DCLI;
 	}
-	rule_ip = se_buf->fccp_cmd.fccp_data.acl_info.acl_param.sip;
+
+	if (0 == se_buf->fccp_cmd.fccp_data.acl_info.acl_param.ipv6_flag)
+	{
+		rule_ip = se_buf->fccp_cmd.fccp_data.acl_info.acl_param.ipv4_sip;
+		flag = 0;
+	}
+	else if (1 == se_buf->fccp_cmd.fccp_data.acl_info.acl_param.ipv6_flag)
+	{
+		rule_ipv6.s6_addr64[0] =  se_buf->fccp_cmd.fccp_data.acl_info.acl_param.ipv6_sip64[0];
+		rule_ipv6.s6_addr64[1] =  se_buf->fccp_cmd.fccp_data.acl_info.acl_param.ipv6_sip64[1];
+		flag = 1;
+	}
+	
 	static_index=se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index;
 	if(0xFFFFFFFF == static_index)
 	{
@@ -1238,10 +1273,12 @@ void se_agent_show_rule_ip(char *buf,struct sockaddr_tipc *client_addr,unsigned 
 			}
 			else
 			{   
-			    if ((s_tbl_rule->rules.dip != rule_ip) && (s_tbl_rule->rules.sip != rule_ip))
+			    if (((0 == flag) && (s_tbl_rule->rules.ipv4_dip != rule_ip) && (s_tbl_rule->rules.ipv4_sip != rule_ip))
+					|| ((1 == flag) && !IPV6_CMP(s_tbl_rule->rules.ipv6_dip, rule_ipv6) && !IPV6_CMP(s_tbl_rule->rules.ipv6_sip, rule_ipv6)))
 			    {
 			        continue;
-			    }
+			    }	
+
 				switch(s_tbl_rule->rules.rule_state)
 				{
 					case RULE_IS_LEARNED:
@@ -1264,12 +1301,13 @@ void se_agent_show_rule_ip(char *buf,struct sockaddr_tipc *client_addr,unsigned 
 			{
 				
 				d_tbl_rule = cvmx_phys_to_ptr((uint64_t)d_tbl_rule);
-			   	if ((d_tbl_rule->rules.dip != rule_ip) && (d_tbl_rule->rules.sip != rule_ip))
+
+				if (((0 == flag) && (d_tbl_rule->rules.ipv4_dip != rule_ip) && (d_tbl_rule->rules.ipv4_sip != rule_ip))
+					|| ((1 == flag) && !IPV6_CMP(d_tbl_rule->rules.ipv6_dip, rule_ipv6) && !IPV6_CMP(d_tbl_rule->rules.ipv6_sip, rule_ipv6)))
 			    {
 			    	d_tbl_rule = d_tbl_rule->next; 
 			        continue;
-			    }
-			    
+			    }	
 
 				switch(d_tbl_rule->rules.rule_state)
 				{
@@ -1304,10 +1342,12 @@ void se_agent_show_rule_ip(char *buf,struct sockaddr_tipc *client_addr,unsigned 
 			}
 			else
 			{
-			    if ((s_tbl_rule->rules.dip != rule_ip) && (s_tbl_rule->rules.sip != rule_ip))
+				if (((0 == flag) && (s_tbl_rule->rules.ipv4_dip != rule_ip) && (s_tbl_rule->rules.ipv4_sip != rule_ip))
+					|| ((1 == flag) && !IPV6_CMP(s_tbl_rule->rules.ipv6_dip, rule_ipv6) && !IPV6_CMP(s_tbl_rule->rules.ipv6_sip, rule_ipv6)))
 			    {
 			        continue;
 			    }
+				
 				switch(s_tbl_rule->rules.rule_state)
 				{
 					case RULE_IS_LEARNED:
@@ -1336,4 +1376,172 @@ SEND_DCLI:
 	}
 	return;
 }
+
+
+
+/*wangjian 2012.07.09 add ip */
+void se_agent_show_rule_ipv6(char *buf,struct sockaddr_tipc *client_addr,unsigned int len)
+{
+	se_interative_t *se_buf=NULL;
+	rule_item_t 	*rule	= NULL;
+	int ret=0;
+	uint32_t i = 0;
+	rule_item_t * s_tbl_rule = NULL;
+	rule_item_t * d_tbl_rule = NULL;
+	int32_t static_count=0;
+	int32_t total_count=0;
+	//uint32_t acl_static_index = -1;
+	uint32_t first_static = 1;
+	uint32_t static_loop=0;
+	uint32_t static_index=0;
+	uint32_t rule_ip=0;
+	struct cvm_ip6_in6_addr rule_ipv6;
+	int flag = 0; /*0:ipv4 1:ipv6*/
+
+	memset(&rule_ipv6,0,sizeof(rule_ipv6));
+	
+	if(NULL==buf || NULL==client_addr || 0==len)
+	{
+		se_agent_syslog_err("se_agent_show_rule_ip param error\n");
+		return ;
+	}
+	se_buf=(se_interative_t *)buf;
+
+	if((acl_bucket_tbl == NULL) || (FASTFWD_NOT_LOADED == fast_forward_module_load_check()))
+	{
+		strncpy(se_buf->err_info,FASTFWD_NO_RESPOND_STR,sizeof(FASTFWD_NO_RESPOND_STR));
+		se_buf->cmd_result = AGENT_RETURN_FAIL;
+		goto SEND_DCLI;
+	}
+
+	if (0 == se_buf->fccp_cmd.fccp_data.acl_info.acl_param.ipv6_flag)
+	{
+		rule_ip = se_buf->fccp_cmd.fccp_data.acl_info.acl_param.ipv4_sip;
+		flag = 0;
+	}
+	else if (1 == se_buf->fccp_cmd.fccp_data.acl_info.acl_param.ipv6_flag)
+	{
+		rule_ipv6.s6_addr64[0] =  se_buf->fccp_cmd.fccp_data.acl_info.acl_param.ipv6_sip64[0];
+		rule_ipv6.s6_addr64[1] =  se_buf->fccp_cmd.fccp_data.acl_info.acl_param.ipv6_sip64[1];
+		flag = 1;
+	}
+	
+	static_index=se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index;
+	if(0xFFFFFFFF == static_index)
+	{
+		for(static_loop = 0; static_loop < acl_static_tbl_size; static_loop++)
+		{ 
+			s_tbl_rule = (rule_item_t *)acl_bucket_tbl+static_loop;
+			if(s_tbl_rule->rules.rule_state == RULE_IS_EMPTY)
+			{
+				if(NULL == s_tbl_rule->next)
+					continue;             
+			}
+			else
+			{   
+			    if (((0 == flag) && (s_tbl_rule->rules.ipv4_dip != rule_ip) && (s_tbl_rule->rules.ipv4_sip != rule_ip))
+					|| ((1 == flag) && !IPV6_CMP(s_tbl_rule->rules.ipv6_dip, rule_ipv6) && !IPV6_CMP(s_tbl_rule->rules.ipv6_sip, rule_ipv6)))
+			    {
+			        continue;
+			    }	
+
+				switch(s_tbl_rule->rules.rule_state)
+				{
+					case RULE_IS_LEARNED:
+					case RULE_IS_LEARNING:
+						if(first_static==1)
+						{
+							first_static=0;
+							static_index=static_loop;
+						}
+						total_count++;
+						static_count++;
+						break;
+					default:
+						break;
+				}
+			}
+			/* dynamic info */
+			d_tbl_rule = s_tbl_rule->next;
+			while(d_tbl_rule != NULL)
+			{
+				
+				d_tbl_rule = cvmx_phys_to_ptr((uint64_t)d_tbl_rule);
+
+				if (((0 == flag) && (d_tbl_rule->rules.ipv4_dip != rule_ip) && (d_tbl_rule->rules.ipv4_sip != rule_ip))
+					|| ((1 == flag) && !IPV6_CMP(d_tbl_rule->rules.ipv6_dip, rule_ipv6) && !IPV6_CMP(d_tbl_rule->rules.ipv6_sip, rule_ipv6)))
+			    {
+			    	d_tbl_rule = d_tbl_rule->next; 
+			        continue;
+			    }	
+
+				switch(d_tbl_rule->rules.rule_state)
+				{
+					case RULE_IS_LEARNED:
+						total_count++;
+						break;
+					case RULE_IS_LEARNING:
+						total_count++;
+						break;
+					default:
+						break;
+				}
+
+				d_tbl_rule = d_tbl_rule->next;
+			}		
+			
+		}
+		se_buf->cmd_result=AGENT_RETURN_OK;
+		se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index = static_index;
+		se_buf->fccp_cmd.fccp_data.acl_info.acl_static_cnt=static_count;
+		se_buf->fccp_cmd.fccp_data.acl_info.acl_cnt=total_count;
+
+		goto SEND_DCLI;
+	}
+	else
+	{
+		for(static_loop=static_index; static_loop < acl_static_tbl_size; static_loop++)
+		{ 
+			s_tbl_rule = (rule_item_t *)acl_bucket_tbl+static_loop;
+			if(s_tbl_rule->rules.rule_state == RULE_IS_EMPTY)
+			{
+				continue;             
+			}
+			else
+			{
+				if (((0 == flag) && (s_tbl_rule->rules.ipv4_dip != rule_ip) && (s_tbl_rule->rules.ipv4_sip != rule_ip))
+					|| ((1 == flag) && !IPV6_CMP(s_tbl_rule->rules.ipv6_dip, rule_ipv6) && !IPV6_CMP(s_tbl_rule->rules.ipv6_sip, rule_ipv6)))
+			    {
+			        continue;
+			    }
+				
+				switch(s_tbl_rule->rules.rule_state)
+				{
+					case RULE_IS_LEARNED:
+					case RULE_IS_LEARNING:
+						read_specified_rule(&(se_buf->fccp_cmd.fccp_data.acl_info.acl_param),s_tbl_rule);
+						se_buf->cmd_result=AGENT_RETURN_OK;
+						se_buf->fccp_cmd.fccp_data.acl_info.acl_static_index=static_loop+1;
+						goto SEND_DCLI;
+						break;
+					default:
+						break;
+				}
+			}
+		}
+				
+	}
+	se_buf->cmd_result=AGENT_RETURN_FAIL;
+	strncpy(se_buf->err_info,NO_THIS_RULE_STR,strlen(NO_THIS_RULE_STR));
+	goto SEND_DCLI;
+SEND_DCLI:
+	ret=sendto(se_socket,(char*)buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
+	if(ret<0)
+	{
+		se_agent_syslog_err("se_agent_show_rule_ip send to dcli failed:%s\n",strerror(errno));
+		return ;
+	}
+	return;
+}
+
 
