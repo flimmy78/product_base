@@ -3,7 +3,7 @@
 
 #include <linux/types.h>
 #include <linux/compiler.h>
-#include <asm/swab.h>
+//#include <asm/swab.h> wangchao delete
 
 /*
  * casts are necessary for constants, because we never know how for sure

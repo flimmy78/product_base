@@ -216,4 +216,8 @@ sysctl -w net.nf_conntrack_max=$cmax
 #This variable changes the behaviour in the state machine regarding TCP out of window packets
 sysctl net.netfilter.nf_conntrack_tcp_be_liberal=1
 
+# wangchao add for the problem that st_set.ko kernel module can't auto load.
+ipset -L > /dev/null
+insmod /lib/modules/2.6.32.27-Cavium-Octeon/misc/xt_set.ko
+
 exit 0;
