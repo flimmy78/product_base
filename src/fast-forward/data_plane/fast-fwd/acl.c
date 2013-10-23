@@ -205,6 +205,7 @@ int acl_table_init()
 
 
 	acl_bucket_tbl = (rule_item_t *) cvmx_bootmem_alloc_named(acl_static_tbl_size*sizeof(rule_item_t), CVMX_CACHE_LINE_SIZE,ACL_TBL_RULE_NAME);
+	printf("sizeof(rule_item_t)=%ld.", sizeof(rule_item_t));
 	if(acl_bucket_tbl == NULL)
 	{
 		printf("Warning: No memory available for ACL static hash table!\n");
