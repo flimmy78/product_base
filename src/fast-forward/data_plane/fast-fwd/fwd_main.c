@@ -208,7 +208,8 @@ int32_t disable_fastfwd()
 	}
 	
 	/* Change the group for only the port we're interested in */
-	for (port_index=0; port_index < CVMX_PIP_NUM_INPUT_PORTS; port_index++)
+	//for (port_index=0; port_index < CVMX_PIP_NUM_INPUT_PORTS; port_index++)
+	for (port_index=0; port_index < 32; port_index++)
 	{
 		if(pip_port_info[port_index].s.if_used  == PORT_USED)
 		{
@@ -235,7 +236,8 @@ int32_t enable_fastfwd()
 	}
 
 	/* Change the group for only the port we're interested in */
-	for (port_index=0; port_index < CVMX_PIP_NUM_INPUT_PORTS; port_index++)
+	//for (port_index=0; port_index < CVMX_PIP_NUM_INPUT_PORTS; port_index++)
+	for (port_index=0; port_index < 32; port_index++)
 	{
 		if(pip_port_info[port_index].s.if_used  == PORT_USED)
 		{
