@@ -350,7 +350,7 @@ ip6t_do_table(struct sk_buff *skb,
 	struct xt_table_info *private;
 	struct xt_match_param mtpar;
 	struct xt_target_param tgpar;
-
+    int i=0;
 	/* Initialization */
 	indev = in ? in->name : nulldevname;
 	outdev = out ? out->name : nulldevname;
@@ -379,7 +379,19 @@ ip6t_do_table(struct sk_buff *skb,
 
 	do {
 		struct ip6t_entry_target *t;
-
+		#if 0
+        printk(KERN_DEBUG"huangjing##ip6t_do_table,struct ip6t_entry:e->ipv6->proto=%d\n",e->ipv6.proto);
+        printk(KERN_DEBUG"huangjing##ip6t_do_table,struct ip6t_entry:e->ipv6.src\n");
+        for(i=0;i<4;i++)
+        {
+        	printk(KERN_DEBUG"%x  ",e->ipv6.src.in6_u.u6_addr32[i]);
+        }
+        printk(KERN_DEBUG"huangjing##ip6t_do_table,struct ip6t_entry:e->ipv6.dst\n");
+        for(i=0;i<4;i++)
+        {
+        	printk(KERN_DEBUG"%x  ",e->ipv6.dst.in6_u.u6_addr32[i]);
+        }
+        #endif
 		IP_NF_ASSERT(e);
 		IP_NF_ASSERT(back);
 		if (!ip6_packet_match(skb, indev, outdev, &e->ipv6,
@@ -394,6 +406,25 @@ ip6t_do_table(struct sk_buff *skb,
 			    sizeof(struct ipv6hdr), 1);
 
 		t = ip6t_get_target(e);
+        #if 0
+		/*huangjing##debug*/
+		if(t->u.kernel.target->target == NULL)
+		{
+            pr_err("huangjing##ip6t_do_table,t->u.kernel.target->target == NULL\n");
+		}
+		else
+		{
+            pr_err("huangjing##ip6t_do_table,t->u.kernel.target->target != NULL\n");
+		}
+		if(t->data == NULL)
+		{
+            pr_err("huangjing##ip6t_do_table,t->data == NULL\n");
+		}
+		else
+		{
+            pr_err("huangjing##ip6t_do_table,t->data != NULL\n");
+		}
+		#endif
 		IP_NF_ASSERT(t->u.kernel.target);
 
 #if defined(CONFIG_NETFILTER_XT_TARGET_TRACE) || \
@@ -403,6 +434,7 @@ ip6t_do_table(struct sk_buff *skb,
 			trace_packet(skb, hook, in, out,
 				     table->name, private, e);
 #endif
+        ipv6_nat_debug("huangjing##ip6t_do_table,find the target name is %s\n",t->u.kernel.target->name);
 		/* Standard target? */
 		if (!t->u.kernel.target->target) {
 			int v;
@@ -903,7 +935,7 @@ translate_table(const char *name,
 	/* And one copy for every other CPU */
 	for_each_possible_cpu(i) {
 		if (newinfo->entries[i] && newinfo->entries[i] != entry0)
-			memcpy(newinfo->entries[i], entry0, newinfo->size);
+			memcpy(newinfo->entries[i], entry0, newinfo->size);/*haungjing#add copy repl->entries to newinfo->entries*/
 	}
 
 	return ret;

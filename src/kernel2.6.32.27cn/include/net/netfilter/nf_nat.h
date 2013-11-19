@@ -3,6 +3,8 @@
 #include <linux/netfilter_ipv4.h>
 #include <net/netfilter/nf_conntrack_tuple.h>
 
+#define NF_NAT_RANGE_PROTO_SPECIFIED	2
+
 #define NF_NAT_MAPPING_TYPE_MAX_NAMELEN 16
 
 enum nf_nat_manip_type
@@ -40,6 +42,16 @@ struct nf_nat_range
 
 	/* Inclusive: network order */
 	union nf_conntrack_man_proto min, max;
+};
+
+
+/*huangjing##add for ipv6*/
+struct nf_nat_ipv6_range {
+	unsigned int			flags;
+	union nf_inet_addr		min_addr;
+	union nf_inet_addr		max_addr;
+	union nf_conntrack_man_proto	min_proto;
+	union nf_conntrack_man_proto	max_proto;
 };
 
 /* For backwards compat: don't use in modern code. */
@@ -90,6 +102,25 @@ extern int nf_nat_used_tuple(const struct nf_conntrack_tuple *tuple,
 static inline struct nf_conn_nat *nfct_nat(const struct nf_conn *ct)
 {
 	return nf_ct_ext_find(ct, NF_CT_EXT_NAT);
+}
+/*huangjing##*/
+static inline bool nf_nat_oif_changed(unsigned int hooknum,
+				      enum ip_conntrack_info ctinfo,
+				      struct nf_conn_nat *nat,
+				      const struct net_device *out)
+{
+/*huangjing##delete
+#if IS_ENABLED(CONFIG_IP_NF_TARGET_MASQUERADE) || \
+    IS_ENABLED(CONFIG_IP6_NF_TARGET_MASQUERADE)
+*/
+	return nat->masq_index && hooknum == NF_INET_POST_ROUTING &&
+	       CTINFO2DIR(ctinfo) == IP_CT_DIR_ORIGINAL &&
+	       nat->masq_index != out->ifindex;
+/*huangjing##delete
+#else
+	return false;
+#endif
+*/
 }
 
 #else  /* !__KERNEL__: iptables wants this to compile. */

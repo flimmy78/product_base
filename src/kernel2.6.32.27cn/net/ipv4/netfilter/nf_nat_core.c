@@ -19,7 +19,9 @@
 #include <linux/icmp.h>
 #include <linux/udp.h>
 #include <linux/jhash.h>
+#include <asm/ptrace.h>
 
+#include <net/netfilter/nf_nat_l3proto.h>
 #include <linux/netfilter_ipv4.h>
 #include <net/netfilter/nf_conntrack.h>
 #include <net/netfilter/nf_conntrack_core.h>
@@ -30,8 +32,29 @@
 #include <net/netfilter/nf_conntrack_helper.h>
 #include <net/netfilter/nf_conntrack_l3proto.h>
 #include <net/netfilter/nf_conntrack_l4proto.h>
+#include <net/netfilter/nf_nat_l4proto.h>
 
 static DEFINE_SPINLOCK(nf_nat_lock);
+
+/*huangjing##*/
+# define __rcu		__attribute__((noderef, address_space(4)))
+static DEFINE_MUTEX(nf_nat_proto_mutex);
+static const struct nf_nat_l3proto __rcu *nf_nat_l3protos[NFPROTO_NUMPROTO]
+						__read_mostly;
+static const struct nf_nat_l4proto __rcu **nf_nat_l4protos[NFPROTO_NUMPROTO]
+						__read_mostly;
+
+#define RCU_INIT_POINTER(p, v) \
+	do { \
+		p = (typeof(*v) __force *)(v); \
+	} while (0)
+
+extern bool nf_nat_ipv6_manip_pkt(struct sk_buff *skb,
+				  unsigned int iphdroff,
+				  const struct nf_nat_l4proto *l4proto,
+				  const struct nf_conntrack_tuple *target,
+				  enum nf_nat_manip_type maniptype);
+/*end*/
 
 static struct nf_conntrack_l3proto *l3proto __read_mostly;
 
@@ -44,6 +67,20 @@ __nf_nat_proto_find(u_int8_t protonum)
 {
 	return rcu_dereference(nf_nat_protos[protonum]);
 }
+/*huangjing##add*/
+
+inline const struct nf_nat_l3proto *
+__nf_nat_l3proto_find(u8 family)
+{
+	return rcu_dereference(nf_nat_l3protos[family]);
+}
+
+inline const struct nf_nat_l4proto *
+__nf_nat_l4proto_find(u8 family, u8 protonum)
+{
+	return rcu_dereference(nf_nat_l4protos[family][protonum]);
+}
+EXPORT_SYMBOL_GPL(__nf_nat_l4proto_find);
 
 const struct nf_nat_protocol *
 nf_nat_proto_find_get(u_int8_t protonum)
@@ -214,6 +251,191 @@ find_best_ips_proto(struct nf_conntrack_tuple *tuple,
 	*var_ipp = htonl(minip + j);
 }
 
+/*haungjing#add*/
+/* If we source map this tuple so reply looks like reply_tuple, will
+ * that meet the constraints of range.
+ */
+static int ipv6_in_range(const struct nf_nat_l3proto *l3proto,
+		    const struct nf_nat_l4proto *l4proto,
+		    const struct nf_conntrack_tuple *tuple,
+		    const struct nf_nat_ipv6_range *range)
+{
+	/* If we are supposed to map IPs, then we must be in the
+	 * range specified, otherwise let this drag us onto a new src IP.
+	 */
+	if (range->flags & IP_NAT_RANGE_MAP_IPS &&
+	    !l3proto->in_range(tuple, range))
+		return 0;
+
+	if (!(range->flags & NF_NAT_RANGE_PROTO_SPECIFIED) ||
+	    l4proto->in_range(tuple, IP_NAT_MANIP_SRC,
+			      &range->min_proto, &range->max_proto))
+		return 1;
+
+	return 0;
+}
+
+/*huangjing##add*/
+/* For [FUTURE] fragmentation handling, we want the least-used
+ * src-ip/dst-ip/proto triple.  Fairness doesn't come into it.  Thus
+ * if the range specifies 1.2.3.4 ports 10000-10005 and 1.2.3.5 ports
+ * 1-65535, we don't do pro-rata allocation based on ports; we choose
+ * the ip with the lowest src-ip/dst-ip/proto usage.
+ */
+static void
+ipv6_find_best_ips_proto(u16 zone, struct nf_conntrack_tuple *tuple,
+		    const struct nf_nat_ipv6_range *range,
+		    const struct nf_conn *ct,
+		    enum nf_nat_manip_type maniptype)
+{
+	union nf_inet_addr *var_ipp;
+	unsigned int i, max;
+	/* Host order */
+	u32 minip, maxip, j, dist;
+	bool full_range;
+
+	/* No IP mapping?  Do nothing. */
+	if (!(range->flags & IP_NAT_RANGE_MAP_IPS))
+		return;
+
+	if (maniptype == IP_NAT_MANIP_SRC)
+		var_ipp = &tuple->src.u3;
+	else
+		var_ipp = &tuple->dst.u3;
+
+	/* Fast path: only one choice. */
+	if (nf_inet_addr_cmp(&range->min_addr, &range->max_addr)) {
+		*var_ipp = range->min_addr;
+		return;
+	}
+
+	if (nf_ct_l3num(ct) == NFPROTO_IPV4)
+		max = sizeof(var_ipp->ip) / sizeof(u32) - 1;
+	else
+		max = sizeof(var_ipp->ip6) / sizeof(u32) - 1;
+
+	/* Hashing source and destination IPs gives a fairly even
+	 * spread in practice (if there are a small number of IPs
+	 * involved, there usually aren't that many connections
+	 * anyway).  The consistency means that servers see the same
+	 * client coming from the same IP (some Internet Banking sites
+	 * like this), even across reboots.
+	 */
+	j = jhash2((u32 *)&tuple->src.u3, sizeof(tuple->src.u3) / sizeof(u32),
+		   range->flags & IP_NAT_RANGE_PERSISTENT ?
+			0 : (__force u32)tuple->dst.u3.all[max] ^ zone);
+
+	full_range = false;
+	for (i = 0; i <= max; i++) {
+		/* If first bytes of the address are at the maximum, use the
+		 * distance. Otherwise use the full range.
+		 */
+		if (!full_range) {
+			minip = ntohl((__force __be32)range->min_addr.all[i]);
+			maxip = ntohl((__force __be32)range->max_addr.all[i]);
+			dist  = maxip - minip + 1;
+		} else {
+			minip = 0;
+			dist  = ~0;
+		}
+
+		var_ipp->all[i] = (__force __u32)
+			htonl(minip + (((u64)j * dist) >> 32));
+		if (var_ipp->all[i] != range->max_addr.all[i])
+			full_range = true;
+
+		if (!(range->flags & IP_NAT_RANGE_PERSISTENT))
+			j ^= (__force u32)tuple->dst.u3.all[i];
+	}
+}
+
+/*huangjing##add*/
+/* Manipulate the tuple into the range given.  For NF_INET_POST_ROUTING,
+ * we change the source to map into the range.  For NF_INET_PRE_ROUTING
+ * and NF_INET_LOCAL_OUT, we change the destination to map into the
+ * range.  It might not be possible to get a unique tuple, but we try.
+ * At worst (or if we race), we will end up with a final duplicate in
+ * __ip_conntrack_confirm and drop the packet. */
+static void
+get_unique_tuple_ipv6(struct nf_conntrack_tuple *tuple,
+		 const struct nf_conntrack_tuple *orig_tuple,
+		 const struct nf_nat_ipv6_range *range,
+		 struct nf_conn *ct,
+		 enum nf_nat_manip_type maniptype)
+{
+    	const struct nf_nat_l3proto *l3proto;
+    	const struct nf_nat_l4proto *l4proto;
+    	struct net *net = nf_ct_net(ct);
+
+    	//printk(KERN_DEBUG"huangjing##get_unique_tuple_ipv6 orig_tuple->src.l3num=%d orig_tuple->dst.protonum=%d\n",orig_tuple->src.l3num,orig_tuple->dst.protonum);
+    	rcu_read_lock();
+    	l3proto = __nf_nat_l3proto_find(orig_tuple->src.l3num);
+        //printk(KERN_DEBUG"huangjing##get_unique_tuple_ipv6 l3proto->l3proto=%d\n",l3proto->l3proto);
+    	l4proto = __nf_nat_l4proto_find(orig_tuple->src.l3num,
+    					orig_tuple->dst.protonum);
+        //printk(KERN_DEBUG"huangjing##get_unique_tuple_ipv6 l4proto->l4proto=%d\n",l4proto->l4proto);
+    	/* 1) If this srcip/proto/src-proto-part is currently mapped,
+    	 * and that same mapping gives a unique tuple within the given
+    	 * range, use that.
+    	 *
+    	 * This is only required for source (ie. NAT/masq) mappings.
+    	 * So far, we don't do local source mappings, so multiple
+    	 * manips not an issue.
+    	 */
+    	if (maniptype == IP_NAT_MANIP_SRC &&
+    	    !(range->flags & IP_NAT_RANGE_PROTO_RANDOM)) {
+    		/* try the original tuple first */
+    		if (ipv6_in_range(l3proto, l4proto, orig_tuple, range)) {
+    			if (!nf_nat_used_tuple(orig_tuple, ct)) {
+    				*tuple = *orig_tuple;
+    				goto out;
+    			}
+    		} else if (find_appropriate_src(net, orig_tuple, tuple, range)) {
+    			pr_debug("get_unique_tuple: Found current src map\n");
+    			if (!nf_nat_used_tuple(tuple, ct))
+    				goto out;
+    		}
+    	}
+
+    	/* 2) Select the least-used IP/proto combination in the given range */
+    	*tuple = *orig_tuple;
+
+		/*huangjing#add "--to-destination must be one IPV6 address.cant`t be a rang"*/
+    	ipv6_find_best_ips_proto(1,tuple, range, ct, maniptype);
+		#if 1
+        ipv6_nat_debug("----------get_unique_tuple----------\n");
+    	ipv6_nat_debug( "src=%pI6 dst=%pI6 ",
+    			  tuple->src.u3.ip6, tuple->dst.u3.ip6);
+    	ipv6_nat_debug("src=%pI6 dst=%pI6 ",
+    			  orig_tuple->src.u3.ip6, orig_tuple->dst.u3.ip6);
+    	ipv6_nat_debug("----------get_unique_tuple end----------\n");
+		#endif
+    	/* 3) The per-protocol part of the manip is made to map into
+    	 * the range to make a unique tuple.
+    	 */
+        //printk(KERN_DEBUG"huangjing##get_unique_tuple_ipv6 range->flags=0x%x \n",range->flags);
+    	/* Only bother mapping if it's not already in range and unique */
+    	if (!(range->flags & IP_NAT_RANGE_PROTO_RANDOM)) {
+    		if (range->flags & NF_NAT_RANGE_PROTO_SPECIFIED) {
+    			if (l4proto->in_range(tuple, maniptype,
+    					      &range->min_proto,
+    					      &range->max_proto) &&
+    			    (range->min_proto.all == range->max_proto.all ||
+    			     !nf_nat_used_tuple(tuple, ct)))
+    				goto out;
+    		} else if (!nf_nat_used_tuple(tuple, ct)) {
+    			goto out;
+    		}
+    	}
+    	/* Last change: get protocol to try to obtain unique tuple. */
+    	l4proto->unique_tuple(l3proto, tuple, range, maniptype, ct);
+    out:
+    	rcu_read_unlock();
+}
+
+
+
+
 /* Manipulate the tuple into the range given.  For NF_INET_POST_ROUTING,
  * we change the source to map into the range.  For NF_INET_PRE_ROUTING
  * and NF_INET_LOCAL_OUT, we change the destination to map into the
@@ -265,7 +487,7 @@ get_unique_tuple(struct nf_conntrack_tuple *tuple,
 
 	/* Only bother mapping if it's not already in range and unique */
 	if ((!(range->flags & IP_NAT_RANGE_PROTO_SPECIFIED) ||
-	     proto->in_range(tuple, maniptype, &range->min, &range->max)) &&
+    	     proto->in_range(tuple, maniptype, &range->min_ip, &range->max_ip)) &&
 	    !nf_nat_used_tuple(tuple, ct))
 		goto out;
 
@@ -275,8 +497,79 @@ out:
 	rcu_read_unlock();
 }
 
-unsigned int
-nf_nat_setup_info(struct nf_conn *ct,
+/*huangjing##add*/
+unsigned int nf_nat_setup_info_ipv6(struct nf_conn *ct,
+		  const struct nf_nat_ipv6_range *range,
+		  enum nf_nat_manip_type maniptype)
+{
+	struct net *net = nf_ct_net(ct);
+	struct nf_conntrack_tuple curr_tuple, new_tuple;
+	struct nf_conn_nat *nat;
+	int have_to_hash = !(ct->status & IPS_NAT_DONE_MASK);
+
+	/* nat helper or nfctnetlink also setup binding */
+	nat = nfct_nat(ct);
+	if (!nat) {
+		nat = nf_ct_ext_add(ct, NF_CT_EXT_NAT, GFP_ATOMIC);
+		if (nat == NULL) {
+			pr_debug("failed to add NAT extension\n");
+			return NF_ACCEPT;
+		}
+	}
+
+	NF_CT_ASSERT(maniptype == IP_NAT_MANIP_SRC ||
+		     maniptype == IP_NAT_MANIP_DST);
+	BUG_ON(nf_nat_initialized(ct, maniptype));
+
+	/* What we've got will look like inverse of reply. Normally
+	   this is what is in the conntrack, except for prior
+	   manipulations (future optimization: if num_manips == 0,
+	   orig_tp =
+	   conntrack->tuplehash[IP_CT_DIR_ORIGINAL].tuple) */
+	    nf_ct_invert_tuplepr(&curr_tuple,
+			     &ct->tuplehash[IP_CT_DIR_REPLY].tuple);
+
+	    get_unique_tuple_ipv6(&new_tuple, &curr_tuple, range, ct, maniptype);
+
+	if (!nf_ct_tuple_equal(&new_tuple, &curr_tuple)) {
+		struct nf_conntrack_tuple reply;
+
+		/* Alter conntrack table so will recognize replies. */
+		nf_ct_invert_tuplepr(&reply, &new_tuple);
+		nf_conntrack_alter_reply(ct, &reply);
+
+		/* Non-atomic: we own this at the moment. */
+		if (maniptype == IP_NAT_MANIP_SRC)
+			ct->status |= IPS_SRC_NAT;
+		else
+			ct->status |= IPS_DST_NAT;
+	}
+
+	/* Place in source hash if this is the first time. */
+	if (have_to_hash) {
+		unsigned int srchash;
+
+		srchash = hash_by_src(net, &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple);
+		spin_lock_bh(&nf_nat_lock);
+		/* nf_conntrack_alter_reply might re-allocate exntension aera */
+		nat = nfct_nat(ct);
+		nat->ct = ct;
+		hlist_add_head_rcu(&nat->bysource,
+				   &net->ipv4.nat_bysource[srchash]);
+		spin_unlock_bh(&nf_nat_lock);
+	}
+
+	/* It's done. */
+	if (maniptype == IP_NAT_MANIP_DST)
+		set_bit(IPS_DST_NAT_DONE_BIT, &ct->status);
+	else
+		set_bit(IPS_SRC_NAT_DONE_BIT, &ct->status);
+
+	return NF_ACCEPT;
+}
+EXPORT_SYMBOL(nf_nat_setup_info_ipv6);
+
+unsigned int nf_nat_setup_info(struct nf_conn *ct,
 		  const struct nf_nat_range *range,
 		  enum nf_nat_manip_type maniptype)
 {
@@ -347,6 +640,28 @@ nf_nat_setup_info(struct nf_conn *ct,
 }
 EXPORT_SYMBOL(nf_nat_setup_info);
 
+ /**
+  * Display a buffer in hex
+  *
+  * @param buffer	  Data buffer to display
+  * @param buffer_len Length of the buffer
+  */
+ static void hex_dump(const void *buffer, int buffer_len)
+ {
+	 const uint8_t *ptr = (const uint8_t*)buffer;
+	 int i;
+	 printk("SKB BUFFER:==========================\n");
+	 for (i=0;i<buffer_len;i++) 
+	 	{
+//		 if (i % 16 == 0) printk("\n%04x: ", i);
+		 if (i % 16 == 0) printk("\n");
+		   printk("%02X ", (unsigned int)*ptr);
+		   ptr++;
+		}
+	 printk("\n");
+	 printk("SKB BUFFER:==========================\n");
+ }
+
 /* Returns true if succeeded. */
 static bool
 manip_pkt(u_int16_t proto,
@@ -388,10 +703,13 @@ unsigned int nf_nat_packet(struct nf_conn *ct,
 			   unsigned int hooknum,
 			   struct sk_buff *skb)
 {
+	const struct nf_nat_l3proto *l3proto;
+	const struct nf_nat_l4proto *l4proto;
 	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
 	unsigned long statusbit;
 	enum nf_nat_manip_type mtype = HOOK2MANIP(hooknum);
-
+	int i=0;	//huangjing
+    
 	if (mtype == IP_NAT_MANIP_SRC)
 		statusbit = IPS_SRC_NAT;
 	else
@@ -405,15 +723,200 @@ unsigned int nf_nat_packet(struct nf_conn *ct,
 	if (ct->status & statusbit) {
 		struct nf_conntrack_tuple target;
 
+        /*huangjing##debug*/
+		#if 0
+    	ipv6_nat_debug("=============nf_nat_packet ct->tuplehash[dir].tuple.src dir=============\n");
+    	for(i=0;i<4;i++)
+    	{
+    		ipv6_nat_debug("0x%x\n",ct->tuplehash[dir].tuple.src.u3.in6.s6_addr32[i]);
+    	}
+    	ipv6_nat_debug("=============nf_nat_packet dir-end=============\n");
+    	ipv6_nat_debug("=============nf_nat_packet ct->tuplehash[!dir].tuple.src !dir=============\n");
+    	for(i=0;i<4;i++)
+    	{
+    		ipv6_nat_debug("0x%x\n",ct->tuplehash[!dir].tuple.src.u3.in6.s6_addr32[i]);
+    	}
+    	ipv6_nat_debug("=============nf_nat_packet !dir-end=============\n");
+        #endif
 		/* We are aiming to look like inverse of other direction. */
 		nf_ct_invert_tuplepr(&target, &ct->tuplehash[!dir].tuple);
+        
+	    //printk(KERN_DEBUG"huangjing##nf_nat_packet,target.src.l3num=%d target.dst.protonum=%d mtype=%d\n",target.src.l3num,target.dst.protonum,mtype);
+		/*huangjing##add ipv6 tree*/
+		if(target.src.l3num == 10)
+		{
+    		l3proto = __nf_nat_l3proto_find(target.src.l3num);
+			//printk(KERN_DEBUG"huangjing##nf_nat_packet,l3proto->l3proto = %d\n",l3proto->l3proto);
 
-		if (!manip_pkt(target.dst.protonum, skb, 0, &target, mtype))
-			return NF_DROP;
+	        l4proto = __nf_nat_l4proto_find(target.src.l3num,target.dst.protonum);
+			//printk(KERN_DEBUG"huangjing##nf_nat_packet,l4proto->l4proto = %d\n",l4proto->l4proto);
+
+			if (!l3proto->manip_pkt(skb, 0, l4proto, &target, mtype))
+			    return NF_DROP;
+		}
+		else
+		{
+        	if (!manip_pkt(target.dst.protonum, skb, 0, &target, mtype))
+        		return NF_DROP;
+		}
 	}
 	return NF_ACCEPT;
 }
 EXPORT_SYMBOL_GPL(nf_nat_packet);
+
+/*huangjing##add*/
+/* kill conntracks with affected NAT section */
+struct nf_nat_proto_clean {
+	u8	l3proto;
+	u8	l4proto;
+};
+
+static int nf_nat_proto_remove(struct nf_conn *i, void *data)
+{
+	const struct nf_nat_proto_clean *clean = data;
+	struct nf_conn_nat *nat = nfct_nat(i);
+
+	if (!nat)
+		return 0;
+
+	if ((clean->l3proto && nf_ct_l3num(i) != clean->l3proto) ||
+	    (clean->l4proto && nf_ct_protonum(i) != clean->l4proto))
+		return 0;
+
+	return i->status & IPS_NAT_MASK ? 1 : 0;
+}
+
+static void nf_nat_l4proto_clean(u8 l3proto, u8 l4proto)
+{
+	struct nf_nat_proto_clean clean = {
+		.l3proto = l3proto,
+		.l4proto = l4proto,
+	};
+	struct net *net;
+
+	rtnl_lock();
+	for_each_net(net)
+		nf_ct_iterate_cleanup(net, nf_nat_proto_remove, &clean);
+	rtnl_unlock();
+}
+
+/* Protocol registration. */
+int nf_nat_l4proto_register(u8 l3proto, const struct nf_nat_l4proto *l4proto)
+{
+	const struct nf_nat_l4proto **l4protos;
+	unsigned int i;
+	int ret = 0;
+
+	mutex_lock(&nf_nat_proto_mutex);
+	if (nf_nat_l4protos[l3proto] == NULL) {
+		l4protos = kmalloc(IPPROTO_MAX * sizeof(struct nf_nat_l4proto *),
+				   GFP_KERNEL);
+		if (l4protos == NULL) {
+			ret = -ENOMEM;
+			goto out;
+		}
+/*huangjing##delete*/
+#if 1
+		for (i = 0; i < IPPROTO_MAX; i++)
+			RCU_INIT_POINTER(l4protos[i], &nf_nat_unknown_protocol);
+#endif
+/*end*/
+		/* Before making proto_array visible to lockless readers,
+		 * we must make sure its content is committed to memory.
+		 */
+		smp_wmb();
+
+		nf_nat_l4protos[l3proto] = l4protos;
+	}
+/*huangjing##delete*/
+#if 0
+	if (rcu_dereference_protected(
+			nf_nat_l4protos[l3proto][l4proto->l4proto],
+			lockdep_is_held(&nf_nat_proto_mutex)
+			) != &nf_nat_l4proto_unknown) {
+		ret = -EBUSY;
+		goto out;
+	}
+#endif
+	RCU_INIT_POINTER(nf_nat_l4protos[l3proto][l4proto->l4proto], l4proto);
+
+/*end*/
+ out:
+	mutex_unlock(&nf_nat_proto_mutex);
+	return ret;
+}
+
+EXPORT_SYMBOL_GPL(nf_nat_l4proto_register);
+
+/* No one stores the protocol anywhere; simply delete it. */
+void nf_nat_l4proto_unregister(u8 l3proto, const struct nf_nat_l4proto *l4proto)
+{
+	mutex_lock(&nf_nat_proto_mutex);
+/*huangjing##delete*/
+#if 1
+	RCU_INIT_POINTER(nf_nat_l4protos[l3proto][l4proto->l4proto],
+			 &nf_nat_unknown_protocol);
+#endif
+/*end*/
+	mutex_unlock(&nf_nat_proto_mutex);
+	synchronize_rcu();
+
+	nf_nat_l4proto_clean(l3proto, l4proto->l4proto);
+}
+EXPORT_SYMBOL_GPL(nf_nat_l4proto_unregister);
+
+static void nf_nat_l3proto_clean(u8 l3proto)
+{
+	struct nf_nat_proto_clean clean = {
+		.l3proto = l3proto,
+	};
+	struct net *net;
+
+	rtnl_lock();
+
+	for_each_net(net)
+		nf_ct_iterate_cleanup(net, nf_nat_proto_remove, &clean);
+	rtnl_unlock();
+}
+/*haungjing##
+change nf_nat_l4proto_unknown to nf_nat_unknown_protocol
+change nf_nat_l4proto_tcp to nf_nat_protocol_tcp
+change nf_nat_l4proto_udp to nf_nat_protocol_udp
+*/
+int nf_nat_l3proto_register(const struct nf_nat_l3proto *l3proto)
+{
+	int err;
+
+	err = nf_ct_l3proto_try_module_get(l3proto->l3proto);
+	if (err < 0)
+		return err;
+
+	mutex_lock(&nf_nat_proto_mutex);
+	RCU_INIT_POINTER(nf_nat_l4protos[l3proto->l3proto][IPPROTO_TCP],
+			 &nf_nat_l4proto_tcp);
+	RCU_INIT_POINTER(nf_nat_l4protos[l3proto->l3proto][IPPROTO_UDP],
+			 &nf_nat_l4proto_udp);
+	mutex_unlock(&nf_nat_proto_mutex);
+
+	RCU_INIT_POINTER(nf_nat_l3protos[l3proto->l3proto], l3proto);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(nf_nat_l3proto_register);
+
+
+void nf_nat_l3proto_unregister(const struct nf_nat_l3proto *l3proto)
+{
+	mutex_lock(&nf_nat_proto_mutex);
+	RCU_INIT_POINTER(nf_nat_l3protos[l3proto->l3proto], NULL);
+	mutex_unlock(&nf_nat_proto_mutex);
+	synchronize_rcu();
+
+	nf_nat_l3proto_clean(l3proto->l3proto);
+	nf_ct_l3proto_module_put(l3proto->l3proto);
+}
+EXPORT_SYMBOL_GPL(nf_nat_l3proto_unregister);
+
+/*end*/
 
 /* Dir is direction ICMP is coming from (opposite to packet it contains) */
 int nf_nat_icmp_reply_translation(struct nf_conn *ct,

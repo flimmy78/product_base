@@ -721,7 +721,7 @@ xt_replace_table(struct xt_table *table,
 		return NULL;
 	}
 
-	table->private = newinfo;
+	table->private = newinfo;/*struct xt_table->private = struct xt_table_info *newinfo*/
 	newinfo->initial_entries = private->initial_entries;
 
 	/*

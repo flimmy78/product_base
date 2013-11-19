@@ -392,6 +392,17 @@ static inline char *pack_hex_byte(char *buf, u8 byte)
 	({ if (0) printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__); 0; })
 #endif
 
+/*huangjing##add ipv6_nat_debug() should produce zero code unless DEBUG is defined */
+#define IPV6_NAT_DEBUG
+
+#ifdef IPV6_NAT_DEBUG
+#define ipv6_nat_debug(fmt, ...) \
+	printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
+#else
+#define ipv6_nat_debug(fmt, ...) \
+	({ if (0) printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__); 0; })
+#endif
+
 /* If you are writing a driver, please use dev_dbg instead */
 #if defined(DEBUG)
 #define pr_debug(fmt, ...) \

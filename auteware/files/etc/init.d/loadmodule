@@ -213,5 +213,18 @@ load_module kpppoe
 # DO NOT Load watchdog nmi by default, since cpld watchdog should be enough.
 #load_module oct_watchdog_nmi
 
+#load the IPV6 NAT module huangjing
+#insmod /lib/modules/2.6.32.27-Cavium-Octeon/kernel/net/ipv6/netfilter/ip6_tables.ko
+#insmod /lib/modules/2.6.32.27-Cavium-Octeon/kernel/net/ipv6/netfilter/nf_conntrack_ipv6.ko
+#insmod /lib/modules/2.6.32.27-Cavium-Octeon/kernel/net/ipv6/netfilter/xt_nat.ko
+#insmod /lib/modules/2.6.32.27-Cavium-Octeon/kernel/net/ipv6/netfilter/ip6table_nat.ko
+#insmod /lib/modules/2.6.32.27-Cavium-Octeon/kernel/net/ipv6/netfilter/nf_nat_ipv6.ko 
+echo "load IPV6 NAT"
+load_module ip6_tables
+load_module nf_conntrack_ipv6
+load_module xt_nat
+load_module ip6table_nat
+load_module nf_nat_ipv6
+
 exit 0
 

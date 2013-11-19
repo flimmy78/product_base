@@ -32,6 +32,7 @@
 #include <linux/mm.h>
 #include <linux/nsproxy.h>
 #include <linux/rculist_nulls.h>
+#include <asm/ptrace.h>
 
 #include <net/netfilter/nf_conntrack.h>
 #include <net/netfilter/nf_conntrack_l3proto.h>
@@ -150,7 +151,15 @@ nf_ct_invert_tuple(struct nf_conntrack_tuple *inverse,
 		   const struct nf_conntrack_l4proto *l4proto)
 {
 	memset(inverse, 0, sizeof(*inverse));
-
+    //dump_stack();
+    #if 0
+    pr_err("===========nf_ct_invert_tuple 1 ===============\n");
+	printk(KERN_DEBUG "src=%pI6 dst=%pI6 ",
+			  inverse->src.u3.ip6, inverse->dst.u3.ip6);
+	printk(KERN_DEBUG"src=%pI6 dst=%pI6 ",
+			  orig->src.u3.ip6, orig->dst.u3.ip6);
+	pr_err("==========nf_ct_invert_tuple 1end================\n");
+    #endif
 	inverse->src.l3num = orig->src.l3num;
 	if (l3proto->invert_tuple(inverse, orig) == 0)
 		return false;
@@ -158,6 +167,14 @@ nf_ct_invert_tuple(struct nf_conntrack_tuple *inverse,
 	inverse->dst.dir = !orig->dst.dir;
 
 	inverse->dst.protonum = orig->dst.protonum;
+	#if 0
+    pr_err("==========nf_ct_invert_tuple 2================\n");
+	printk(KERN_DEBUG"src=%pI6 dst=%pI6 ",
+			  inverse->src.u3.ip6, inverse->dst.u3.ip6);
+	printk(KERN_DEBUG"src=%pI6 dst=%pI6 ",
+			  orig->src.u3.ip6, orig->dst.u3.ip6);
+	pr_err("==========nf_ct_invert_tuple 2end================\n");
+	#endif
 	return l4proto->invert_tuple(inverse, orig);
 }
 EXPORT_SYMBOL_GPL(nf_ct_invert_tuple);
