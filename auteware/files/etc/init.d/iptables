@@ -90,6 +90,7 @@
 #
 #############################################################################
 IPTABLES="sudo /opt/bin/iptables"
+IP6TABLES="sudo /opt/bin/ip6tables"
 
 TRAFFIC_CONTROL="TRAFFIC_CONTROL"
 FW_FILTER="FW_FILTER"
@@ -204,6 +205,104 @@ if [ ! $? -eq 0 ]; then
 	$IPTABLES -N $STRICT_FORWARD
 	$IPTABLES -I FORWARD -j $STRICT_FORWARD
 	$IPTABLES -A $STRICT_FORWARD -j RETURN
+fi
+
+$IP6TABLES -nL $FW_FILTER > /dev/null 2>&1
+if [ ! $? -eq 0 ];then
+    $IP6TABLES -N $FW_FILTER
+    $IP6TABLES -I FORWARD -j $FW_FILTER
+    $IP6TABLES -A $FW_FILTER -j ACCEPT
+fi
+
+$IP6TABLES -nL $TRAFFIC_CONTROL > /dev/null 2>&1
+if [ ! $? -eq 0 ];then
+    $IP6TABLES -N $TRAFFIC_CONTROL
+    $IP6TABLES -I $FW_FILTER -j $TRAFFIC_CONTROL
+    $IP6TABLES -A $TRAFFIC_CONTROL -j RETURN
+fi
+
+$IP6TABLES -nL $FW_INPUT > /dev/null 2>&1
+if [ ! $? -eq 0 ];then
+    $IP6TABLES -N $FW_INPUT
+    $IP6TABLES -I INPUT -j $FW_INPUT
+    $IP6TABLES -A $FW_INPUT -j RETURN
+fi
+
+$IP6TABLES -t nat -nL $FW_DNAT > /dev/null 2>&1
+if [ ! $? -eq 0 ];then
+    $IP6TABLES -t nat -N $FW_DNAT
+    $IP6TABLES -t nat -I PREROUTING -j $FW_DNAT
+    $IP6TABLES -t nat -A $FW_DNAT -j ACCEPT
+fi
+
+$IP6TABLES -t nat -nL $FW_SNAT > /dev/null 2>&1
+if [ ! $? -eq 0 ];then
+    $IP6TABLES -t nat -N $FW_SNAT
+    $IP6TABLES -t nat -I POSTROUTING -j $FW_SNAT
+    $IP6TABLES -t nat -A $FW_SNAT -j ACCEPT
+fi
+
+$IP6TABLES -nL $CP_FILTER > /dev/null 2>&1
+if [ ! $? -eq 0 ];then                        
+    $IP6TABLES -N $CP_FILTER
+    $IP6TABLES -I FORWARD -j $CP_FILTER
+    $IP6TABLES -A $CP_FILTER -j RETURN
+fi
+
+$IP6TABLES -nL $CP_DNAT -t nat > /dev/null 2>&1
+if [ ! $? -eq 0 ];then                        
+    $IP6TABLES -t nat -N $CP_DNAT
+    $IP6TABLES -t nat -I PREROUTING -j $CP_DNAT
+    $IP6TABLES -t nat -A $CP_DNAT -j RETURN
+fi
+
+$IP6TABLES -nL $MAC_PRE_FILTER > /dev/null 2>&1
+if [ ! $? -eq 0 ];then                        
+    $IP6TABLES -N $MAC_PRE_FILTER
+    $IP6TABLES -I FORWARD -j $MAC_PRE_FILTER
+    $IP6TABLES -A $MAC_PRE_FILTER -j RETURN
+fi
+
+$IP6TABLES -nL $MAC_PRE_DNAT -t nat > /dev/null 2>&1
+if [ ! $? -eq 0 ];then                        
+    $IP6TABLES -t nat -N $MAC_PRE_DNAT
+    $IP6TABLES -t nat -I PREROUTING -j $MAC_PRE_DNAT
+    $IP6TABLES -t nat -A $MAC_PRE_DNAT -j RETURN
+fi
+
+$IP6TABLES -nL $EAP_FILTER > /dev/null 2>&1
+if [ ! $? -eq 0 ];then                        
+    $IP6TABLES -N $EAP_FILTER
+    $IP6TABLES -I FORWARD -j $EAP_FILTER
+    $IP6TABLES -A $EAP_FILTER -j RETURN
+fi
+
+$IP6TABLES -nL $EAP_DNAT -t nat > /dev/null 2>&1
+if [ ! $? -eq 0 ];then                        
+    $IP6TABLES -t nat -N $EAP_DNAT
+    $IP6TABLES -t nat -I PREROUTING -j $EAP_DNAT
+    $IP6TABLES -t nat -A $EAP_DNAT -j RETURN
+fi
+
+$IP6TABLES -nL $STRICT_INPUT > /dev/null 2>&1
+if [ ! $? -eq 0 ]; then
+	$IP6TABLES -N $STRICT_INPUT
+	$IP6TABLES -I INPUT -j $STRICT_INPUT
+	$IP6TABLES -A $STRICT_INPUT -j RETURN
+fi
+
+$IP6TABLES -nL $STRICT_OUTPUT > /dev/null 2>&1
+if [ ! $? -eq 0 ]; then
+	$IP6TABLES -N $STRICT_OUTPUT
+	$IP6TABLES -I OUTPUT -j $STRICT_OUTPUT
+	$IP6TABLES -A $STRICT_OUTPUT -j RETURN
+fi
+
+$IP6TABLES -nL $STRICT_FORWARD > /dev/null 2>&1
+if [ ! $? -eq 0 ]; then
+	$IP6TABLES -N $STRICT_FORWARD
+	$IP6TABLES -I FORWARD -j $STRICT_FORWARD
+	$IP6TABLES -A $STRICT_FORWARD -j RETURN
 fi
 
 mem=`cat /proc/meminfo | grep MemTotal | awk '{print $2}'`
