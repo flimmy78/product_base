@@ -393,7 +393,7 @@ static inline char *pack_hex_byte(char *buf, u8 byte)
 #endif
 
 /*huangjing##add ipv6_nat_debug() should produce zero code unless DEBUG is defined */
-#define IPV6_NAT_DEBUG
+/*#define IPV6_NAT_DEBUG*/
 
 #ifdef IPV6_NAT_DEBUG
 #define ipv6_nat_debug(fmt, ...) \
