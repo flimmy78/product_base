@@ -3909,11 +3909,11 @@ DEFUN(config_fdb_static_delete_port_cmd_func,
 
 DEFUN(config_fdb_delete_trunk_cmd_func,
 	config_fdb_delete_trunk_cmd,
-	"delete fdb trunk <1-127>",
+	"delete fdb trunk <1-64>",
 	"Delete FDB table\n"
 	"Config FDB table \n"
 	"FDB table trunk\n"
-	"Config FDB trunk value, range in <1-127> \n"
+	"Config FDB trunk value, range in <1-64> \n"
 )
 {
 	DBusMessage *query, *reply;

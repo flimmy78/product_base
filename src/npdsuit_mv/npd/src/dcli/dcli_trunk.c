@@ -1854,7 +1854,7 @@ DEFUN(delete_trunk_cmd_fun,
 	"delete trunk <1-64>",
 	"Delete trunk on system\n"
 	"Trunk entity\n"
-	"Trunk ID range <1-110>\n")
+	"Trunk ID range <1-64>\n")
 {
 	DBusMessage *query = NULL, *reply = NULL;
 	DBusError err;
@@ -1942,7 +1942,7 @@ DEFUN(delete_trunk_cmd_fun,
 					vty_out(vty,"%% Error occurs in Config on HW.\n");
 				}
 				else if(TRUNK_RETURN_CODE_ERR_NONE == op_ret) {
-					/*vty_out(vty,"query reply op %d ,Delete trunk %d OK.\n",op_ret,trunkId);*/
+					vty_out(vty,"Delete trunk %d OK. trunk member will add to default vlan 1\n",op_ret,trunkId);
 				}
 			} 
 			else 
