@@ -1646,10 +1646,10 @@ int non_active_master_board_keep_alive_test_client(void *arg)
 		temp_info->core_temp = temp;
 		
 		temp = temp/1000;
-		if (local_board->board_type == BOARD_TYPE_AX81_12X 
-			|| local_board->board_type == BOARD_TYPE_AX81_1X12G12S
-			|| local_board->board_type == BOARD_TYPE_AX71_1X12G12S 
-			/*|| local_board->board_type == BOARD_TYPE_AX81_4X*/ )
+		if (local_board->board_id == BOARD_SOFT_ID_AX81_12X 
+			|| local_board->board_id == BOARD_SOFT_ID_AX81_1X12G12S
+			|| local_board->board_id == BOARD_SOFT_ID_AX7605I_1X12G12S 
+			/*|| local_board->board_id == BOARD_SOFT_ID_AX81_AC4X*/ )
 		{
 			if (temp >= 105){
 				
@@ -1931,7 +1931,7 @@ void AX81_1X12G12S_board_special_init(int *reboot_flag)
 {
 	/*huangjing@autelan.com.Init for FPGA*/
 	#if 1
-	if(local_board->board_code == AX81_1X12G12S_BOARD_CODE)
+	if(local_board->board_id == BOARD_SOFT_ID_AX81_1X12G12S)
 	{
 		car_head = creat_car_linklist();
 		if(car_head == NULL)
@@ -1953,7 +1953,7 @@ void AX81_1X12G12S_board_special_init(int *reboot_flag)
     	}
 	}
     #if 0
-	if(local_board->board_code == AX81_1X12G12S_BOARD_CODE)
+	if(local_board->board_id == BOARD_SOFT_ID_AX81_1X12G12S)
 	{
         if (sem_thread_create(&FPGA_keep_alive_thread, (void *)ax81_1x12g12s_download_fpga_QT, NULL, IS_DETACHED) != SEM_THREAD_CREATE_SUCCESS)
     	{
@@ -1967,7 +1967,7 @@ void AX81_1X12G12S_board_special_init(int *reboot_flag)
 /*AX81_CRSMUE Board's unique needs*/
 void AX81_CRSMUE_board_special_init(int *reboot_flag)
 {
-	if (local_board->board_type == BOARD_TYPE_AX81_SMUE && local_board->board_code == AX81_CRSMUE_BOARD_CODE)
+	if (local_board->board_id == BOARD_SOFT_ID_AX81_SMUE)
 	{
 		if (sem_thread_create(&ax81_smue_panel_port_check, (void *)ax81_smue_panel_port_check_fc, NULL, IS_DETACHED) != SEM_THREAD_CREATE_SUCCESS)
 	    {
@@ -2137,7 +2137,7 @@ int main(int argc,char **argv)
 			usleep(1000);
 		}
 	}
-	if (local_board->board_type == BOARD_TYPE_AX81_AC12C && local_board->board_code == AX81_AC12C_BOARD_CODE)
+	if (local_board->board_id == BOARD_SOFT_ID_AX81_AC12C)
 	{
 		if (sem_thread_create(&slave_cpu_port_check, (void *)slave_cpu_port_check_fc, NULL, IS_DETACHED) != SEM_THREAD_CREATE_SUCCESS)
 	    {

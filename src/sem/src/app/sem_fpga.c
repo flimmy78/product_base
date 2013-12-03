@@ -5114,7 +5114,7 @@ DBusMessage *sem_dbus_local_check_board_type(DBusConnection *conn, DBusMessage *
 
 	dbus_error_init(&err);
 
-    if(local_board->board_type == BOARD_TYPE_AX81_1X12G12S || local_board->board_type == BOARD_TYPE_AX71_1X12G12S)
+    if(local_board->board_id == BOARD_SOFT_ID_AX81_1X12G12S || local_board->board_id == BOARD_SOFT_ID_AX7605I_1X12G12S)
     {
         ret = 1;
 	}
@@ -5155,7 +5155,7 @@ DBusMessage *sem_dbus_check_board_type(DBusConnection *conn, DBusMessage *msg, v
 		sem_syslog_dbg("sem_dbus_check_board_type get arg failed and reset normal\n");
 	}
 
-    if(local_board->board_type == BOARD_TYPE_AX81_1X12G12S || local_board->board_type == BOARD_TYPE_AX71_1X12G12S)
+    if(local_board->board_id == BOARD_SOFT_ID_AX81_1X12G12S || local_board->board_id == BOARD_SOFT_ID_AX7605I_1X12G12S)
     {
         ret = 1;
 	}

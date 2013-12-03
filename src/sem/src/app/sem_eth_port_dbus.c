@@ -1500,7 +1500,7 @@ DBusMessage * sem_dbus_ethports_interface_show_ethport_stat
 	{
 		ret = ETHPORT_RETURN_CODE_NO_SUCH_PORT;
 	}
-	else if((local_board->board_code == AX81_1X12G12S_BOARD_CODE && local_port_no == 25) ||(local_board->board_code == AX71_1X12G12S_BOARD_CODE && local_port_no == 25))
+	else if((local_board->board_id == BOARD_SOFT_ID_AX81_1X12G12S && local_port_no == 25) ||(local_board->board_id == BOARD_SOFT_ID_AX7605I_1X12G12S && local_port_no == 25))
 	{
         ret = INTERFACE_RETURN_CODE_FPGA_ETH_XGE_FIBER;
 	}

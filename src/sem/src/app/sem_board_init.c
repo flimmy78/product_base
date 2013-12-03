@@ -362,8 +362,8 @@ int set_local_board(void)
 	}
 
 	if (product->product_type == XXX_YYY_AX8603 && 
-		(local_board->board_type == BOARD_TYPE_AX81_AC8C || local_board->board_type == BOARD_TYPE_AX81_AC12C || 
-		local_board->board_type == BOARD_TYPE_AX81_1X12G12S || local_board->board_type == BOARD_TYPE_AX81_AC4X)) {
+		(local_board->board_id == BOARD_SOFT_ID_AX81_AC8C || local_board->board_id == BOARD_SOFT_ID_AX81_AC12C || 
+		local_board->board_id == BOARD_SOFT_ID_AX81_1X12G12S || local_board->board_id == BOARD_SOFT_ID_AX81_AC4X)) {
 		for (ret=0; ret<product->master_slot_count; ret++) {
 			if (product->master_slot_id[ret] == local_board->slot_id) {
 				local_board->is_master = IS_MASTER;
