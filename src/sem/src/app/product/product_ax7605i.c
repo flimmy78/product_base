@@ -602,6 +602,13 @@ int ax71_tipc_init(board_fix_param_t *board)
 		system(sbuff);
 		sleep(1);
 	}
+	/* init ipv6 address for obc0 */
+	if (board->is_master)
+	{
+		memset(sbuff, 0, 64);
+		sprintf(sbuff, "ip addr add fe00::%d.%d.%d.%d/120 dev obc0", 169, 254, 2, board->slot_id+1);
+		system(sbuff);						
+	}	
 	#endif
 	return 0;
 }

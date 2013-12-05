@@ -404,6 +404,17 @@ int ax81_tipc_init(board_fix_param_t *board)
 		system(sbuff);
 		system("echo 1 > /sys/module/e1000e/parameters/e1000e_rx_en");/*enable e1000e rx packet.*/
 	}
+
+	/* add ipv6 address */
+	if (board->board_type == BOARD_TYPE_AX81_AC8C ||
+		board->board_type == BOARD_TYPE_AX81_AC12C ||
+		board->board_type == BOARD_TYPE_AX81_1X12G12S)
+	{
+		sem_syslog_dbg("config slot %d ve port ipv6 address\n", board->slot_id+1);		
+		memset(sbuff, 0, 64);
+		sprintf(sbuff, "ip addr add fe00::%d.%d.%d.%d/120 dev ve%02df%d", 169, 254, 2, board->slot_id+1, board->slot_id+1, 1);
+		system(sbuff);				
+	}	
 	#endif
 	
 	return 0;
