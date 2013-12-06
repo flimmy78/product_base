@@ -1942,7 +1942,7 @@ DEFUN(delete_trunk_cmd_fun,
 					vty_out(vty,"%% Error occurs in Config on HW.\n");
 				}
 				else if(TRUNK_RETURN_CODE_ERR_NONE == op_ret) {
-					vty_out(vty,"Delete trunk %d OK. trunk member will add to default vlan 1\n",trunkId);
+					vty_out(vty,"Delete trunk %d OK. trunk member will add to default vlan 1\n",op_ret,trunkId);
 				}
 			} 
 			else 

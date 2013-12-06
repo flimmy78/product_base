@@ -10328,7 +10328,7 @@ end_without_close_fd:
         socklen_t addr_len;
 		unsigned int filter = 0;
 		unsigned int ipAddr = 0;
-		unsigned char *ifName = NULL;
+		unsigned char *ifName = NULL,*dst_ifname = NULL;
 		unsigned int state = 0;
 		unsigned char macAddr[MAC_ADDR_LEN] = {0};
 		unsigned int signal = FALSE;
@@ -10364,7 +10364,8 @@ end_without_close_fd:
 		dbus_message_iter_get_basic(&iter, &filterType);
 
 		dbus_message_iter_next(&iter);
-		if(ARP_FILTER_MAC == filterType){
+		if(ARP_FILTER_MAC == filterType)
+		{
 			dbus_message_iter_get_basic(&iter, &f_macAddr[0]);
 			dbus_message_iter_next(&iter);
 			
@@ -10383,23 +10384,38 @@ end_without_close_fd:
 			dbus_message_iter_get_basic(&iter, &f_macAddr[5]);
 			dbus_message_iter_next(&iter);
 
-            mac = (char*)&f_macAddr;
-           
+            mac = (char*)&f_macAddr;  
 		}
-		else if(ARP_FILTER_NONE != filterType){			
+		else if(ARP_FILTER_NONE != filterType)
+		{			
 			dbus_message_iter_get_basic(&iter, &filter);
 			dbus_message_iter_next(&iter);
+			if(ARP_FILTER_IFINDEX == filterType)
+			{
+				dst_ifname = (char *)malloc(MAX_IFNAME_LEN+1);
+				memset(dst_ifname,0,MAX_IFNAME_LEN+1);
+				dbus_message_iter_get_basic(&iter, &dst_ifname);
+				dbus_message_iter_next(&iter); 
+				filter = if_nametoindex(dst_ifname);
+
+
+				npd_syslog_dbg("filter = %d,dst_ifname = %s\n",filter,dst_ifname);
+				free(dst_ifname);
+				dst_ifname = NULL;
+			}
 		}
 			
 		ifName = (unsigned char *)malloc(MAX_IFNAME_LEN + 1);
-		if(!ifName){
+		if(!ifName)
+		{
 			npd_syslog_err("memory malloc failed!\n");
 			return NULL;
 		}
 		memset(ifName, 0, MAX_IFNAME_LEN + 1);
         reply = dbus_message_new_method_return(msg);
 		npd_syslog_dbg("enter show ip neigh,reply %s\n",reply ? "not null":"null");
-		if(!reply){
+		if(!reply)
+		{
 			free(ifName);
 			return NULL;
 		}
@@ -10407,7 +10423,8 @@ end_without_close_fd:
 		
 		ret_count  = arp_entry_count(filterType, filter, mac);
 
-		if (ret_count < 0) {
+		if (ret_count < 0) 
+		{
 			npd_syslog_err("arp_entry_count error!\n");
 			ret = ARP_RETURN_CODE_ERROR;
 			goto end;
