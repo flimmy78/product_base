@@ -145,6 +145,139 @@ int cvm_rpa_local_netdevnum_get(int ifindex)
 }
 EXPORT_SYMBOL(cvm_rpa_local_netdevnum_get);
 
+/*
+ * broadcast the neighbor advertisement packet for ipv6 function 
+ * caojia , 20111012
+ */
+rpa_callback_result_t rpa_ipv6_neighbor_advertisement_broadcast(struct sk_buff *skb)
+{
+	struct ethhdr *ether_header;
+	rpa_vlan_eth_header *vlan_ether_header;
+	struct ipv6hdr *ipv6_header;
+	struct icmp6hdr *icmp6_header;
+
+	int netdevNum = 0;
+	int slot = 0;
+	struct sk_buff *skb_cp = NULL;
+	int ret;
+
+	if ((NULL == skb) || (NULL == skb->dev)) {
+		return -1;
+	}
+
+	if (cvm_rpa_tx_hook == NULL) {
+		return -1;
+	}
+
+	if (!rpa_broadcast_mask) {
+		return 0;
+	}
+
+	if ((skb->dev->priv_flags & IFF_RPA) || (skb->dev->priv_flags & IFF_802_1Q_VLAN)) {
+		return 0;
+	}
+
+	if (skb->mac_header) {
+		ether_header = eth_hdr(skb);
+		vlan_ether_header = (rpa_vlan_eth_header *)eth_hdr(skb);
+	}
+	else {
+		return 0;
+	}
+
+	/* is ipv6 packet */
+	if (likely(ETH_P_IPV6 == ntohs(ether_header->h_proto)))
+	{
+		ipv6_header = (struct ipv6hdr *)(skb->data);
+
+		/* next header is icmpv6*/
+		if (likely(0x6 == ipv6_header->version) && likely(0x3a == ipv6_header->nexthdr))
+		{
+			icmp6_header = (struct icmp6hdr *)(skb->data + 40);
+		}
+		else
+		{
+			return -1;
+		}
+	}
+	else if ((ETH_P_8021Q == vlan_ether_header->vlan_type) && \
+		(ETH_P_IPV6 == vlan_ether_header->ether_type))
+	{
+		ipv6_header = (struct ipv6hdr *)(skb->data + 4);
+
+		/* next header is icmpv6*/
+		if (likely(0x6 == ipv6_header->version) && likely(0x3a == ipv6_header->nexthdr))
+		{
+			icmp6_header = (struct icmp6hdr *)(skb->data + 40 + 4);
+		}
+		else
+		{
+			return -1;
+		}
+	}
+	else
+	{
+		return -1;
+	}
+
+	/* icmpv6 type is neighbor advertisement */
+	if (likely(0x88 == icmp6_header->icmp6_type))
+	{
+		netdevNum = cvm_rpa_local_netdevnum_get(skb->dev->ifindex);
+		if (netdevNum < 0)
+		{
+			return 0;
+		}
+		for (slot = 0; slot < RPA_SLOT_NUM; slot++)
+		{	
+			if (slot == rpa_local_slot_num || !((rpa_broadcast_mask >> slot) & 0x1)) {
+				continue;
+			}
+			
+			if (rpa_arp_send_dev[slot].netdev)
+			{
+				skb_cp = skb_copy(skb, GFP_ATOMIC);/*copy the skb */
+				if (!skb_cp) {
+					rpa_warning("skb_copy failed in rpa_arp_broadcast!\n");
+					return -1;
+				}
+
+				else
+				{
+					skb_cp->data = (unsigned char *)eth_hdr(skb_cp);
+					skb_cp->len += RPA_ETHER_HEAD_LEN;
+				}
+
+				skb_cp->dev = rpa_arp_send_dev[slot].netdev;
+				ret = cvm_rpa_tx_hook(skb_cp, skb_cp->dev, netdevNum, RPA_ENTER_STACK_ENABLE);
+				if (ret != 0) {
+/*					kfree_skb(skb_cp); skb has been freed in cvm_rpa_tx_hook.*/ 
+					if (rpa_arp_eth_debug) {
+						rpa_info("IPV6 Neighbor Advertisement send to slot %d by rpa failed !\n", slot);
+					}
+				}
+				else {
+					if (rpa_arp_eth_debug) {
+						rpa_info("IPV6 Neighbor Advertisement send to slot %d by rpa sucess!\n", slot);
+					}
+				}
+			}
+			else {
+				if (rpa_arp_eth_debug) {
+					printk("rpa_arp_send_dev[%d].netdev not exist!\n", slot);
+				}
+			}
+		}
+	}
+	else
+	{
+		return 0;
+	}
+
+	return 0;
+}
+
+
 rpa_callback_result_t rpa_arp_broadcast(struct sk_buff *skb)
 {
 	struct ethhdr *ether_header;

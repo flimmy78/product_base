@@ -207,6 +207,7 @@ EXPORT_SYMBOL(dev_base_lock);
 unsigned int (*cvm_rpa_rx_hook)(struct net_device *dev, struct sk_buff *skb, unsigned int flag) = NULL;
 int (*cvm_rpa_tx_hook)(struct sk_buff *skb, struct net_device *netdev, unsigned int netdevNum, int flag) = NULL;
 int (*cvm_rpa_arp_bc_hook)(struct sk_buff *) = NULL;
+int (*rpa_ipv6_na_bc_hook)(struct sk_buff *) = NULL;
 
 int (*cvm_pfm_rx_hook)(struct sk_buff*) = NULL;
 int (* rcv_rate_limit_hook)(unsigned int * ,int) = NULL;
@@ -222,6 +223,7 @@ int (*pppoe_rx_hook)(struct sk_buff *) = NULL;
 EXPORT_SYMBOL(cvm_rpa_rx_hook);
 EXPORT_SYMBOL(cvm_rpa_tx_hook);
 EXPORT_SYMBOL(cvm_rpa_arp_bc_hook);
+EXPORT_SYMBOL(rpa_ipv6_na_bc_hook);
 EXPORT_SYMBOL(cvm_pfm_rx_hook);
 EXPORT_SYMBOL(cvm_sfd_rx_hook);
 EXPORT_SYMBOL(cvm_arp_rx_hook);
@@ -2425,6 +2427,10 @@ int netif_receive_skb(struct sk_buff *skb)
 	if (cvm_rpa_arp_bc_hook)
 	{
 		cvm_rpa_arp_bc_hook(skb);
+	}
+	if (rpa_ipv6_na_bc_hook)
+	{
+		rpa_ipv6_na_bc_hook(skb);
 	}
 
 	if(cvm_pfm_rx_hook){

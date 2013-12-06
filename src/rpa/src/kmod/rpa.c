@@ -91,6 +91,7 @@ extern cvmx_bootinfo_t *octeon_bootinfo;
 extern unsigned int (*cvm_rpa_rx_hook)(struct net_device *dev, struct sk_buff *skb, unsigned int flag);
 extern int (*cvm_rpa_tx_hook)(struct sk_buff *skb, struct net_device *netdev, unsigned int netdevNum, int flag);
 extern int (*cvm_rpa_arp_bc_hook)(struct sk_buff *);
+extern int (*rpa_ipv6_na_bc_hook)(struct sk_buff *);
 extern rpa_callback_t rpa_intercept_cb;
 extern unsigned int rpa_rcv_skb_data_offset;
 extern mac_addr_stored_t stored_base_mac;
@@ -109,6 +110,7 @@ extern int cvm_rpa_dev_index_print(unsigned int slot);
 extern int rpa_tx_dev_index_init(product_type_t product_type, board_type_t board_type);
 extern int rpa_tx_dev_index_clear(void);
 extern int rpa_arp_broadcast(struct sk_buff * skb);
+extern int rpa_ipv6_neighbor_advertisement_broadcast(struct sk_buff * skb);
 extern int rpa_xmit_with_4094_vlan(struct sk_buff *skb, struct net_device *dev);
 extern int rpa_xmit_with_4093_vlan(struct sk_buff *skb, struct net_device *dev);
 extern int rpa_send_xmit_with_default_vlan(struct sk_buff *skb, struct net_device *dev, unsigned int portNum, int flag);
@@ -676,6 +678,11 @@ static int __init rpa_init_module(void)
 		cvm_rpa_arp_bc_hook = rpa_arp_broadcast;
 	}
 
+	if (NULL == rpa_ipv6_na_bc_hook)
+	{
+		rpa_ipv6_na_bc_hook = rpa_ipv6_neighbor_advertisement_broadcast;
+	}
+
 	return 0;
 }
 
@@ -720,6 +727,7 @@ static void __exit rpa_cleanup_module(void)
 	cvm_rpa_rx_hook = NULL;
 	cvm_rpa_tx_hook = NULL;
 	cvm_rpa_arp_bc_hook = NULL;
+	rpa_ipv6_na_bc_hook = NULL;
  
 	rpa_dev_cleanup();
 	rpa_tx_dev_index_clear();
