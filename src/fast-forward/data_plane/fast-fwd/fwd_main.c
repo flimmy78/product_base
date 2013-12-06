@@ -3862,30 +3862,35 @@ static inline int acl_cache_flow(cvmx_wqe_t* work, control_cmd_t * fccp_cmd)
 	}
 	else if(fccp_cmd->cmd_opcode == FCCP_CMD_USER_ONLINE)
 	{
-		if(user_action_online(fccp_cmd->fccp_data.user_info.user_ip) != RETURN_OK)
+		if (0 != fccp_cmd->fccp_data.user_info.user_ip)
 		{
-			//return_fccp(work, FCCP_RETURN_ERROR, fccp_cmd, product_info.to_linux_fccp_group);
-			cvmx_helper_free_packet_data(work); /*free data*/                
-			cvmx_fpa_free(work, CVMX_FPA_WQE_POOL, 0); /*free wqe*/
-			return RETURN_ERROR;
+			user_action_online(fccp_cmd->fccp_data.user_info.user_ip);
 		}
-		//return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
+
+		if (0 != fccp_cmd->fccp_data.user_info.user_ipv6.s6_addr64[0])
+		{
+			user_ipv6_action_online(&fccp_cmd->fccp_data.user_info.user_ipv6);
+		}
+		
 		cvmx_helper_free_packet_data(work); /*free data*/                
 		cvmx_fpa_free(work, CVMX_FPA_WQE_POOL, 0); /*free wqe*/
 		return RETURN_OK;
 	}
 	else if(fccp_cmd->cmd_opcode == FCCP_CMD_USER_OFFLINE)
 	{
-		if(user_action_offline(fccp_cmd->fccp_data.user_info.user_ip) != RETURN_OK)
+		if (0 != fccp_cmd->fccp_data.user_info.user_ip)
 		{
-			//return_fccp(work, FCCP_RETURN_ERROR, fccp_cmd, product_info.to_linux_fccp_group);
-			cvmx_helper_free_packet_data(work); /*free data*/                
-			cvmx_fpa_free(work, CVMX_FPA_WQE_POOL, 0); /*free wqe*/
-			return RETURN_ERROR;
+			user_action_offline(fccp_cmd->fccp_data.user_info.user_ip);
 		}
+
+		if (0 != fccp_cmd->fccp_data.user_info.user_ipv6.s6_addr64[0])
+		{
+			user_ipv6_action_offline(&fccp_cmd->fccp_data.user_info.user_ipv6);
+		}
+
+		
 		cvmx_helper_free_packet_data(work); /*free data*/                
 		cvmx_fpa_free(work, CVMX_FPA_WQE_POOL, 0); /*free wqe*/
-		//return_fccp(work, FCCP_RETURN_OK, fccp_cmd, product_info.to_linux_fccp_group);
 		return RETURN_OK;
 	}	
 	else if(fccp_cmd->cmd_opcode == FCCP_CMD_USER_STATS_CLEAR)
@@ -4913,6 +4918,9 @@ static void application_main_loop(unsigned int coremask_data)
 			/*not tcp udp ipv6 dont support ,maybe support later*/
 			else
 			{
+				/*for user flow stats*/
+				CVM_WQE_SET_UNUSED(work, PACKET_TYPE_ETH_IP);
+				
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 						"IPV6 packet but next header not tcpudp,trap to linux.\n");
 				action_type = FLOW_ACTION_TOLINUX;			
@@ -4959,7 +4967,14 @@ capwap_decap:
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
 						"Warning]: recv capwap packet, decap capwap failed\n");
-				action_type = FLOW_ACTION_TOLINUX;			
+				action_type = FLOW_ACTION_TOLINUX;	
+
+				/* for ipv6 icmp user flow stats */
+				if ((NULL != in_ip) && (CVM_COMMON_IPPROTO_ICMPV6 == ((cvm_common_ipv6_hdr_t *)in_ip)->ip_nexthdr))
+				{
+					true_ip = in_ip;
+				}
+				
 				goto scheme_execute; 
 			}
 			true_ip = in_ip;
@@ -4971,7 +4986,14 @@ capwap_decap:
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_ERROR,
 						"Warning]: recv capwap 802.3 packet, decap capwap failed\n");
-				action_type = FLOW_ACTION_TOLINUX;			
+				action_type = FLOW_ACTION_TOLINUX;	
+
+				/* for ipv6 icmp user flow stats */
+				if ((NULL != in_ip) && (CVM_COMMON_IPPROTO_ICMPV6 == ((cvm_common_ipv6_hdr_t *)in_ip)->ip_nexthdr))
+				{
+					true_ip = in_ip;
+				}
+				
 				goto scheme_execute; 	
 			}
 			true_ip = in_ip;	
@@ -5068,7 +5090,6 @@ scheme_execute:
             (CVM_WQE_GET_UNUSED(work) == PACKET_TYPE_CAPWAP_802_3) ||
             (CVM_WQE_GET_UNUSED(work) == PACKET_TYPE_ICMP))
         {
-       
             user_flow_statistics_process(work,rule,true_ip);
         }
 

@@ -105,11 +105,17 @@ CVMX_SHARED uint32_t capwap_cache_tbl_size = 0;
 CVMX_SHARED rule_item_t  *acl_dynamic_tbl = NULL;
 CVMX_SHARED uint32_t acl_dynamic_tbl_size = 0;
 
-CVMX_SHARED user_item_t*  user_bucket_tbl = NULL;
+CVMX_SHARED user_ipv4_item_t*  user_bucket_tbl = NULL;
 CVMX_SHARED uint32_t user_static_tbl_size = 0;
 
-CVMX_SHARED user_item_t*  user_dynamic_tbl = NULL;
+CVMX_SHARED user_ipv4_item_t*  user_dynamic_tbl = NULL;
 CVMX_SHARED uint32_t user_dynamic_tbl_size = 0;
+
+CVMX_SHARED user_ipv6_item_t *user_ipv6_bucket_tbl = NULL;
+CVMX_SHARED uint32_t user_ipv6_static_tbl_size = 0;
+CVMX_SHARED user_ipv6_item_t*  user_ipv6_dynamic_tbl = NULL;
+CVMX_SHARED uint32_t user_ipv6_dynamic_tbl_size = 0;
+
 CVMX_SHARED func_item_t *se_agent_cmd_func_tbl = NULL;
 #define SLOTID_PATH         "/dbm/local_board/slot_id"
 
@@ -3152,6 +3158,9 @@ int se_agent_cmd_func_table_init()
 	se_agent_cmd_func_register(SE_AGENT_USER_ONLINE,(cmd_handle_func)se_agent_user_online);
 	se_agent_cmd_func_register(SE_AGENT_USER_OFFLINE,(cmd_handle_func)se_agent_user_offline);
 	se_agent_cmd_func_register(SE_AGENT_GET_USER_FLOWS,(cmd_handle_func)se_agent_get_user_flow_statistics);
+	//se_agent_cmd_func_register(SE_AGENT_USER_IPV6_ONLINE,(cmd_handle_func)se_agent_user_online);
+	//se_agent_cmd_func_register(SE_AGENT_USER_IPV6_OFFLINE,(cmd_handle_func)se_agent_user_offline);
+	//se_agent_cmd_func_register(SE_AGENT_GET_USER_IPV6_FLOWS,(cmd_handle_func)se_agent_get_user_flow_statistics);
 	se_agent_cmd_func_register(SE_AGENT_CONFIG_PURE_PAYLOAD_ACCT,(cmd_handle_func)se_agent_config_pure_payload_acct);
 	se_agent_cmd_func_register(SE_AGENT_CONFIG_TRAFFIC_MONITOR,(cmd_handle_func)se_agent_config_traffic_monitor);
 	se_agent_cmd_func_register(SE_AGENT_CLEAR_TRAFFIC_MONITOR,(cmd_handle_func)se_agent_clear_traffic_monitor);
@@ -3261,6 +3270,8 @@ void find_fastfwd_table()
 	const cvmx_bootmem_named_block_desc_t  *acl_dynamic_tbl_block = NULL;
 	const cvmx_bootmem_named_block_desc_t  *user_bucket_tbl_block = NULL;
 	const cvmx_bootmem_named_block_desc_t  *user_dynamic_tbl_block = NULL;
+	const cvmx_bootmem_named_block_desc_t  *user_ipv6_bucket_tbl_block = NULL;
+	const cvmx_bootmem_named_block_desc_t  *user_ipv6_dynamic_tbl_block = NULL;
 	acl_bucket_tbl_block=cvmx_bootmem_find_named_block(ACL_TBL_RULE_NAME);
 	if(!acl_bucket_tbl_block)
 	{
@@ -3302,7 +3313,7 @@ void find_fastfwd_table()
 	else
 	{
 		user_bucket_tbl = cvmx_phys_to_ptr(user_bucket_tbl_block->base_addr);
-		user_static_tbl_size = (user_bucket_tbl_block->size)/sizeof(user_item_t);
+		user_static_tbl_size = (user_bucket_tbl_block->size)/sizeof(user_ipv4_item_t);
 	}
 
 	user_dynamic_tbl_block = cvmx_bootmem_find_named_block(USER_DYNAMIC_TBL_RULE_NAME);
@@ -3313,8 +3324,31 @@ void find_fastfwd_table()
 	else
 	{
 		user_dynamic_tbl = cvmx_phys_to_ptr(user_dynamic_tbl_block->base_addr);
-		user_dynamic_tbl_size = (user_dynamic_tbl_block->size)/sizeof(user_item_t);
+		user_dynamic_tbl_size = (user_dynamic_tbl_block->size)/sizeof(user_ipv4_item_t);
 	}
+
+	user_ipv6_bucket_tbl_block = cvmx_bootmem_find_named_block(USER_IPV6_TBL_RULE_NAME);
+	if(!user_ipv6_bucket_tbl_block)
+	{
+		se_agent_syslog_err("find user ipv6 table block error\n");
+	}
+	else
+	{
+		user_ipv6_bucket_tbl = cvmx_phys_to_ptr(user_ipv6_bucket_tbl_block->base_addr);
+		user_ipv6_static_tbl_size = (user_ipv6_bucket_tbl_block->size)/sizeof(user_ipv6_item_t);
+	}
+
+	user_ipv6_dynamic_tbl_block = cvmx_bootmem_find_named_block(USER_IPV6_DYNAMIC_TBL_RULE_NAME);
+	if(!user_ipv6_dynamic_tbl_block)
+	{
+		se_agent_syslog_err("find user ipv6 dynamic table block error\n");
+	}
+	else
+	{
+		user_ipv6_dynamic_tbl = cvmx_phys_to_ptr(user_ipv6_dynamic_tbl_block->base_addr);
+		user_ipv6_dynamic_tbl_size = (user_ipv6_dynamic_tbl_block->size)/sizeof(user_ipv6_item_t);
+	}
+
 	return ;
 }
 

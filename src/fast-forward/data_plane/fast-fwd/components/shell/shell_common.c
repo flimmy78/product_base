@@ -4107,7 +4107,7 @@ void show_user_stats()
 
 #define USER_STATE(t)  ((t) == USER_IS_ONLINE ? "online" : ((t) == USER_IS_OFFLINE ? "offline" : "empty"))     
 
-void print_user(user_item_t* user)
+void print_user(user_ipv4_item_t* user)
 {
     if(user == NULL)
         return;
@@ -4122,7 +4122,7 @@ void print_user(user_item_t* user)
 
 void show_user_all()
 {
-	user_item_t *user;
+	user_ipv4_item_t *user;
 	uint64_t i = 0;
 	uint32_t online_user_cnt = 0;
 	uint32_t offline_user_cnt = 0;

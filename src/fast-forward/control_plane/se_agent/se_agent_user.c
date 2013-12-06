@@ -26,12 +26,16 @@ extern CVMX_SHARED int se_socket;
 
 extern CVMX_SHARED int nl_socket;
 
-extern CVMX_SHARED user_item_t*  user_bucket_tbl ;
+extern CVMX_SHARED user_ipv4_item_t*  user_bucket_tbl ;
 extern CVMX_SHARED uint32_t user_static_tbl_size ;
 extern CVMX_SHARED uint32_t user_dynamic_tbl_size ;
+extern CVMX_SHARED user_ipv6_item_t*  user_ipv6_bucket_tbl;
+extern CVMX_SHARED uint32_t user_ipv6_static_tbl_size;
+extern CVMX_SHARED uint32_t user_ipv6_dynamic_tbl_size;
 
 
-int read_user_rule(user_info_t *user_info, user_item_t *user_rule)
+
+int read_user_rule(user_info_t *user_info, user_ipv4_item_t *user_rule)
 {
     if((NULL == user_info) || (NULL == user_rule))
         return SE_AGENT_RETURN_FAIL;
@@ -49,7 +53,7 @@ int read_user_rule(user_info_t *user_info, user_item_t *user_rule)
 
 static inline uint32_t user_cache_bucket_lookup (uint32_t ip_address)
 {
-	user_item_t *bucket = NULL;
+	user_ipv4_item_t *bucket = NULL;
 	uint64_t idx = 0;
 
 #if defined(__KERNEL__) && defined(linux)
@@ -63,6 +67,26 @@ static inline uint32_t user_cache_bucket_lookup (uint32_t ip_address)
 
 	bucket = &user_bucket_tbl[idx];
 	cvmx_scratch_write64(CVM_SCR_USER_CACHE_PTR, (uint64_t) (CAST64(bucket)));
+	return (idx);
+}
+
+static inline uint32_t user_ipv6_cache_bucket_lookup (struct cvm_ip6_in6_addr *ipv6)
+{
+	user_ipv6_item_t *bucket;
+	uint64_t idx;
+
+#if defined(__KERNEL__) && defined(linux)
+	set_c0_status(ST0_CU2);
+#endif
+	CVMX_MT_CRC_POLYNOMIAL(0x1edc6f41);
+	CVMX_MT_CRC_IV(0);
+	CVMX_MT_CRC_DWORD(ipv6->s6_addr64[0]);
+	CVMX_MT_CRC_DWORD(ipv6->s6_addr64[1]);
+	CVMX_MF_CRC_IV(idx);
+	idx &= (user_ipv6_static_tbl_size - 1);
+
+	bucket = &user_ipv6_bucket_tbl[idx];
+	cvmx_scratch_write64(CVM_SCR_USER_IPV6_CACHE_PTR, (uint64_t) (CAST64(bucket)));
 	return (idx);
 }
 
@@ -112,7 +136,10 @@ int se_agent_user_online(char *buf,struct sockaddr_tipc *client_addr,unsigned in
 	se_buf->fccp_cmd.agent_pid=getpid();
 	if(SE_AGENT_RETURN_FAIL == (send_fccp(&(se_buf->fccp_cmd),0, FCCP_SEND_GROUP)))
 	{
-		se_agent_syslog_err("se_agent_user_online: user %d.%d.%d.%d online fail\n",IP_FMT(user_ip));
+		se_agent_syslog_err("se_agent_user_online: user %d.%d.%d.%d  online fail\n",IP_FMT(user_ip));
+		se_agent_syslog_err("se_agent_user_online: user %16lx %16lx online fail\n", \
+			se_buf->fccp_cmd.fccp_data.user_info.user_ipv6.s6_addr64[0], \
+			se_buf->fccp_cmd.fccp_data.user_info.user_ipv6.s6_addr64[1]);
 		return SE_AGENT_RETURN_FAIL;
 	}
 	return SE_AGENT_RETURN_OK;
@@ -145,7 +172,7 @@ int se_agent_user_offline(char *buf,struct sockaddr_tipc *client_addr,unsigned i
 	uint32_t user_ip = 0;
 	if(NULL==buf || NULL==client_addr ||0==len)
 	{
-		se_agent_syslog_err("se_agent_user_online  param error\n");
+		se_agent_syslog_err("se_agent_user_offline  param error\n");
 		return SE_AGENT_RETURN_FAIL;
 	}
 	se_buf=(se_interative_t *)buf;
@@ -161,9 +188,12 @@ int se_agent_user_offline(char *buf,struct sockaddr_tipc *client_addr,unsigned i
 	se_buf->fccp_cmd.cmd_opcode=FCCP_CMD_USER_OFFLINE;
 	se_buf->fccp_cmd.cmd_len=sizeof(control_cmd_t);
 	se_buf->fccp_cmd.agent_pid=getpid();
+	
 	if(SE_AGENT_RETURN_FAIL == (send_fccp(&(se_buf->fccp_cmd),0, FCCP_SEND_GROUP)))
 	{
-		se_agent_syslog_err("se_agent_user_offline: user %d.%d.%d.%d offline fail\n",IP_FMT(user_ip));
+		se_agent_syslog_err("se_agent_user_offline: user %d.%d.%d.%d ipv6 %16lx %16lx offline fail\n",IP_FMT(user_ip), \
+			se_buf->fccp_cmd.fccp_data.user_info.user_ipv6.s6_addr64[0], \
+			se_buf->fccp_cmd.fccp_data.user_info.user_ipv6.s6_addr64[1]);
 		return SE_AGENT_RETURN_FAIL;
 	}
 	return SE_AGENT_RETURN_OK;
@@ -190,7 +220,8 @@ int se_agent_user_offline(char *buf,struct sockaddr_tipc *client_addr,unsigned i
 int se_agent_get_user_flow_statistics(char *buf,struct sockaddr_tipc *client_addr,unsigned int len)
 {
 	se_interative_t *se_buf = NULL;
-	user_item_t * user_tbl = NULL;
+	user_ipv4_item_t * user_ipv4_tbl = NULL;
+	user_ipv6_item_t * user_ipv6_tbl = NULL;
 	int ret = 0;
 	uint32_t user_ip = 0;
 	if(NULL==buf || NULL==client_addr || 0==len)
@@ -199,53 +230,118 @@ int se_agent_get_user_flow_statistics(char *buf,struct sockaddr_tipc *client_add
 		return SE_AGENT_RETURN_FAIL;
 	}
 	se_buf=(se_interative_t *)buf;
-	user_ip = se_buf->fccp_cmd.fccp_data.user_info.user_ip;
-	
-	if(NULL == user_bucket_tbl)
+
+	if (0 != se_buf->fccp_cmd.fccp_data.user_info.user_ip)
 	{
-		strncpy((se_buf->err_info),FIND_USER_TLB_ERROR_STR,strlen(FIND_USER_TLB_ERROR_STR));
-		se_buf->cmd_result = AGENT_RETURN_FAIL;
-		goto SENDTO_DCLI;
-	}
-	
-	user_cache_bucket_lookup(user_ip);
-	user_tbl = CASTPTR(user_item_t, cvmx_scratch_read64(CVM_SCR_USER_CACHE_PTR));
-	if(0 == user_tbl->valid_entries )
-	{
-		strncpy((se_buf->err_info),USER_TBL_NO_USER_STR,strlen(USER_TBL_NO_USER_STR));
-		se_buf->cmd_result = AGENT_RETURN_FAIL;
-		goto SENDTO_DCLI;			
-	}
-	while(1)
-	{
-		if(user_tbl->user_info.user_state == USER_IS_EMPTY || user_tbl->user_info.user_ip != user_ip)
+		user_ip = se_buf->fccp_cmd.fccp_data.user_info.user_ip;
+
+		if(NULL == user_bucket_tbl)
 		{
-			if(NULL == user_tbl->next)
+			strncpy((se_buf->err_info),FIND_USER_TLB_ERROR_STR,strlen(FIND_USER_TLB_ERROR_STR));
+			se_buf->cmd_result = AGENT_RETURN_FAIL;
+			goto IPV6_PROCESS;
+		}
+		user_cache_bucket_lookup(user_ip);
+		user_ipv4_tbl = CASTPTR(user_ipv4_item_t, cvmx_scratch_read64(CVM_SCR_USER_CACHE_PTR));
+	
+	
+		if(0 == user_ipv4_tbl->valid_entries )
+		{
+			strncpy((se_buf->err_info),USER_TBL_NO_USER_STR,strlen(USER_TBL_NO_USER_STR));
+			se_buf->cmd_result = AGENT_RETURN_FAIL;
+			goto IPV6_PROCESS;			
+		}
+		while(1)
+		{
+			if(user_ipv4_tbl->user_info.user_state == USER_IS_EMPTY || user_ipv4_tbl->user_info.user_ip != user_ip)
+			{
+				if(NULL == user_ipv4_tbl->next)
+				{
+					strncpy((se_buf->err_info),USER_TBL_NO_USER_STR,strlen(USER_TBL_NO_USER_STR));
+					se_buf->cmd_result = AGENT_RETURN_FAIL;
+					goto IPV6_PROCESS;	
+				}
+				user_ipv4_tbl = (user_ipv4_item_t *)cvmx_phys_to_ptr((uint64_t)user_ipv4_tbl->next);
+			}
+			else
+			{
+				se_buf->fccp_cmd.fccp_data.user_info.forward_up_bytes = user_ipv4_tbl->user_info.forward_up_bytes;
+				se_buf->fccp_cmd.fccp_data.user_info.forward_up_packet = user_ipv4_tbl->user_info.forward_up_packet;
+				se_buf->fccp_cmd.fccp_data.user_info.forward_down_bytes = user_ipv4_tbl->user_info.forward_down_bytes;	
+				se_buf->fccp_cmd.fccp_data.user_info.forward_down_packet = user_ipv4_tbl->user_info.forward_down_packet;
+				se_buf->cmd_result = AGENT_RETURN_OK;
+				goto IPV6_PROCESS;	
+			}
+				
+		}
+	}
+
+IPV6_PROCESS:
+	if (0 != se_buf->fccp_cmd.fccp_data.user_info.user_ipv6.s6_addr64[0])
+	{
+		if(NULL == user_ipv6_bucket_tbl)
+		{
+			if (AGENT_RETURN_OK != se_buf->cmd_result)
+			{
+				strncpy((se_buf->err_info),FIND_USER_TLB_ERROR_STR,strlen(FIND_USER_TLB_ERROR_STR));
+				se_buf->cmd_result = AGENT_RETURN_FAIL;
+			}
+			goto SENDTO_DCLI;
+		}
+
+		user_ipv6_cache_bucket_lookup(&se_buf->fccp_cmd.fccp_data.user_info.user_ipv6);
+		user_ipv6_tbl = CASTPTR(user_ipv6_item_t, cvmx_scratch_read64(CVM_SCR_USER_IPV6_CACHE_PTR));
+	
+	
+		if(0 == user_ipv6_tbl->valid_entries)
+		{
+			if (AGENT_RETURN_OK != se_buf->cmd_result)
 			{
 				strncpy((se_buf->err_info),USER_TBL_NO_USER_STR,strlen(USER_TBL_NO_USER_STR));
 				se_buf->cmd_result = AGENT_RETURN_FAIL;
+			}
+			goto SENDTO_DCLI;			
+		}
+
+		while(1)
+		{
+			if(user_ipv6_tbl->user_info.user_state == USER_IS_EMPTY 
+				|| !((user_ipv6_tbl->user_info.user_ipv6.s6_addr64[0] == se_buf->fccp_cmd.fccp_data.user_info.user_ipv6.s6_addr64[0]) 
+				    && (user_ipv6_tbl->user_info.user_ipv6.s6_addr64[1] == se_buf->fccp_cmd.fccp_data.user_info.user_ipv6.s6_addr64[1])))
+			{
+				if(NULL == user_ipv6_tbl->next)
+				{
+					if (AGENT_RETURN_OK != se_buf->cmd_result)
+					{
+						strncpy((se_buf->err_info),USER_TBL_NO_USER_STR,strlen(USER_TBL_NO_USER_STR));
+						se_buf->cmd_result = AGENT_RETURN_FAIL;
+					}
+					goto SENDTO_DCLI;	
+				}
+				user_ipv6_tbl = (user_ipv6_item_t *)cvmx_phys_to_ptr((uint64_t)user_ipv6_tbl->next);
+			}
+			else
+			{
+				se_buf->fccp_cmd.fccp_data.user_info.ipv6_forward_up_bytes = user_ipv6_tbl->user_info.ipv6_forward_up_bytes;
+				se_buf->fccp_cmd.fccp_data.user_info.ipv6_forward_up_packet = user_ipv6_tbl->user_info.ipv6_forward_up_packet;
+				se_buf->fccp_cmd.fccp_data.user_info.ipv6_forward_down_bytes = user_ipv6_tbl->user_info.ipv6_forward_down_bytes;	
+				se_buf->fccp_cmd.fccp_data.user_info.ipv6_forward_down_packet = user_ipv6_tbl->user_info.ipv6_forward_down_packet;
+				se_buf->cmd_result = AGENT_RETURN_OK;
 				goto SENDTO_DCLI;	
 			}
-			user_tbl = (user_item_t *)cvmx_phys_to_ptr((uint64_t)user_tbl->next);
+				
 		}
-		else
-		{
-			se_buf->fccp_cmd.fccp_data.user_info.forward_up_bytes = user_tbl->user_info.forward_up_bytes;
-			se_buf->fccp_cmd.fccp_data.user_info.forward_up_packet = user_tbl->user_info.forward_up_packet;
-			se_buf->fccp_cmd.fccp_data.user_info.forward_down_bytes = user_tbl->user_info.forward_down_bytes;	
-			se_buf->fccp_cmd.fccp_data.user_info.forward_down_packet = user_tbl->user_info.forward_down_packet;
-			se_buf->cmd_result = AGENT_RETURN_OK;
-			goto SENDTO_DCLI;	
-		}
-			
 	}
+
 SENDTO_DCLI:
+	
 	ret=sendto(se_socket,buf, sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
 	if(ret<0)
 	{
 		se_agent_syslog_err("se_agent_get_user_flow_statistics send to dcli failed\n");
 		return SE_AGENT_RETURN_FAIL;
 	}
+	
 	return SE_AGENT_RETURN_OK;
 
 }
@@ -320,11 +416,15 @@ int se_agent_config_pure_payload_acct(char *buf,struct sockaddr_tipc *client_add
 void se_agent_show_fwd_user_stats(char *buf,struct sockaddr_tipc *client_addr,unsigned int len)
 {
     se_interative_t *se_buf=NULL;
-	user_item_t     *s_tbl_rule = NULL;
-	user_item_t     *d_tbl_rule = NULL;
+	user_ipv4_item_t     *ipv4_s_tbl_rule = NULL;
+	user_ipv4_item_t     *ipv4_d_tbl_rule = NULL;
+	user_ipv6_item_t     *ipv6_s_tbl_rule = NULL;
+	user_ipv6_item_t     *ipv6_d_tbl_rule = NULL;
 	int         ret=0;
     int32_t     s_tbl_used_rule = 0;
 	int32_t     d_tbl_used_rule=0;
+    int32_t     ipv6_s_tbl_used_rule = 0;
+	int32_t     ipv6_d_tbl_used_rule=0;
 	uint32_t    static_loop = 0;
 
 	if(NULL==buf || NULL==client_addr || 0==len)
@@ -334,39 +434,72 @@ void se_agent_show_fwd_user_stats(char *buf,struct sockaddr_tipc *client_addr,un
 	}
 	se_buf=(se_interative_t *)buf;
 
-	if((user_bucket_tbl == NULL) || (FASTFWD_NOT_LOADED == fast_forward_module_load_check()))
+	if(((user_bucket_tbl == NULL) && (user_ipv6_bucket_tbl == NULL)) || (FASTFWD_NOT_LOADED == fast_forward_module_load_check()))
 	{
 		strncpy(se_buf->err_info,FASTFWD_NO_RESPOND_STR,sizeof(FASTFWD_NO_RESPOND_STR));
 		se_buf->cmd_result = AGENT_RETURN_FAIL;
 		goto SEND_DCLI;
 	}
-	
-	for(static_loop = 0; static_loop < user_static_tbl_size; static_loop++)
-	{ 
-		s_tbl_rule = (user_item_t *)user_bucket_tbl+static_loop;
-		if(s_tbl_rule->user_info.user_state == USER_IS_EMPTY)
-		{
-			if(NULL == s_tbl_rule->next)
-				continue;             
+
+	if (NULL != user_bucket_tbl)
+	{
+		for(static_loop = 0; static_loop < user_static_tbl_size; static_loop++)
+		{ 
+			ipv4_s_tbl_rule = (user_ipv4_item_t *)user_bucket_tbl+static_loop;
+			if(ipv4_s_tbl_rule->user_info.user_state == USER_IS_EMPTY)
+			{
+				if(NULL == ipv4_s_tbl_rule->next)
+					continue;             
+			}
+			else
+			{
+		        s_tbl_used_rule++;
+			}
+			/* dynamic info */
+			ipv4_d_tbl_rule = ipv4_s_tbl_rule->next;
+			while(ipv4_d_tbl_rule != NULL)
+			{
+				ipv4_d_tbl_rule = cvmx_phys_to_ptr((uint64_t)ipv4_d_tbl_rule);
+		        d_tbl_used_rule++;
+				ipv4_d_tbl_rule = ipv4_d_tbl_rule->next;
+			}		
 		}
-		else
-		{
-            s_tbl_used_rule++;
-		}
-		/* dynamic info */
-		d_tbl_rule = s_tbl_rule->next;
-		while(d_tbl_rule != NULL)
-		{
-			d_tbl_rule = cvmx_phys_to_ptr((uint64_t)d_tbl_rule);
-            d_tbl_used_rule++;
-			d_tbl_rule = d_tbl_rule->next;
-		}		
+
+		se_buf->fccp_cmd.fccp_data.user_stats.user_static_tbl_size = user_static_tbl_size;
+		se_buf->fccp_cmd.fccp_data.user_stats.user_dynamic_tbl_size = user_dynamic_tbl_size;
+		se_buf->fccp_cmd.fccp_data.user_stats.s_tbl_used_rule = s_tbl_used_rule;
+		se_buf->fccp_cmd.fccp_data.user_stats.d_tbl_used_rule = d_tbl_used_rule;
 	}
-	
-	se_buf->fccp_cmd.fccp_data.user_stats.user_static_tbl_size = user_static_tbl_size;
-	se_buf->fccp_cmd.fccp_data.user_stats.user_dynamic_tbl_size = user_dynamic_tbl_size;
-	se_buf->fccp_cmd.fccp_data.user_stats.s_tbl_used_rule = s_tbl_used_rule;
-	se_buf->fccp_cmd.fccp_data.user_stats.d_tbl_used_rule = d_tbl_used_rule;
+
+	if (NULL != user_ipv6_bucket_tbl)
+	{
+		for(static_loop = 0; static_loop < user_ipv6_static_tbl_size; static_loop++)
+		{ 
+			ipv6_s_tbl_rule = (user_ipv6_item_t *)user_ipv6_bucket_tbl+static_loop;
+			if(ipv6_s_tbl_rule->user_info.user_state == USER_IS_EMPTY)
+			{
+				if(NULL == ipv6_s_tbl_rule->next)
+					continue;             
+			}
+			else
+			{
+		        ipv6_s_tbl_used_rule++;
+			}
+			/* dynamic info */
+			ipv6_d_tbl_rule = ipv6_s_tbl_rule->next;
+			while(ipv6_d_tbl_rule != NULL)
+			{
+				ipv6_d_tbl_rule = cvmx_phys_to_ptr((uint64_t)ipv6_d_tbl_rule);
+		        ipv6_d_tbl_used_rule++;
+				ipv6_d_tbl_rule = ipv6_d_tbl_rule->next;
+			}		
+		}
+
+		se_buf->fccp_cmd.fccp_data.user_stats.ipv6_user_static_tbl_size = user_ipv6_static_tbl_size;
+		se_buf->fccp_cmd.fccp_data.user_stats.ipv6_user_dynamic_tbl_size = user_ipv6_dynamic_tbl_size;
+		se_buf->fccp_cmd.fccp_data.user_stats.ipv6_s_tbl_used_rule = ipv6_s_tbl_used_rule;
+		se_buf->fccp_cmd.fccp_data.user_stats.ipv6_d_tbl_used_rule = ipv6_d_tbl_used_rule;
+	}
     se_buf->cmd_result=AGENT_RETURN_OK;
 
 SEND_DCLI:
@@ -402,7 +535,7 @@ SEND_DCLI:
 void se_agent_show_fwd_user_rule_all(char *buf,struct sockaddr_tipc *client_addr,unsigned int len)
 {
     se_interative_t *se_buf=NULL;
-	user_item_t 	*rule	= NULL;
+	user_ipv4_item_t 	*rule	= NULL;
 	int         ret=0;
 	uint32_t    i = 0;
 	uint32_t     static_loop = 0;
@@ -428,7 +561,7 @@ void se_agent_show_fwd_user_rule_all(char *buf,struct sockaddr_tipc *client_addr
     
 	for(static_loop=static_index; static_loop < user_static_tbl_size; static_loop++)
 	{ 
-		rule = (user_item_t *)user_bucket_tbl+static_loop;
+		rule = (user_ipv4_item_t *)user_bucket_tbl+static_loop;
 
         for(i=0; i<dynamic_index; i++)
         {
@@ -496,7 +629,7 @@ SEND_DCLI:
 int se_agent_show_user_rule_by_ip(char *buf,struct sockaddr_tipc *client_addr,unsigned int len)
 {
 	se_interative_t *se_buf = NULL;
-	user_item_t * user_tbl = NULL;
+	user_ipv4_item_t * user_tbl = NULL;
 	int ret = 0;
 	uint32_t user_ip = 0;
 	uint32_t user_index = 0xffffffff;
@@ -518,7 +651,7 @@ int se_agent_show_user_rule_by_ip(char *buf,struct sockaddr_tipc *client_addr,un
 	}
 	
 	user_index = user_cache_bucket_lookup(user_ip);
-	user_tbl = CASTPTR(user_item_t, cvmx_scratch_read64(CVM_SCR_USER_CACHE_PTR));
+	user_tbl = CASTPTR(user_ipv4_item_t, cvmx_scratch_read64(CVM_SCR_USER_CACHE_PTR));
 	if(0 == user_tbl->valid_entries )
 	{
 		strncpy((se_buf->err_info),USER_TBL_NO_USER_STR,strlen(USER_TBL_NO_USER_STR));
@@ -535,7 +668,7 @@ int se_agent_show_user_rule_by_ip(char *buf,struct sockaddr_tipc *client_addr,un
 				se_buf->cmd_result = AGENT_RETURN_FAIL;
 				goto SENDTO_DCLI;	
 			}
-			user_tbl = (user_item_t *)cvmx_phys_to_ptr((uint64_t)user_tbl->next);
+			user_tbl = (user_ipv4_item_t *)cvmx_phys_to_ptr((uint64_t)user_tbl->next);
 			user_link_index++;
 		}
 		else

@@ -48,6 +48,9 @@
 #define ACL_DYNAMIC_TBL_RULE_NAME   "acl_dynamic_tbl_rule"
 #define USER_TBL_RULE_NAME "user_tbl"
 #define USER_DYNAMIC_TBL_RULE_NAME "user_dynamic_tbl"
+#define USER_IPV6_TBL_RULE_NAME "user_ipv6_tbl"
+#define USER_IPV6_DYNAMIC_TBL_RULE_NAME "user_ipv6_dynamic_tbl"
+
 #define BASE_MAC_TABLE_NAME     "basemac_table"
 
 #define IPV6_CMP(a, b) ((a.s6_addr64[0] == b.s6_addr64[0]) && (a.s6_addr64[1] == b.s6_addr64[1]))
@@ -92,11 +95,18 @@ typedef enum {
  */
 typedef struct user_info_s
 {
+	/* ipv6 flux */
+	struct cvm_ip6_in6_addr user_ipv6; 
+	uint64_t ipv6_forward_up_bytes;
+	uint64_t ipv6_forward_up_packet;
+	uint64_t ipv6_forward_down_bytes;
+	uint64_t ipv6_forward_down_packet;
+	
 	uint64_t forward_up_bytes;
 	uint64_t forward_up_packet;
 	uint64_t forward_down_bytes;
 	uint64_t forward_down_packet;
-
+	
 	uint32_t user_ip;	
 	uint16_t meter_index;	/*the CAR index*/	
 	uint16_t flow_number;
@@ -115,17 +125,66 @@ typedef struct user_info_s
 	/*uint64_t	begin_time_stamp;*/
 } user_info_t;
 
+
+typedef struct user_ipv4_info_s
+{	
+	uint64_t forward_up_bytes;
+	uint64_t forward_up_packet;
+	uint64_t forward_down_bytes;
+	uint64_t forward_down_packet;
+	
+	uint32_t user_ip;	
+	uint16_t meter_index;	/*the CAR index*/	
+	uint16_t flow_number;
+
+	/*below is the user car information*/
+	uint32_t   depth;       /*CBS in bytes*/
+	uint32_t   rate;        /* CIR in kbps*/
+
+	uint64_t   rate_in_cycles_per_byte;
+	uint64_t   depth_in_cycles;
+	uint64_t   cycles_prev;
+
+	uint8_t  user_state;
+	uint8_t  reserved[7];	
+
+	/*uint64_t	begin_time_stamp;*/
+} user_ipv4_info_t;
+
 /********************************************************
  *	user tables
  *********************************************************/
-typedef struct  user_item_s{
-	struct user_item_s *next;
-	struct user_info_s user_info;
+typedef struct  user_ipv4_item_s{
+	struct user_ipv4_item_s *next;
+	struct user_ipv4_info_s user_info;
 	//cvmx_spinlock_t      lock; /*only the first bucket lock is used*/
 	cvmx_rwlock_wp_lock_t lock;
 	uint16_t valid_entries;  /*only the first bucket valid_entries is used for the number of rule entry*/
 	uint8_t reserved[2];	
-}user_item_t;
+}user_ipv4_item_t;
+
+typedef struct user_ipv6_info_s
+{
+	/* ipv6 flux */
+	struct cvm_ip6_in6_addr user_ipv6; 
+	uint64_t ipv6_forward_up_bytes;
+	uint64_t ipv6_forward_up_packet;
+	uint64_t ipv6_forward_down_bytes;
+	uint64_t ipv6_forward_down_packet;
+
+	uint8_t  user_state;
+	uint8_t  reserved[7];
+} user_ipv6_info_t;
+
+
+typedef struct  user_ipv6_item_s{
+	struct user_ipv6_item_s *next;
+	struct user_ipv6_info_s user_info;
+	//cvmx_spinlock_t      lock; /*only the first bucket lock is used*/
+	cvmx_rwlock_wp_lock_t lock;
+	uint16_t valid_entries;  /*only the first bucket valid_entries is used for the number of rule entry*/
+	uint8_t reserved[2];	
+}user_ipv6_item_t;
 
 
 
@@ -493,8 +552,10 @@ extern CVMX_SHARED int cvm_pure_payload_acct;
 #ifdef USER_TABLE_FUNCTION	
 static int acl_index_age_num=0;
 extern CVMX_SHARED uint64_t *pfast_acl_mask_tbl;
-extern CVMX_SHARED user_item_t *user_bucket_tbl;
+extern CVMX_SHARED user_ipv4_item_t *user_bucket_tbl;
 extern CVMX_SHARED uint32_t user_static_tbl_size;
+extern CVMX_SHARED user_ipv6_item_t *user_ipv6_bucket_tbl;
+extern CVMX_SHARED uint32_t user_ipv6_static_tbl_size;
 extern CVMX_SHARED cvmx_spinlock_t  acl_mask_lock;
 #define ACL_FAST_TBL_MASK_NAME "acl_fast_tbl mask"
 
@@ -834,13 +895,122 @@ static inline void fast_del_rule_by_ip(uint32_t ip)
 			"del_fast_acl_index : delete fast rule is 0x%x \n " , acl_index_age_num);
 }
 
+static inline void fast_del_rule_by_ipv6(struct cvm_ip6_in6_addr *ipv6)
+{
+	uint64_t *ptr_mask_64;
+	uint64_t loop,loop_1;
+	rule_item_t *p_age_index ; /*页的基址*/
+	rule_item_t	*p_pre_age_index; /*除页首地址外，需要删除元素的前地址，用来连接链表；*/
+	uint32_t num,check_last_entry=0;
+	int age_entry_num=0, free_entry_flag=0;
+	rule_item_t  *p_loop_addr , *p_base_addr;
+	ptr_mask_64 = pfast_acl_mask_tbl;
+	p_loop_addr = acl_bucket_tbl;
+
+	if((acl_static_tbl_size%64)!=0)
+	{
+		num = acl_static_tbl_size/64+1;
+	}
+	else
+	{
+		num = acl_static_tbl_size/64;
+	}
+
+	for(loop=0;loop < num;loop++)
+	{
+		/*选acl hash base  addr ,是64位图的变量地址*/
+		p_loop_addr=acl_bucket_tbl + loop*64;
+
+		for(loop_1 = 0; loop_1 < 64; loop_1++)
+		{
+			if(((*(ptr_mask_64+loop))&(1ull<<loop_1))!=0)
+			{
+				/* 这个地址的索引有可能需要老化的快表；
+				   选位图赋值为1的地址*/
+				p_age_index= p_loop_addr+loop_1;
+				p_base_addr=p_age_index;
+
+				/*保存这个hash链的前一个指针*/
+				p_pre_age_index=p_age_index;
+				age_entry_num=0;
+				check_last_entry=0;
+            
+				cvmx_spinlock_lock(&p_base_addr->lock);
+				while(1)
+				{   
+					free_entry_flag=0;							  
+
+					if(((p_age_index->rules.ipv6_sip64[0] == ipv6->s6_addr64[0]) && (p_age_index->rules.ipv6_sip64[1] == ipv6->s6_addr64[1])) 
+						|| ((p_age_index->rules.ipv6_dip64[0] == ipv6->s6_addr64[0]) && (p_age_index->rules.ipv6_dip64[1] == ipv6->s6_addr64[1])))
+					{							
+						/*删除一个表项，可能还有需要删除其他的，所以不能返回;*/
+						if (delete_fast_rule_by_addr(p_base_addr,p_pre_age_index ,p_age_index) == FREE_ACL_BUCKET)
+						{								      	    	          
+							free_entry_flag = 1;										    
+						}
+						acl_index_age_num++;		
+					}
+
+					if(check_last_entry==1)
+					{                                    
+						break;
+					}
+
+					/* 只有释放了entry,前一个指针才不需要移动；如果p_age_index不释放资源，
+					   p_pre_age_index要移动 如果 p_age_index释放了，则必须由p_pre_age_index得到*/
+					if(free_entry_flag==1)
+					{
+
+						if(p_pre_age_index!=NULL)
+						{
+							/*p_age_index 被释放了，所以必须由前指针告知*/
+							p_age_index=p_pre_age_index->next;
+						}
+						else
+						{
+							FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
+									"fast_del_rule_by_ipv6:p_pre_age_index is NULL ! -- so shouldn''t come here. \n ");						
+							break;
+						}
+
+						/*释放的是最后entry ，可结束循环了*/
+						if(p_pre_age_index->next==NULL)
+						{
+							break;
+						}					
+					}
+					else
+						/*没有释放，则p_pre_age_index ，p_age_index 需要更新*/
+					{ 
+						p_pre_age_index=p_age_index;
+
+						if((p_age_index->next==NULL))
+						{
+							check_last_entry=1;	 						          
+						}
+						else
+						{
+							p_age_index=p_age_index->next;
+						}
+					}
+				}    
+				cvmx_spinlock_unlock(&p_base_addr->lock);
+			}
+		}	    
+	}
+
+	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+			"fast_del_rule_by_ipv6 : delete fast rule is 0x%x \n " , acl_index_age_num);
+}
+
+
 /* get user info by user_index and user_link_index */
 /* this function must return quickly */
 /* add by zhaohan */
-static inline user_item_t * get_user_item(uint32_t usr_idx, uint16_t link_idx)
+static inline user_ipv4_item_t * get_user_item(uint32_t usr_idx, uint16_t link_idx)
 {
 	uint32_t i = 0;
-	user_item_t* user = NULL;
+	user_ipv4_item_t* user = NULL;
 
 	if(cvmx_unlikely(usr_idx > user_static_tbl_size - 1))
 		return NULL;
@@ -856,6 +1026,27 @@ static inline user_item_t * get_user_item(uint32_t usr_idx, uint16_t link_idx)
 
 	return user;
 }
+
+static inline user_ipv6_item_t * get_user_ipv6_item(uint32_t usr_idx, uint16_t link_idx)
+{
+	uint32_t i = 0;
+	user_ipv6_item_t* user = NULL;
+
+	if(cvmx_unlikely(usr_idx > user_ipv6_static_tbl_size - 1))
+		return NULL;
+
+	user = &user_ipv6_bucket_tbl[usr_idx];
+
+	for(i = 0; i < link_idx; i++)
+	{
+		user = user->next;
+		if(cvmx_unlikely(user == NULL))
+			return NULL;
+	}
+
+	return user;
+}
+
 
 #endif
 /****************************************************************/
@@ -1072,7 +1263,7 @@ static inline rule_item_t * hash_v6_32(uint32_t dip_1, uint32_t dip_2, uint32_t 
  */
 static inline uint32_t user_cache_bucket_lookup (uint32_t ip_address)
 {
-	user_item_t *bucket;
+	user_ipv4_item_t *bucket;
 	uint64_t idx;
 
 #if defined(__KERNEL__) && defined(linux)
@@ -1088,6 +1279,29 @@ static inline uint32_t user_cache_bucket_lookup (uint32_t ip_address)
 	cvmx_scratch_write64(CVM_SCR_USER_CACHE_PTR, (uint64_t) (CAST64(bucket)));
 	return (idx);
 }
+
+
+static inline uint32_t user_ipv6_cache_bucket_lookup (struct cvm_ip6_in6_addr *ipv6)
+{
+	user_ipv6_item_t *bucket;
+	uint64_t idx;
+
+#if defined(__KERNEL__) && defined(linux)
+	set_c0_status(ST0_CU2);
+#endif
+	CVMX_MT_CRC_POLYNOMIAL(0x1edc6f41);
+	CVMX_MT_CRC_IV(0);
+	CVMX_MT_CRC_DWORD(ipv6->s6_addr64[0]);
+	CVMX_MT_CRC_DWORD(ipv6->s6_addr64[1]);
+	CVMX_MF_CRC_IV(idx);
+	idx &= (user_ipv6_static_tbl_size - 1);
+
+	bucket = &user_ipv6_bucket_tbl[idx];
+	cvmx_scratch_write64(CVM_SCR_USER_IPV6_CACHE_PTR, (uint64_t) (CAST64(bucket)));
+	return (idx);
+}
+
+
 /********************************************************************/
 #define MAX_AGING_TIMER     0xffffffff
 #define MIN_AGING_TIMER     1
@@ -2604,6 +2818,8 @@ int32_t acl_self_learn_icmp_rule(rule_param_t *rule_para, capwap_cache_t *cw_cac
 
 int32_t user_action_online(uint32_t user_ip);
 int32_t user_action_offline(uint32_t user_ip);
+int32_t user_ipv6_action_online(struct cvm_ip6_in6_addr *ipv6);
+int32_t user_ipv6_action_offline(struct cvm_ip6_in6_addr *ipv6);
 int32_t user_stats_clear(uint32_t user_ip);
 void user_flow_statistics_process(cvmx_wqe_t *work, rule_item_t *rule,cvm_common_ip_hdr_t *true_ip);
 

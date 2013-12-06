@@ -583,6 +583,9 @@ int32_t acl_self_learn_pure_ip_rule(rule_param_t *rule_para, capwap_cache_t *cw_
 	}
 	else if ((1 == rule_para->ipv6_flag) && (FUNC_ENABLE == pure_ipv6_forward_enable))
 	{
+		/* get user table idx, store to rule */
+	    fwd_get_user_idx(rule_para);
+				
 		hash_v6_pure_ip(rule_para->ipv6_dip64[0], rule_para->ipv6_dip64[1],rule_para->ipv6_sip64[0], rule_para->ipv6_sip64[1]);
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 			"acl_self_learn_pure_ip_rule: packet-fiveTuple----%x:%x:%x:%x => %x:%x:%x:%x \r\n",

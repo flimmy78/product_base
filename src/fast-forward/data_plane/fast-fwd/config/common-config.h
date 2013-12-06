@@ -351,6 +351,12 @@
 		permanent = true
 		description = "Pointer to user_table entry";
 
+	scratch CVM_SCR_USER_IPV6_CACHE_PTR
+		size = 8
+		iobdma = true
+		permanent = true
+		description = "Pointer to user_ipv6_table entry";
+
 	scratch CVM_SCR_MBUFF_INFO_PTR
 		size = 8
 		iobdma = true

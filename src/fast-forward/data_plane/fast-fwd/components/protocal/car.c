@@ -24,7 +24,7 @@ CVMX_SHARED   cvm_car_tb_t  *car_tbl;
 CVMX_SHARED uint64_t cvm_car_rate_const_scaled;
 
 #ifdef USER_TABLE_FUNCTION
-extern CVMX_SHARED user_item_t *user_bucket_tbl;
+extern CVMX_SHARED user_ipv4_item_t *user_bucket_tbl;
 extern CVMX_SHARED uint32_t user_static_tbl_size;
 #endif
 
@@ -42,13 +42,13 @@ int car_init(void)
 	return 0;
 }
 
-inline void prefetch_car_table(user_item_t *user)
+inline void prefetch_car_table(user_ipv4_item_t *user)
 {
 	CVMX_PREFETCH0(user);
 }
 
 
-int cvm_car_tb_set(user_item_t *user, int rate)
+int cvm_car_tb_set(user_ipv4_item_t *user, int rate)
 {
 	if((rate <0) || (user == NULL))
 		return -1;
@@ -77,7 +77,7 @@ inline int cvm_car_result(int bytes, uint32_t usr_idx, uint16_t usr_link_idx)
 	uint64_t cycles_elapsed = 0;
 	uint64_t cycles_reqd    = 0;
 	int      retval         = CVM_CAR_DROP_PKT;
-	user_item_t *user = NULL;
+	user_ipv4_item_t *user = NULL;
 	
 	if((user = get_user_item(usr_idx, usr_link_idx)) == NULL)
 		return -1;

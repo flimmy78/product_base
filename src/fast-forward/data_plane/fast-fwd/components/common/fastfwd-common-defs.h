@@ -530,6 +530,8 @@ typedef struct cvm_common_udp_hdr {
 #define CVM_COMMON_IPPROTO_UDP	   17
 #define CVM_COMMON_IPPROTO_IPV6    41
 #define CVM_COMMON_IPPROTO_RAW	  255
+#define CVM_COMMON_IPPROTO_ICMPV6  0x3a
+
 
 /*
  * The number of bytes in an ethernet (MAC) address.

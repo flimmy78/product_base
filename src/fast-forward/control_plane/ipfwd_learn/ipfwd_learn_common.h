@@ -86,6 +86,17 @@ typedef struct vlan_eth_hdr_s {
 				((uint16_t*)&(m))[2], \
 				((uint16_t*)&(m))[3]
 
+#define IPV6_FMT_MN(m,n)	\
+					((uint16_t*)&(m))[0], \
+					((uint16_t*)&(m))[1], \
+					((uint16_t*)&(m))[2], \
+					((uint16_t*)&(m))[3], \
+					((uint16_t*)&(n))[0], \
+					((uint16_t*)&(n))[1], \
+					((uint16_t*)&(n))[2], \
+					((uint16_t*)&(n))[3]
+
+
 
 #define MAC_FMT_DEFINE(m)  \
 				((uint8_t*)(m))[0], \

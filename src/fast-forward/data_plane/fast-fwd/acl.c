@@ -46,6 +46,8 @@ CVMX_SHARED cvmx_spinlock_t capwap_cache_bl_lock; /* add by zhaohan */
 
 CVMX_SHARED cvmx_arena_list_t   rule_arena;
 CVMX_SHARED cvmx_arena_list_t   user_table_arena;
+CVMX_SHARED cvmx_arena_list_t   user_ipv6_table_arena;
+
 CVMX_SHARED rule_item_t  *acl_bucket_tbl;
 CVMX_SHARED uint32_t acl_static_tbl_size;
 CVMX_SHARED uint32_t acl_dynamic_tbl_size;
@@ -54,9 +56,12 @@ CVMX_SHARED uint32_t acl_aging_enable = FUNC_DISABLE;
 CVMX_SHARED uint32_t acl_bucket_max_entries = 8;
 
 #ifdef USER_TABLE_FUNCTION
-CVMX_SHARED user_item_t *user_bucket_tbl;
+CVMX_SHARED user_ipv4_item_t *user_bucket_tbl;
 CVMX_SHARED uint32_t user_static_tbl_size;
 CVMX_SHARED uint32_t user_dynamic_tbl_size;
+CVMX_SHARED user_ipv6_item_t *user_ipv6_bucket_tbl;
+CVMX_SHARED uint32_t user_ipv6_static_tbl_size;
+CVMX_SHARED uint32_t user_ipv6_dynamic_tbl_size;
 CVMX_SHARED uint64_t *pfast_acl_mask_tbl;
 CVMX_SHARED cvmx_spinlock_t  acl_mask_lock;
 #endif
@@ -114,7 +119,8 @@ int acl_table_init()
 {
 	void  *ptr = NULL;
 	rule_item_t *bucket = NULL;
-	user_item_t *user_bucket = NULL;	
+	user_ipv4_item_t *user_bucket = NULL;	
+	user_ipv6_item_t *user_ipv6_bucket = NULL;	
 	uint32_t   loop = 0;
 
 	switch(product_info.rule_mem_size)
@@ -142,46 +148,81 @@ int acl_table_init()
 
 	user_static_tbl_size = (64*1024);
 	user_dynamic_tbl_size = (64*1024);
+	user_ipv6_static_tbl_size = (64*1024);
+	user_ipv6_dynamic_tbl_size = (64*1024);
 
 	printf("acl_static_tbl_size = 0x%x\n", acl_static_tbl_size);
 	printf("acl_dynamic_tbl_size = 0x%x\n", acl_dynamic_tbl_size);
 	printf("user_static_tbl_size = 0x%x\n", user_static_tbl_size);
 	printf("user_dynamic_tbl_size = 0x%x\n", user_dynamic_tbl_size);
+	printf("user_ipv6_static_tbl_size = 0x%x\n", user_ipv6_static_tbl_size);
+	printf("user_ipv6_dynamic_tbl_size = 0x%x\n", user_ipv6_dynamic_tbl_size);
 	/*
 	 * cvmx_bootmem_alloc用来分配大块的共享内存，使用后不在释放。
 	 * 由应用程序自己负责相关内存的读写
 	 */
 #ifdef USER_TABLE_FUNCTION
-	user_bucket_tbl =  (user_item_t *) cvmx_bootmem_alloc_named(user_static_tbl_size*sizeof(user_item_t), CVMX_CACHE_LINE_SIZE,USER_TBL_RULE_NAME);
+	user_bucket_tbl =  (user_ipv4_item_t *) cvmx_bootmem_alloc_named(user_static_tbl_size*sizeof(user_ipv4_item_t), CVMX_CACHE_LINE_SIZE,USER_TBL_RULE_NAME);
 	if(user_bucket_tbl == NULL)
 	{
 		printf("Warning: No memory available for USER static hash table!\n");
 		return RETURN_ERROR;
 	}
 	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
-			"user_bucket_tbl address: 0x%lx,  User table size=%ld\n", (uint64_t)user_bucket_tbl, user_static_tbl_size*sizeof(user_item_t));
+			"user_bucket_tbl address: 0x%lx,  User table size=%ld\n", (uint64_t)user_bucket_tbl, user_static_tbl_size*sizeof(user_ipv4_item_t));
 
-	memset((void *)user_bucket_tbl, 0, user_static_tbl_size*sizeof(user_item_t));
+	memset((void *)user_bucket_tbl, 0, user_static_tbl_size*sizeof(user_ipv4_item_t));
 
 	for (loop = 0; loop < user_static_tbl_size; loop++)
 	{
-		user_bucket = (user_item_t *)user_bucket_tbl+loop;
+		user_bucket = (user_ipv4_item_t *)user_bucket_tbl+loop;
 		//cvmx_spinlock_init(&user_bucket->lock);
 		cvmx_rwlock_wp_init(&user_bucket->lock);
 	}
 
-	ptr = cvmx_bootmem_alloc_named(user_dynamic_tbl_size*sizeof(user_item_t), CVMX_CACHE_LINE_SIZE, USER_DYNAMIC_TBL_RULE_NAME);
+	ptr = cvmx_bootmem_alloc_named(user_dynamic_tbl_size*sizeof(user_ipv4_item_t), CVMX_CACHE_LINE_SIZE, USER_DYNAMIC_TBL_RULE_NAME);
 	if(ptr == NULL)
 	{
 		printf("Warning: No memory available for user dynamic hash table!\n");
 		return RETURN_ERROR;
 	}
-	memset((void *)ptr, 0, user_dynamic_tbl_size*sizeof(user_item_t));
-	if(cvmx_add_arena  (&user_table_arena, ptr, user_dynamic_tbl_size*sizeof(user_item_t))<0)
+	memset((void *)ptr, 0, user_dynamic_tbl_size*sizeof(user_ipv4_item_t));
+	if(cvmx_add_arena  (&user_table_arena, ptr, user_dynamic_tbl_size*sizeof(user_ipv4_item_t))<0)
 	{
 		printf("Failed to add arena for user dynamic table\n");
 		return RETURN_ERROR;
 	}
+
+	user_ipv6_bucket_tbl =  (user_ipv6_item_t *) cvmx_bootmem_alloc_named(user_ipv6_static_tbl_size*sizeof(user_ipv6_item_t), CVMX_CACHE_LINE_SIZE,USER_IPV6_TBL_RULE_NAME);
+	if(user_ipv6_bucket_tbl == NULL)
+	{
+		printf("Warning: No memory available for USER IPV6 static hash table!\n");
+		return RETURN_ERROR;
+	}
+	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+			"user_bucket_tbl address: 0x%lx,  User table size=%ld\n", (uint64_t)user_ipv6_bucket_tbl, user_ipv6_static_tbl_size*sizeof(user_ipv6_item_t));
+
+	memset((void *)user_ipv6_bucket_tbl, 0, user_ipv6_static_tbl_size*sizeof(user_ipv6_item_t));
+
+	for (loop = 0; loop < user_ipv6_static_tbl_size; loop++)
+	{
+		user_ipv6_bucket = (user_ipv6_item_t *)user_ipv6_bucket_tbl+loop;
+		cvmx_rwlock_wp_init(&user_ipv6_bucket->lock);
+	}
+
+	ptr = cvmx_bootmem_alloc_named(user_ipv6_dynamic_tbl_size*sizeof(user_ipv6_item_t), CVMX_CACHE_LINE_SIZE, USER_IPV6_DYNAMIC_TBL_RULE_NAME);
+	if(ptr == NULL)
+	{
+		printf("Warning: No memory available for user ipv6 dynamic hash table!\n");
+		return RETURN_ERROR;
+	}
+	memset((void *)ptr, 0, user_ipv6_dynamic_tbl_size*sizeof(user_ipv6_item_t));
+	if(cvmx_add_arena  (&user_ipv6_table_arena, ptr, user_ipv6_dynamic_tbl_size*sizeof(user_ipv6_item_t))<0)
+	{
+		printf("Failed to add arena for user ipv6 dynamic table\n");
+		return RETURN_ERROR;
+	}
+
 
 	if((acl_static_tbl_size%64)!=0)
 	{
@@ -783,15 +824,15 @@ int32_t acl_insert_static_rule(rule_param_t *rule_para, capwap_cache_t *cw_cache
  *************************************************************/
 static inline int32_t fwd_find_user_idx(uint32_t ip, uint32_t *p_usr_idx, uint16_t *p_link_idx)
 {
-	user_item_t *head_user = NULL;
-	user_item_t *user = NULL;
+	user_ipv4_item_t *head_user = NULL;
+	user_ipv4_item_t *user = NULL;
 	cvmx_rwlock_wp_lock_t *head_lock = NULL;
 	
     if(user_bucket_tbl == NULL)
         return RETURN_ERROR;
 
 	*p_usr_idx = user_cache_bucket_lookup(ip);
-	head_user = CASTPTR(user_item_t, cvmx_scratch_read64(CVM_SCR_USER_CACHE_PTR));
+	head_user = CASTPTR(user_ipv4_item_t, cvmx_scratch_read64(CVM_SCR_USER_CACHE_PTR));
 	user = head_user;
 	head_lock = &head_user->lock; 
 	cvmx_rwlock_wp_read_lock(head_lock);
@@ -841,6 +882,77 @@ static inline int32_t fwd_find_user_idx(uint32_t ip, uint32_t *p_usr_idx, uint16
 
 /*************************************************************
  * Description:
+ *         find the user from user table
+ *
+ * Parameter:
+ *         ipv6  : user's ipv6 address
+ *         p_usr_idx   : user index in user table
+ *         p_link_idx  : user  linkedlist index in user table(used for hash conflicts)
+ *         
+ * Return:
+ *        
+ *************************************************************/
+static inline int32_t fwd_find_user_ipv6_idx(struct cvm_ip6_in6_addr *ipv6, uint32_t *p_usr_idx, uint16_t *p_link_idx)
+{
+	user_ipv6_item_t *head_user = NULL;
+	user_ipv6_item_t *user = NULL;
+	cvmx_rwlock_wp_lock_t *head_lock = NULL;
+	
+    if(user_ipv6_bucket_tbl == NULL)
+        return RETURN_ERROR;
+
+	*p_usr_idx = user_ipv6_cache_bucket_lookup(ipv6);
+	head_user = CASTPTR(user_ipv6_item_t, cvmx_scratch_read64(CVM_SCR_USER_IPV6_CACHE_PTR));
+	user = head_user;
+	head_lock = &head_user->lock; 
+	cvmx_rwlock_wp_read_lock(head_lock);
+	
+	if(head_user->user_info.user_state == USER_IS_EMPTY)
+	{
+		if(head_user->valid_entries == 0)
+		{
+			cvmx_rwlock_wp_read_unlock(head_lock);
+			return RETURN_ERROR;
+		}
+		else /*first bucket is empty but with other buckets*/
+		{
+			if(head_user->next != NULL)
+			{
+				user = head_user->next;
+				(*p_link_idx)++;
+			}
+			else
+			{
+				cvmx_rwlock_wp_read_unlock(head_lock);
+				return RETURN_ERROR;
+			}
+		}
+	}
+
+	while(1)
+	{ 
+		if((user->user_info.user_ipv6.s6_addr64[0] == ipv6->s6_addr64[0]) && (user->user_info.user_ipv6.s6_addr64[1] == ipv6->s6_addr64[1]))
+		{
+			cvmx_rwlock_wp_read_unlock(head_lock);
+			return RETURN_OK;
+		}
+		else
+		{
+			user = user->next; 
+			if(user == NULL)
+			{
+				cvmx_rwlock_wp_read_unlock(head_lock);
+				return RETURN_ERROR;
+			}
+			(*p_link_idx)++;
+		}
+	}
+	return RETURN_ERROR;
+}
+
+
+/*************************************************************
+ * Description:
  *         Get user information for fastfwd module 
  *         (Contain user index,user direct_flag)
  *
@@ -865,14 +977,29 @@ inline int32_t fwd_get_user_idx(rule_param_t *rule_param)
         return RETURN_ERROR;
     }
 
-	if(fwd_find_user_idx(rule_param->ipv4_sip, &sip_usr_idx, &sip_usr_link_idx) == RETURN_OK)
+	if (1 == rule_param->ipv6_flag)
 	{
-		sip_user_flag = 1;
-	}
+		if(fwd_find_user_ipv6_idx(&rule_param->ipv6_sip, &sip_usr_idx, &sip_usr_link_idx) == RETURN_OK)
+		{
+			sip_user_flag = 1;
+		}
 
-	if(fwd_find_user_idx(rule_param->ipv4_dip, &dip_usr_idx, &dip_usr_link_idx) == RETURN_OK)
+		if(fwd_find_user_ipv6_idx(&rule_param->ipv6_dip, &dip_usr_idx, &dip_usr_link_idx) == RETURN_OK)
+		{
+			dip_user_flag = 1;
+		}
+	}
+	else
 	{
-		dip_user_flag = 1;
+		if(fwd_find_user_idx(rule_param->ipv4_sip, &sip_usr_idx, &sip_usr_link_idx) == RETURN_OK)
+		{
+			sip_user_flag = 1;
+		}
+
+		if(fwd_find_user_idx(rule_param->ipv4_dip, &dip_usr_idx, &dip_usr_link_idx) == RETURN_OK)
+		{
+			dip_user_flag = 1;
+		}
 	}
 
 	/* uplink */
@@ -943,6 +1070,9 @@ int32_t acl_self_learn_rule(rule_param_t *rule_para, capwap_cache_t *cw_cache)
 	}
 	else if (1 == rule_para->ipv6_flag)
 	{
+		/* get user table idx, store to rule */
+	    fwd_get_user_idx(rule_para);
+	
 		hash_v6(rule_para->ipv6_dip64[0], rule_para->ipv6_dip64[1], rule_para->ipv6_sip64[0], rule_para->ipv6_sip64[1], rule_para->protocol, rule_para->dport, rule_para->sport);
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 			"acl_self_learn_rule: packet-fiveTuple----%x.%x.%x.%x:%u => %x.%x.%x.%x:%u proto=%d\n",
@@ -1631,9 +1761,9 @@ int32_t user_action_online(uint32_t user_ip)
 {
 	uint32_t user_index = 0xffffffff;
 	uint32_t user_link_index = 0;
-	user_item_t  *user = NULL;
-	user_item_t  *free_user  = NULL; /*the first free bucket position*/
-	user_item_t  *head_user = NULL;	
+	user_ipv4_item_t  *user = NULL;
+	user_ipv4_item_t  *free_user  = NULL; /*the first free bucket position*/
+	user_ipv4_item_t  *head_user = NULL;	
 	cvmx_rwlock_wp_lock_t *head_lock = NULL;
 
 	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
@@ -1641,7 +1771,7 @@ int32_t user_action_online(uint32_t user_ip)
 
 	/*look up user Table and get the bucket*/
 	user_index = user_cache_bucket_lookup(user_ip);
-	user = CASTPTR(user_item_t, cvmx_scratch_read64(CVM_SCR_USER_CACHE_PTR));
+	user = CASTPTR(user_ipv4_item_t, cvmx_scratch_read64(CVM_SCR_USER_CACHE_PTR));
 
 	head_user = user;
 	head_lock = &head_user->lock;
@@ -1729,7 +1859,7 @@ int32_t user_action_online(uint32_t user_ip)
 				if(free_user == NULL)
 				{
 					/* need malloc a node */
-					user->next = (user_item_t *)cvmx_malloc(user_table_arena, sizeof(user_item_t));
+					user->next = (user_ipv4_item_t *)cvmx_malloc(user_table_arena, sizeof(user_ipv4_item_t));
 					if(user->next == NULL)
 					{
 						FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_ERROR, 
@@ -1737,7 +1867,7 @@ int32_t user_action_online(uint32_t user_ip)
 						cvmx_rwlock_wp_write_unlock(head_lock);
 						return RETURN_ERROR;
 					}	
-					memset(user->next, 0, sizeof(user_item_t));
+					memset(user->next, 0, sizeof(user_ipv4_item_t));
 					free_user = user->next;
 				}
 
@@ -1754,6 +1884,143 @@ int32_t user_action_online(uint32_t user_ip)
 
 }
 
+int32_t user_ipv6_action_online(struct cvm_ip6_in6_addr *ipv6)
+{
+	uint32_t user_index = 0xffffffff;
+	uint32_t user_link_index = 0;
+	user_ipv6_item_t  *user = NULL;
+	user_ipv6_item_t  *free_user  = NULL; /*the first free bucket position*/
+	user_ipv6_item_t  *head_user = NULL;	
+	cvmx_rwlock_wp_lock_t *head_lock = NULL;
+
+	
+	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+			"user_ipv6_action_online: user %16lx %16lx is online \r\n", 
+			ipv6->s6_addr64[0], ipv6->s6_addr64[1]);
+	
+	/*look up user Table and get the bucket*/
+	user_index = user_ipv6_cache_bucket_lookup(ipv6);
+	user = CASTPTR(user_ipv6_item_t, cvmx_scratch_read64(CVM_SCR_USER_IPV6_CACHE_PTR));
+
+	head_user = user;
+	head_lock = &head_user->lock;
+	cvmx_rwlock_wp_write_lock(head_lock);
+
+	/*if the first bucket is empty and there are no more buckets, then insert current flow*/
+	if(head_user->user_info.user_state == USER_IS_EMPTY)
+	{
+		if(head_user->valid_entries == 0)
+		{
+			head_user->user_info.user_ipv6.s6_addr64[0] = ipv6->s6_addr64[0];
+			head_user->user_info.user_ipv6.s6_addr64[1] = ipv6->s6_addr64[1];
+			head_user->user_info.user_state = USER_IS_ONLINE;
+			head_user->valid_entries++;
+			cvmx_rwlock_wp_write_unlock(head_lock);
+			return RETURN_OK;
+		}
+		else /*first bucket is empty but with other buckets*/
+		{
+			free_user = head_user; /*record current free bucket position*/
+
+			if(head_user->next != NULL)
+			{
+				user = head_user->next;
+				user_link_index++;
+			}
+			else
+			{
+				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
+						"user_ipv6_action_online: Should never come to here file%s, line %d, rule=0x%p, num=0x%d,next=0x%p.\r\n",__FILE__, __LINE__,head_user,head_user->valid_entries,head_user->next);	
+				cvmx_rwlock_wp_write_unlock(head_lock);
+				return RETURN_ERROR;
+			}
+		}
+	}
+
+	while(1)
+	{
+		if(user == NULL)
+		{
+			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
+					"user_ipv6_action_online: Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
+			cvmx_rwlock_wp_write_unlock(head_lock);
+			return RETURN_ERROR;
+		}
+
+		if((user->user_info.user_ipv6.s6_addr64[0] == ipv6->s6_addr64[0]) && (user->user_info.user_ipv6.s6_addr64[1] == ipv6->s6_addr64[1]))
+		{
+			if(user->user_info.user_state == USER_IS_ONLINE)
+			{
+				cvmx_atomic_set64((int64_t *)(&user->user_info.ipv6_forward_up_packet), 0);
+				cvmx_atomic_set64((int64_t *)(&user->user_info.ipv6_forward_up_bytes), 0);
+				cvmx_atomic_set64((int64_t *)(&user->user_info.ipv6_forward_down_packet), 0);
+				cvmx_atomic_set64((int64_t *)(&user->user_info.ipv6_forward_down_bytes), 0);
+				
+				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+						"user_ipv6_action_online: user %16lx %16lx has already online \r\n", ipv6->s6_addr64[0], ipv6->s6_addr64[1]);
+				
+				cvmx_rwlock_wp_write_unlock(head_lock);
+				//fast_del_rule_by_ip(user_ip);
+				return RETURN_ERROR;
+			}
+			else if(user->user_info.user_state == USER_IS_OFFLINE)
+			{
+				
+				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+						"user_ipv6_action_online: user %16lx %16lx is offline, reonline\r\n", ipv6->s6_addr64[0], ipv6->s6_addr64[1]);
+				
+				head_user->user_info.user_state = USER_IS_ONLINE;       
+				cvmx_rwlock_wp_write_unlock(head_lock);
+				return RETURN_OK;
+			}
+			else
+			{
+				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
+						"user_ipv6_action_online: Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
+				cvmx_rwlock_wp_write_unlock(head_lock);
+				return RETURN_ERROR;
+			}
+		}
+		else
+		{
+			if(user->next != NULL)
+			{
+				user = user->next;
+				user_link_index++;
+			}
+			else
+			{
+				if(free_user == NULL)
+				{
+					/* need malloc a node */
+					user->next = (user_ipv6_item_t *)cvmx_malloc(user_ipv6_table_arena, sizeof(user_ipv6_item_t));
+					if(user->next == NULL)
+					{
+						FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_ERROR, 
+								"Insert user: Memory not available for adding user\n");
+						cvmx_rwlock_wp_write_unlock(head_lock);
+						return RETURN_ERROR;
+					}	
+					memset(user->next, 0, sizeof(user_ipv6_item_t));
+					free_user = user->next;
+				}
+
+				/* free_user == head_bucket, fill head_bucket  */
+				free_user->user_info.user_ipv6.s6_addr64[0] = ipv6->s6_addr64[0];
+				free_user->user_info.user_ipv6.s6_addr64[1] = ipv6->s6_addr64[1];
+			
+				free_user->user_info.user_state = USER_IS_ONLINE;
+				head_user->valid_entries++;
+				cvmx_rwlock_wp_write_unlock(head_lock);
+				return RETURN_OK;
+			}
+		}
+
+	}
+
+}
+
+
 /*
  * user offline, notify by fccp.
  * delete user form user table, and remove all rules form acl table.
@@ -1763,17 +2030,17 @@ int32_t user_action_offline(uint32_t user_ip)
 {
 	uint32_t user_index = 0xffffffff;
 	uint32_t user_link_index = 0;
-	user_item_t  *user = NULL;
-	user_item_t  *user_prev = NULL;
-	user_item_t  *head_user = NULL;	
+	user_ipv4_item_t  *user = NULL;
+	user_ipv4_item_t  *user_prev = NULL;
+	user_ipv4_item_t  *head_user = NULL;	
 	cvmx_rwlock_wp_lock_t *head_lock = NULL;
 
 	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
-			"user_action_online: user %d.%d.%d.%d is online \r\n", IP_FMT(user_ip));
+			"user_action_offline: user %d.%d.%d.%d is offline \r\n", IP_FMT(user_ip));
 
 	/*look up user Table and get the bucket*/
 	user_index = user_cache_bucket_lookup(user_ip);
-	user = CASTPTR(user_item_t, cvmx_scratch_read64(CVM_SCR_USER_CACHE_PTR));
+	user = CASTPTR(user_ipv4_item_t, cvmx_scratch_read64(CVM_SCR_USER_CACHE_PTR));
 
 	head_user = user;
 	user_prev = user;
@@ -1800,7 +2067,7 @@ int32_t user_action_offline(uint32_t user_ip)
 			else
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
-						"user_stats_clear: Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
+						"user_action_offline: Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
 				cvmx_rwlock_wp_write_unlock(head_lock);
 				return RETURN_ERROR;
 			}
@@ -1829,7 +2096,7 @@ int32_t user_action_offline(uint32_t user_ip)
 			{
 				if(user == head_user)    /* head bucket, zero it */
 				{
-					memset(&user->user_info, 0, sizeof(user_info_t));
+					memset(&user->user_info, 0, sizeof(user_ipv4_info_t));
 				}
 				else    /* in list, remove and free it */
 				{
@@ -1855,19 +2122,118 @@ int32_t user_action_offline(uint32_t user_ip)
 	return RETURN_OK;
 }
 
+int32_t user_ipv6_action_offline(struct cvm_ip6_in6_addr *ipv6)
+{
+	uint32_t user_index = 0xffffffff;
+	uint32_t user_link_index = 0;
+	user_ipv6_item_t  *user = NULL;
+	user_ipv6_item_t  *user_prev = NULL;
+	user_ipv6_item_t  *head_user = NULL;	
+	cvmx_rwlock_wp_lock_t *head_lock = NULL;
+	
+	FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+			"user_ipv6_action_offline: user %16lx %16lx is offline \r\n", ipv6->s6_addr64[0], ipv6->s6_addr64[1]);
+	
+	
+	/*look up user Table and get the bucket*/
+	user_index = user_ipv6_cache_bucket_lookup(ipv6);
+	user = CASTPTR(user_ipv6_item_t, cvmx_scratch_read64(CVM_SCR_USER_IPV6_CACHE_PTR));
+
+	head_user = user;
+	user_prev = user;
+	head_lock = &head_user->lock; 
+	cvmx_rwlock_wp_write_lock(head_lock);
+
+	/* */
+	if(head_user->user_info.user_state == USER_IS_EMPTY)
+	{
+		if(head_user->valid_entries == 0)
+		{
+			
+			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
+					"user_ipv6_action_offline: can't find user %16lx %16lx\r\n", ipv6->s6_addr64[0], ipv6->s6_addr64[1]);
+			
+			cvmx_rwlock_wp_write_unlock(head_lock);
+			return RETURN_ERROR;
+		}
+		else /*first bucket is empty but with other buckets*/
+		{
+			if(head_user->next != NULL)
+			{
+				user = head_user->next;
+				user_link_index++;
+			}
+			else
+			{
+				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
+						"user_ipv6_action_offline: Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
+				cvmx_rwlock_wp_write_unlock(head_lock);
+				return RETURN_ERROR;
+			}
+		}
+	}
+
+	while(1)
+	{
+		if(user == NULL)
+		{
+			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_MUST_PRINT,
+					"user_ipv6_action_offline: Should never come to here file%s, line %d.\n",__FILE__, __LINE__);
+			cvmx_rwlock_wp_write_unlock(head_lock);
+			return RETURN_ERROR;
+		}
+
+		if((user->user_info.user_ipv6.s6_addr64[0] == ipv6->s6_addr64[0]) && (user->user_info.user_ipv6.s6_addr64[1] == ipv6->s6_addr64[1]))
+		{
+			if(user->user_info.user_state == USER_IS_OFFLINE)
+			{
+				/* Warning: user has already offline */
+				cvmx_rwlock_wp_write_unlock(head_lock);
+				return RETURN_ERROR;
+			}
+			else if(user->user_info.user_state == USER_IS_ONLINE)
+			{
+				if(user == head_user)    /* head bucket, zero it */
+				{
+					memset(&user->user_info, 0, sizeof(user_ipv6_info_t));
+				}
+				else    /* in list, remove and free it */
+				{
+					user_prev->next = user->next;
+					cvmx_free(user);
+					user = NULL;
+				}
+				head_user->valid_entries--;
+				cvmx_rwlock_wp_write_unlock(head_lock);
+				fast_del_rule_by_ipv6(ipv6); /* del all rules belong to this user */	
+				return RETURN_OK;
+			}
+		}
+		else
+		{
+			user_prev = user;
+			user = user->next;
+			user_link_index++;
+		}
+
+	}
+
+	return RETURN_OK;
+}
+
 
 /*
  * Users statistical information reset. notify by fccp packets
  */
 int32_t user_stats_clear(uint32_t user_ip)
 {
-	user_item_t  *user = NULL;
-	user_item_t  *head_user = NULL;
+	user_ipv4_item_t  *user = NULL;
+	user_ipv4_item_t  *head_user = NULL;
 	cvmx_rwlock_wp_lock_t *head_lock = NULL;
 
 	/*look up user Table and get the bucket*/
 	user_cache_bucket_lookup(user_ip);
-	user = CASTPTR(user_item_t, cvmx_scratch_read64(CVM_SCR_USER_CACHE_PTR));
+	user = CASTPTR(user_ipv4_item_t, cvmx_scratch_read64(CVM_SCR_USER_CACHE_PTR));
 
 	head_user = user;
 	head_lock = &head_user->lock; 
@@ -1931,14 +2297,14 @@ int32_t user_stats_clear(uint32_t user_ip)
  * find usr index from user tbl by user_ip
  * 
  */
-static inline user_item_t* fwd_find_user(uint32_t ip, cvmx_rwlock_wp_lock_t** p_user_lock)
+static inline user_ipv4_item_t* fwd_find_user(uint32_t ip, cvmx_rwlock_wp_lock_t** p_user_lock)
 {
-	user_item_t *head_user = NULL;
-	user_item_t *user = NULL;
+	user_ipv4_item_t *head_user = NULL;
+	user_ipv4_item_t *user = NULL;
 	cvmx_rwlock_wp_lock_t *head_lock = NULL;
 
 	user_cache_bucket_lookup(ip);
-	head_user = CASTPTR(user_item_t, cvmx_scratch_read64(CVM_SCR_USER_CACHE_PTR));
+	head_user = CASTPTR(user_ipv4_item_t, cvmx_scratch_read64(CVM_SCR_USER_CACHE_PTR));
 	user = head_user;
 	head_lock = &head_user->lock;
 	*p_user_lock = head_lock;   
@@ -1986,6 +2352,61 @@ static inline user_item_t* fwd_find_user(uint32_t ip, cvmx_rwlock_wp_lock_t** p_
 	return NULL;
 }
 
+static inline user_ipv6_item_t* fwd_find_user_ipv6(struct cvm_ip6_in6_addr *ipv6, cvmx_rwlock_wp_lock_t** p_user_lock)
+{
+	user_ipv6_item_t *head_user = NULL;
+	user_ipv6_item_t *user = NULL;
+	cvmx_rwlock_wp_lock_t *head_lock = NULL;
+
+	user_ipv6_cache_bucket_lookup(ipv6);
+	head_user = CASTPTR(user_ipv6_item_t, cvmx_scratch_read64(CVM_SCR_USER_IPV6_CACHE_PTR));
+	user = head_user;
+	head_lock = &head_user->lock;
+	*p_user_lock = head_lock;   
+	cvmx_rwlock_wp_read_lock(head_lock);
+
+	if(head_user->user_info.user_state == USER_IS_EMPTY)
+	{
+		if(head_user->valid_entries == 0)
+		{
+			cvmx_rwlock_wp_read_unlock(head_lock);
+			return NULL;
+		}
+		else /*first bucket is empty but with other buckets*/
+		{
+			if(head_user->next != NULL)
+			{
+				user = head_user->next;
+			}
+			else
+			{
+				cvmx_rwlock_wp_read_unlock(head_lock);
+				return NULL;
+			}
+		}
+	}
+
+	while(1)
+	{ 
+		if((user->user_info.user_ipv6.s6_addr64[0] == ipv6->s6_addr64[0]) && (user->user_info.user_ipv6.s6_addr64[1] == ipv6->s6_addr64[1]))
+		{
+			cvmx_rwlock_wp_read_unlock(head_lock);
+			return user;
+		}
+		else
+		{ 
+			user = user->next; 
+			if(user == NULL)
+			{
+				cvmx_rwlock_wp_read_unlock(head_lock);
+				return NULL;
+			}
+		}
+	}
+
+	return NULL;
+}
+
 
 /* calculate_user_paload */
 static inline uint32_t calculate_user_paload(cvmx_wqe_t *work, cvm_common_ip_hdr_t *ip)
@@ -1996,7 +2417,8 @@ static inline uint32_t calculate_user_paload(cvmx_wqe_t *work, cvm_common_ip_hdr
 
 	/* calculate user paload */
 	user_payload = CVM_WQE_GET_LEN(work) - ((uint8_t *)ip - pkt_ptr);
-	if(FUNC_ENABLE == cvm_pure_payload_acct)
+	/* hear dont support ipv6 pure payload acct tag by wangjian */
+	if((FUNC_ENABLE == cvm_pure_payload_acct) && (CVM_IP_IPVERSION == ip->ip_v))
 	{
 		user_payload -= (ip->ip_hl << 2);/*decrease ip header length*/
 	}
@@ -2019,9 +2441,11 @@ void user_flow_statistics_process
  cvm_common_ip_hdr_t *true_ip
  )
 {
-	user_item_t* user = NULL;
+	user_ipv4_item_t* user_ipv4 = NULL;
+	user_ipv6_item_t* user_ipv6 = NULL;
 	cvmx_rwlock_wp_lock_t* user_lock = NULL;
 	uint32_t user_payload = 0;	
+	cvm_common_ipv6_hdr_t *ipv6 = NULL;
 
 	if(NULL == true_ip)
 	{
@@ -2032,85 +2456,170 @@ void user_flow_statistics_process
 
 	if (CVM_IP_IPVERSION_V6 == true_ip->ip_v)
 	{
+		ipv6 = (cvm_common_ipv6_hdr_t *)true_ip;
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
-				"user_flow_statistics_process: true_ip is ipv6 dont flow statistics!\n");
-		return;
+				"user_flow_statistics_process: true_ip is ipv6 flow statistics! %16lx %16lx => %16lx %16lx nexthdr %d!\n", 
+				ipv6->ip_src.s6_addr64[0], ipv6->ip_src.s6_addr64[1],
+				ipv6->ip_dst.s6_addr64[0], ipv6->ip_dst.s6_addr64[1], ipv6->ip_nexthdr);
+
+		/* calculate user paload */
+		user_payload = calculate_user_paload(work, true_ip);
+
+		/* count pkts which we can fast-forward */
+		if((NULL != rule) && 
+				((rule->rules.action_type == FLOW_ACTION_ETH_FORWARD) ||
+				 (rule->rules.action_type == FLOW_ACTION_RPA_ETH_FORWARD) ||
+				 (rule->rules.action_type == FLOW_ACTION_CAPWAP_FORWARD) ||
+				 (rule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_FORWARD) ||
+				 (rule->rules.action_type == FLOW_ACTION_CAP802_3_FORWARD) ||
+				 (rule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_802_11_ICMP)))
+		{
+			if( rule->rules.direct_flag == DIRECTION_UP)
+			{
+				user_ipv6 = get_user_ipv6_item(rule->rules.user_index, rule->rules.user_link_index);
+				if(user_ipv6 != NULL){
+					cvmx_atomic_add64((int64_t *)(&(user_ipv6->user_info.ipv6_forward_up_packet)), 1);
+					cvmx_atomic_add64((int64_t *)(&(user_ipv6->user_info.ipv6_forward_up_bytes)), user_payload);
+				}
+			}
+			else if(rule->rules.direct_flag == DIRECTION_DOWN)
+			{
+				user_ipv6 = get_user_ipv6_item(rule->rules.user_index, rule->rules.user_link_index);
+				if(user_ipv6 != NULL){
+					cvmx_atomic_add64((int64_t *)(&(user_ipv6->user_info.ipv6_forward_down_packet)),1);
+					cvmx_atomic_add64((int64_t *)(&(user_ipv6->user_info.ipv6_forward_down_bytes)),user_payload);
+				}
+			}
+			else if(rule->rules.direct_flag == DIRECTION_UP_DOWN)   /* user to user */
+			{
+				/* user_index and user_link_index identify upload user */
+				user_ipv6 = get_user_ipv6_item(rule->rules.user_index, rule->rules.user_link_index);
+				if(user_ipv6 != NULL)
+				{
+					cvmx_atomic_add64((int64_t *)(&(user_ipv6->user_info.ipv6_forward_up_packet)),1);
+					cvmx_atomic_add64((int64_t *)(&(user_ipv6->user_info.ipv6_forward_up_bytes)),user_payload);
+				}
+
+				/* user2_index and user2_link_index identify download user */
+				user_ipv6 = get_user_ipv6_item(rule->rules.user2_index, rule->rules.user2_link_index);
+				if(user_ipv6 != NULL)
+				{
+					cvmx_atomic_add64((int64_t *)(&(user_ipv6->user_info.ipv6_forward_down_packet)),1);
+					cvmx_atomic_add64((int64_t *)(&(user_ipv6->user_info.ipv6_forward_down_bytes)),user_payload);
+				}					
+			}		
+		}
+		/* Damn it! don't forward,but need statistics. shit! */
+		else
+		{
+			/* src ip, forward up */
+			if ((user_ipv6 = fwd_find_user_ipv6(&ipv6->ip_src, &user_lock)) != NULL) 
+			{
+				if(user_ipv6 != NULL) 
+				{ 
+					cvmx_rwlock_wp_write_lock(user_lock);
+					cvmx_atomic_add64((int64_t *)(&(user_ipv6->user_info.ipv6_forward_up_packet)), 1);
+					cvmx_atomic_add64((int64_t *)(&(user_ipv6->user_info.ipv6_forward_up_bytes)), user_payload);
+					cvmx_rwlock_wp_write_unlock(user_lock);
+				}
+			}
+			/* dst ip, forward down */
+			if ((user_ipv6 = fwd_find_user_ipv6(&ipv6->ip_dst, &user_lock)) != NULL) 
+			{
+				if(user_ipv6 != NULL) 
+				{
+					cvmx_rwlock_wp_write_lock(user_lock); 
+					cvmx_atomic_add64((int64_t *)(&(user_ipv6->user_info.ipv6_forward_down_packet)),1);
+					cvmx_atomic_add64((int64_t *)(&(user_ipv6->user_info.ipv6_forward_down_bytes)),user_payload);			
+					cvmx_rwlock_wp_write_unlock(user_lock);
+				}
+			}
+		}
+		
 	}
-
-	/* calculate user paload */
-	user_payload = calculate_user_paload(work, true_ip);
-
-	/* count pkts which we can fast-forward */
-	if((NULL != rule) && 
-			((rule->rules.action_type == FLOW_ACTION_ETH_FORWARD) ||
-			 (rule->rules.action_type == FLOW_ACTION_RPA_ETH_FORWARD) ||
-			 (rule->rules.action_type == FLOW_ACTION_CAPWAP_FORWARD) ||
-			 (rule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_FORWARD) ||
-			 (rule->rules.action_type == FLOW_ACTION_CAP802_3_FORWARD) ||
-			 (rule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_802_11_ICMP)))
+	else if (CVM_IP_IPVERSION == true_ip->ip_v)
 	{
-		if( rule->rules.direct_flag == DIRECTION_UP)
-		{
-			user = get_user_item(rule->rules.user_index, rule->rules.user_link_index);
-			if(user != NULL){
-				cvmx_atomic_add64((int64_t *)(&(user->user_info.forward_up_packet)), 1);
-				cvmx_atomic_add64((int64_t *)(&(user->user_info.forward_up_bytes)), user_payload);
-			}
-		}
-		else if(rule->rules.direct_flag == DIRECTION_DOWN)
-		{
-			user = get_user_item(rule->rules.user_index, rule->rules.user_link_index);
-			if(user != NULL){
-				cvmx_atomic_add64((int64_t *)(&(user->user_info.forward_down_packet)),1);
-				cvmx_atomic_add64((int64_t *)(&(user->user_info.forward_down_bytes)),user_payload);
-			}
-		}
-		else if(rule->rules.direct_flag == DIRECTION_UP_DOWN)   /* user to user */
-		{
-			/* user_index and user_link_index identify upload user */
-			user = get_user_item(rule->rules.user_index, rule->rules.user_link_index);
-			if(user != NULL)
-			{
-				cvmx_atomic_add64((int64_t *)(&(user->user_info.forward_up_packet)),1);
-				cvmx_atomic_add64((int64_t *)(&(user->user_info.forward_up_bytes)),user_payload);
-			}
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+				"user_flow_statistics_process: true_ip is ipv4 flow statistics!%d.%d.%d.%d => %d.%d.%d.%d proto %d!\n", 
+				IP_FMT(true_ip->ip_src),
+				IP_FMT(true_ip->ip_src),
+				true_ip->ip_p);
+		
+		/* calculate user paload */
+		user_payload = calculate_user_paload(work, true_ip);
 
-			/* user2_index and user2_link_index identify download user */
-			user = get_user_item(rule->rules.user2_index, rule->rules.user2_link_index);
-			if(user != NULL)
-			{
-				cvmx_atomic_add64((int64_t *)(&(user->user_info.forward_down_packet)),1);
-				cvmx_atomic_add64((int64_t *)(&(user->user_info.forward_down_bytes)),user_payload);
-			}					
-		}		
-	}
-	/* Damn it! don't forward,but need statistics. shit! */
-	else
-	{
-		/* src ip, forward up */
-		if ((user = fwd_find_user(true_ip->ip_src, &user_lock)) != NULL) 
+		/* count pkts which we can fast-forward */
+		if((NULL != rule) && 
+				((rule->rules.action_type == FLOW_ACTION_ETH_FORWARD) ||
+				 (rule->rules.action_type == FLOW_ACTION_RPA_ETH_FORWARD) ||
+				 (rule->rules.action_type == FLOW_ACTION_CAPWAP_FORWARD) ||
+				 (rule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_FORWARD) ||
+				 (rule->rules.action_type == FLOW_ACTION_CAP802_3_FORWARD) ||
+				 (rule->rules.action_type == FLOW_ACTION_RPA_CAPWAP_802_11_ICMP)))
 		{
-			if(user != NULL) 
-			{ 
-				cvmx_rwlock_wp_write_lock(user_lock);
-				cvmx_atomic_add64((int64_t *)(&(user->user_info.forward_up_packet)), 1);
-				cvmx_atomic_add64((int64_t *)(&(user->user_info.forward_up_bytes)), user_payload);
-				cvmx_rwlock_wp_write_unlock(user_lock);
-			}
-		}
-		/* dst ip, forward down */
-		if ((user = fwd_find_user(true_ip->ip_dst, &user_lock)) != NULL) 
-		{
-			if(user != NULL) 
+			if( rule->rules.direct_flag == DIRECTION_UP)
 			{
-				cvmx_rwlock_wp_write_lock(user_lock); 
-				cvmx_atomic_add64((int64_t *)(&(user->user_info.forward_down_packet)),1);
-				cvmx_atomic_add64((int64_t *)(&(user->user_info.forward_down_bytes)),user_payload);			
-				cvmx_rwlock_wp_write_unlock(user_lock);
+				user_ipv4 = get_user_item(rule->rules.user_index, rule->rules.user_link_index);
+				if(user_ipv4 != NULL){
+					cvmx_atomic_add64((int64_t *)(&(user_ipv4->user_info.forward_up_packet)), 1);
+					cvmx_atomic_add64((int64_t *)(&(user_ipv4->user_info.forward_up_bytes)), user_payload);
+				}
 			}
-		}
-	}
+			else if(rule->rules.direct_flag == DIRECTION_DOWN)
+			{
+				user_ipv4 = get_user_item(rule->rules.user_index, rule->rules.user_link_index);
+				if(user_ipv4 != NULL){
+					cvmx_atomic_add64((int64_t *)(&(user_ipv4->user_info.forward_down_packet)),1);
+					cvmx_atomic_add64((int64_t *)(&(user_ipv4->user_info.forward_down_bytes)),user_payload);
+				}
+			}
+			else if(rule->rules.direct_flag == DIRECTION_UP_DOWN)   /* user to user */
+			{
+				/* user_index and user_link_index identify upload user */
+				user_ipv4 = get_user_item(rule->rules.user_index, rule->rules.user_link_index);
+				if(user_ipv4 != NULL)
+				{
+					cvmx_atomic_add64((int64_t *)(&(user_ipv4->user_info.forward_up_packet)),1);
+					cvmx_atomic_add64((int64_t *)(&(user_ipv4->user_info.forward_up_bytes)),user_payload);
+				}
 
+				/* user2_index and user2_link_index identify download user */
+				user_ipv4 = get_user_item(rule->rules.user2_index, rule->rules.user2_link_index);
+				if(user_ipv4 != NULL)
+				{
+					cvmx_atomic_add64((int64_t *)(&(user_ipv4->user_info.forward_down_packet)),1);
+					cvmx_atomic_add64((int64_t *)(&(user_ipv4->user_info.forward_down_bytes)),user_payload);
+				}					
+			}		
+		}
+		/* Damn it! don't forward,but need statistics. shit! */
+		else
+		{
+			/* src ip, forward up */
+			if ((user_ipv4 = fwd_find_user(true_ip->ip_src, &user_lock)) != NULL) 
+			{
+				if(user_ipv4 != NULL) 
+				{ 
+					cvmx_rwlock_wp_write_lock(user_lock);
+					cvmx_atomic_add64((int64_t *)(&(user_ipv4->user_info.forward_up_packet)), 1);
+					cvmx_atomic_add64((int64_t *)(&(user_ipv4->user_info.forward_up_bytes)), user_payload);
+					cvmx_rwlock_wp_write_unlock(user_lock);
+				}
+			}
+			/* dst ip, forward down */
+			if ((user_ipv4 = fwd_find_user(true_ip->ip_dst, &user_lock)) != NULL) 
+			{
+				if(user_ipv4 != NULL) 
+				{
+					cvmx_rwlock_wp_write_lock(user_lock); 
+					cvmx_atomic_add64((int64_t *)(&(user_ipv4->user_info.forward_down_packet)),1);
+					cvmx_atomic_add64((int64_t *)(&(user_ipv4->user_info.forward_down_bytes)),user_payload);			
+					cvmx_rwlock_wp_write_unlock(user_lock);
+				}
+			}
+		}
+	}
+	
 	return;
 }
 

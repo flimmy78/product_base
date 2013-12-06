@@ -55,7 +55,7 @@ typedef struct _cvm_car_tb
 } cvm_car_tb_t; 
 
 int car_init(void);
-int cvm_car_tb_set(user_item_t *user, int speed);
+int cvm_car_tb_set(user_ipv4_item_t *user, int speed);
 inline int cvm_car_result(int bytes, uint32_t usr_idx, uint16_t usr_link_idx);
 void cvm_car_show(uint32_t car_index);
 void cvm_car_dump(void);
