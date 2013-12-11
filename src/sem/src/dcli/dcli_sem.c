@@ -2322,7 +2322,13 @@ DEFUN (delete_patch_single,
 	
    	if(2 == argc)
 	{ 
-		
+		patchname= (char *)argv[0];
+    	ret = strlen(patchname);
+    	if(ret > 100)
+    	{
+            vty_out(vty, "patch name should less than 100Bytes.\n");
+    		return CMD_WARNING;
+    	}
 		//rm **.sp at all slot
 	    slot_id = atoi(argv[1]);
 		if(slot_id > get_product_info(SEM_SLOT_COUNT_PATH) || slot_id <= 0)
@@ -2367,8 +2373,6 @@ DEFUN (delete_patch_single,
 					return CMD_SUCCESS;
 			}
 		}
-
-		patchname= (char *)argv[0];
 
 		//vty_out(vty, "SLOT %d **********\n",i);
 
@@ -2446,7 +2450,16 @@ DEFUN (delete_patch_single,
 			return CMD_SUCCESS;
 		}
    	}else{
-    	memset(cmd,0,256);
+
+		patchname= (char *)argv[0];
+		ret = strlen(patchname);
+    	if(ret > 100)
+    	{
+            vty_out(vty, "patch name should less than 100Bytes.\n");
+    		return CMD_WARNING;
+    	}
+		
+		memset(cmd,0,256);
     	sprintf(cmd,"rm /mnt/patch/%s > /dev/null 2> /dev/null",argv[0]);
     	ret = system(cmd);
     	ret = WEXITSTATUS(ret);
@@ -2475,8 +2488,7 @@ DEFUN (delete_patch_single,
     		else
     			vty_out(vty,"Delete local board patch success\n");
     	}
-
-    	patchname= (char *)argv[0];
+		
     	for(i = 1;i < MAX_SLOT ; i++)
     	{
     		if(NULL != (dbus_connection_dcli[i] -> dcli_dbus_connection))
