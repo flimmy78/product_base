@@ -641,7 +641,7 @@ static GT_STATUS dxChNetIfSdmaTxPacketSend
 
     }
 
-    osPrintfErr("***************jump out the loop !!!!!!!!!\n", devNum,synchronicSend,currSwDesc->txDesc);	
+    osPrintfErr("***************jump out the loop !!!!!!!!!\n");	
 
 
     #if 1   /* Add for debug */

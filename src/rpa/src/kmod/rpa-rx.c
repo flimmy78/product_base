@@ -161,6 +161,8 @@ rpa_callback_result_t rpa_ipv6_neighbor_advertisement_broadcast(struct sk_buff *
 	struct sk_buff *skb_cp = NULL;
 	int ret;
 
+	return 0;  /* for debug, need remove later! */
+	
 	if ((NULL == skb) || (NULL == skb->dev)) {
 		return -1;
 	}
