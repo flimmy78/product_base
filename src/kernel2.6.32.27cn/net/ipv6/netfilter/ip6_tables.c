@@ -34,6 +34,10 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
 MODULE_DESCRIPTION("IPv6 packet filter");
 
+/*huangjing##add for debug*/
+int ip6_tables_debug = 0;
+module_param(ip6_tables_debug,int,0644);
+
 /*#define DEBUG_IP_FIREWALL*/
 /*#define DEBUG_ALLOW_ALL*/ /* Useful for remote debugging */
 /*#define DEBUG_IP_FIREWALL_USER*/
@@ -379,19 +383,20 @@ ip6t_do_table(struct sk_buff *skb,
 
 	do {
 		struct ip6t_entry_target *t;
-		#if 0
-        printk(KERN_DEBUG"huangjing##ip6t_do_table,struct ip6t_entry:e->ipv6->proto=%d\n",e->ipv6.proto);
-        printk(KERN_DEBUG"huangjing##ip6t_do_table,struct ip6t_entry:e->ipv6.src\n");
-        for(i=0;i<4;i++)
-        {
-        	printk(KERN_DEBUG"%x  ",e->ipv6.src.in6_u.u6_addr32[i]);
-        }
-        printk(KERN_DEBUG"huangjing##ip6t_do_table,struct ip6t_entry:e->ipv6.dst\n");
-        for(i=0;i<4;i++)
-        {
-        	printk(KERN_DEBUG"%x  ",e->ipv6.dst.in6_u.u6_addr32[i]);
-        }
-        #endif
+		if(ip6_tables_debug)
+		{
+            printk(KERN_DEBUG"Function:ip6t_do_table;struct ip6t_entry->ipv6->proto=%d\n",e->ipv6.proto);
+            printk(KERN_DEBUG"Function:ip6t_do_table;struct ip6t_entry->ipv6.src\n");
+            for(i=0;i<4;i++)
+            {
+            	printk(KERN_DEBUG"%x  ",e->ipv6.src.in6_u.u6_addr32[i]);
+            }
+            printk(KERN_DEBUG"Function:ip6t_do_table;struct ip6t_entry->ipv6.dst\n");
+            for(i=0;i<4;i++)
+            {
+            	printk(KERN_DEBUG"%x  ",e->ipv6.dst.in6_u.u6_addr32[i]);
+            }
+		}
 		IP_NF_ASSERT(e);
 		IP_NF_ASSERT(back);
 		if (!ip6_packet_match(skb, indev, outdev, &e->ipv6,
@@ -406,25 +411,18 @@ ip6t_do_table(struct sk_buff *skb,
 			    sizeof(struct ipv6hdr), 1);
 
 		t = ip6t_get_target(e);
-        #if 0
 		/*huangjing##debug*/
-		if(t->u.kernel.target->target == NULL)
-		{
-            pr_err("huangjing##ip6t_do_table,t->u.kernel.target->target == NULL\n");
-		}
-		else
-		{
-            pr_err("huangjing##ip6t_do_table,t->u.kernel.target->target != NULL\n");
-		}
-		if(t->data == NULL)
-		{
-            pr_err("huangjing##ip6t_do_table,t->data == NULL\n");
-		}
-		else
-		{
-            pr_err("huangjing##ip6t_do_table,t->data != NULL\n");
-		}
-		#endif
+        if(ip6_tables_debug)
+        {
+    		if(t->u.kernel.target->target == NULL)
+                printk(KERN_DEBUG"Function:ip6t_do_table;t->u.kernel.target->target == NULL\n");
+    		else
+                printk(KERN_DEBUG"Function:ip6t_do_table;t->u.kernel.target->target != NULL\n");
+    		if(t->data == NULL)
+                printk(KERN_DEBUG"Function:ip6t_do_table;t->data == NULL\n");
+    		else
+                printk(KERN_DEBUG"Function:ip6t_do_table;t->data != NULL\n");
+        }
 		IP_NF_ASSERT(t->u.kernel.target);
 
 #if defined(CONFIG_NETFILTER_XT_TARGET_TRACE) || \

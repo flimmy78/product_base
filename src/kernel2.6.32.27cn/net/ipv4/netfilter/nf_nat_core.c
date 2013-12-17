@@ -54,6 +54,10 @@ extern bool nf_nat_ipv6_manip_pkt(struct sk_buff *skb,
 				  const struct nf_nat_l4proto *l4proto,
 				  const struct nf_conntrack_tuple *target,
 				  enum nf_nat_manip_type maniptype);
+
+/*huangjing##add for debug*/
+int nf_nat_core_debug = 0;
+module_param(nf_nat_core_debug,int,0644);
 /*end*/
 
 static struct nf_conntrack_l3proto *l3proto __read_mostly;
@@ -516,7 +520,10 @@ unsigned int nf_nat_setup_info_ipv6(struct nf_conn *ct,
 			return NF_ACCEPT;
 		}
 	}
-
+    if(nf_nat_core_debug)
+    {
+        printk(KERN_DEBUG"Function:nf_nat_setup_info_ipv6;\n");
+	}
 	NF_CT_ASSERT(maniptype == IP_NAT_MANIP_SRC ||
 		     maniptype == IP_NAT_MANIP_DST);
 	BUG_ON(nf_nat_initialized(ct, maniptype));
@@ -564,7 +571,11 @@ unsigned int nf_nat_setup_info_ipv6(struct nf_conn *ct,
 		set_bit(IPS_DST_NAT_DONE_BIT, &ct->status);
 	else
 		set_bit(IPS_SRC_NAT_DONE_BIT, &ct->status);
-
+	
+    if(nf_nat_core_debug)
+    {
+        printk(KERN_DEBUG"Function:nf_nat_setup_info_ipv6;ct->status=0x%x\n",ct->status);
+	}
 	return NF_ACCEPT;
 }
 EXPORT_SYMBOL(nf_nat_setup_info_ipv6);
@@ -718,30 +729,37 @@ unsigned int nf_nat_packet(struct nf_conn *ct,
 	/* Invert if this is reply dir. */
 	if (dir == IP_CT_DIR_REPLY)
 		statusbit ^= IPS_NAT_MASK;
-
+	
+    if(nf_nat_core_debug)
+    {
+        printk(KERN_DEBUG"Function:nf_nat_packet;statusbit=0x%x,ct->status=0x%x\n",statusbit,ct->status);
+	}
 	/* Non-atomic: these bits don't change. */
 	if (ct->status & statusbit) {
 		struct nf_conntrack_tuple target;
 
         /*huangjing##debug*/
 		#if 0
-    	ipv6_nat_debug("=============nf_nat_packet ct->tuplehash[dir].tuple.src dir=============\n");
-    	for(i=0;i<4;i++)
-    	{
-    		ipv6_nat_debug("0x%x\n",ct->tuplehash[dir].tuple.src.u3.in6.s6_addr32[i]);
-    	}
-    	ipv6_nat_debug("=============nf_nat_packet dir-end=============\n");
-    	ipv6_nat_debug("=============nf_nat_packet ct->tuplehash[!dir].tuple.src !dir=============\n");
-    	for(i=0;i<4;i++)
-    	{
-    		ipv6_nat_debug("0x%x\n",ct->tuplehash[!dir].tuple.src.u3.in6.s6_addr32[i]);
-    	}
-    	ipv6_nat_debug("=============nf_nat_packet !dir-end=============\n");
-        #endif
+		if(nf_nat_core_debug)
+		{
+        	ipv6_nat_debug("=============nf_nat_packet ct->tuplehash[dir].tuple.src dir=============\n");
+        	for(i=0;i<4;i++)
+        	{
+        		ipv6_nat_debug("0x%x\n",ct->tuplehash[dir].tuple.src.u3.in6.s6_addr32[i]);
+        	}
+        	ipv6_nat_debug("=============nf_nat_packet dir-end=============\n");
+        	ipv6_nat_debug("=============nf_nat_packet ct->tuplehash[!dir].tuple.src !dir=============\n");
+        	for(i=0;i<4;i++)
+        	{
+        		ipv6_nat_debug("0x%x\n",ct->tuplehash[!dir].tuple.src.u3.in6.s6_addr32[i]);
+        	}
+        	ipv6_nat_debug("=============nf_nat_packet !dir-end=============\n");
+		}
+		#endif
 		/* We are aiming to look like inverse of other direction. */
 		nf_ct_invert_tuplepr(&target, &ct->tuplehash[!dir].tuple);
-        
-	    //printk(KERN_DEBUG"huangjing##nf_nat_packet,target.src.l3num=%d target.dst.protonum=%d mtype=%d\n",target.src.l3num,target.dst.protonum,mtype);
+        if(nf_nat_core_debug)
+	    printk(KERN_DEBUG"Function:nf_nat_packet,target.src.l3num=%d target.dst.protonum=%d mtype=%d\n",target.src.l3num,target.dst.protonum,mtype);
 		/*huangjing##add ipv6 tree*/
 		if(target.src.l3num == 10)
 		{

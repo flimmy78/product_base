@@ -28,6 +28,11 @@
 
 static const struct nf_nat_l3proto nf_nat_l3proto_ipv6;
 extern void nf_nat_l3proto_unregister(const struct nf_nat_l3proto *l3proto);
+
+/*huangjing##add for debug*/
+int nf_nat_l3proto_ipv6_debug = 0;
+module_param(nf_nat_l3proto_ipv6_debug,int,0644);
+
 /*huangjing##delete
 
 #ifdef CONFIG_XFRM
@@ -114,13 +119,19 @@ bool nf_nat_ipv6_manip_pkt(struct sk_buff *skb,
 	u8 nexthdr;
 	int i=0;
 	__be16 _frag_off, *fp;
-    //hex_dump(skb->data, skb->len);
-	printk(KERN_DEBUG"++++++++++++target->dst.u3.in6.s6_addr32+++++++++++\n");
-	for(i=0;i<4;i++)
+
+	if(nf_nat_l3proto_ipv6_debug)
 	{
-		printk(KERN_DEBUG"0x%x\n",target->dst.u3.in6.s6_addr32[i]);
-	}
-	printk(KERN_DEBUG"+++++++++++++target->dst.u3.in6.s6_addr32++++++++++\n");
+		printk(KERN_DEBUG"Function:nf_nat_ipv6_manip_pkt\n");
+        hex_dump(skb->data, skb->len);
+    	printk(KERN_DEBUG"++++++++++++target->dst.u3.in6.s6_addr32+++++++++++\n");
+    	for(i=0;i<4;i++)
+    	{
+    		printk(KERN_DEBUG"0x%x\n",target->dst.u3.in6.s6_addr32[i]);
+    	}
+    	printk(KERN_DEBUG"+++++++++++++target->dst.u3.in6.s6_addr32++++++++++\n");
+    }
+	
 	if (!skb_make_writable(skb, iphdroff + sizeof(*ipv6h)))
 		return false;
 
@@ -156,7 +167,11 @@ manip_addr:
 		ipv6h->saddr = target->src.u3.in6;
 	else
 		ipv6h->daddr = target->dst.u3.in6;
-    //hex_dump(skb->data, skb->len);
+	if(nf_nat_l3proto_ipv6_debug)
+	{
+		printk(KERN_DEBUG"Function:nf_nat_ipv6_manip_pkt End.\n");
+        hex_dump(skb->data, skb->len);
+    }
 	return true;
 }
 

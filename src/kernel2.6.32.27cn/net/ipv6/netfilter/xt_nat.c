@@ -156,20 +156,9 @@ static struct xt_target xt_nat_target_reg[] __read_mostly = {
 };
 #endif
 
-static unsigned int
-xt_snat_target_v1(struct sk_buff *skb, const struct xt_target_param *par)
-{
-	const struct nf_nat_ipv6_range *range = par->targinfo;
-	enum ip_conntrack_info ctinfo;
-	struct nf_conn *ct;
-
-	ct = nf_ct_get(skb, &ctinfo);
-	NF_CT_ASSERT(ct != NULL &&
-		     (ctinfo == IP_CT_NEW || ctinfo == IP_CT_RELATED ||
-		      ctinfo == IP_CT_RELATED_REPLY));
-
-	return nf_nat_setup_info_ipv6(ct, range, IP_NAT_MANIP_SRC);
-}
+/*huangjing##add for debug*/
+int xt_nat_debug = 0;
+module_param(xt_nat_debug,int,0644);
 
  /**
   * Display a buffer in hex
@@ -195,15 +184,33 @@ static void hex_dump(const void *buffer, int buffer_len)
 
 
 static unsigned int
+xt_snat_target_v1(struct sk_buff *skb, const struct xt_target_param *par)
+{
+	const struct nf_nat_ipv6_range *range = par->targinfo;
+	enum ip_conntrack_info ctinfo;
+	struct nf_conn *ct;
+
+	ct = nf_ct_get(skb, &ctinfo);
+	NF_CT_ASSERT(ct != NULL &&
+		     (ctinfo == IP_CT_NEW || ctinfo == IP_CT_RELATED ||
+		      ctinfo == IP_CT_RELATED_REPLY));
+
+	return nf_nat_setup_info_ipv6(ct, range, IP_NAT_MANIP_SRC);
+}
+
+static unsigned int
 xt_dnat_target_v1(struct sk_buff *skb, const struct xt_target_param *par)
 {
 	const struct nf_nat_ipv6_range *range = par->targinfo;
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn *ct;
 
-	//dump_stack();
-	//hex_dump(skb->data, skb->len);
-    
+	if(xt_nat_debug)
+	{
+		printk(KERN_DEBUG"Function:xt_dnat_target_v1;\n");
+	    //dump_stack();
+	    //hex_dump(skb->data, skb->len);
+	}
 	ct = nf_ct_get(skb, &ctinfo);
 	NF_CT_ASSERT(ct != NULL &&
 		     (ctinfo == IP_CT_NEW || ctinfo == IP_CT_RELATED));

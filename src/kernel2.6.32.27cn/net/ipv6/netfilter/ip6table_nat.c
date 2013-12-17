@@ -20,6 +20,10 @@
 #include <net/netfilter/nf_nat_core.h>
 #include <net/netfilter/nf_nat_l3proto.h>
 
+/*huangjing##add for debug*/
+int ip6table_nat_debug = 0;
+module_param(ip6table_nat_debug,int,0644);
+
 /*huangjing##add*/
 /* Set up the info structure to map into this range. */
 extern unsigned int nf_nat_setup_info_ipv6(struct nf_conn *ct,
@@ -74,6 +78,29 @@ static struct
 	},
 	.term = IP6T_ERROR_INIT,		/* ERROR */
 };
+
+ /**
+  * Display a buffer in hex
+  *
+  * @param buffer	  Data buffer to display
+  * @param buffer_len Length of the buffer
+  */
+ static void hex_dump(const void *buffer, int buffer_len)
+ {
+	 const uint8_t *ptr = (const uint8_t*)buffer;
+	 int i;
+	 printk(KERN_DEBUG"SKB BUFFER:==========================\n");
+	 for (i=0;i<buffer_len;i++) 
+	 	{
+//		 if (i % 16 == 0) printk("\n%04x: ", i);
+		 if (i % 16 == 0) printk("\n");
+		   printk("%02X ", (unsigned int)*ptr);
+		   ptr++;
+		}
+	 printk(KERN_DEBUG"\n");
+	 printk(KERN_DEBUG"SKB BUFFER:==========================\n");
+ }
+
 /*huangjing##add end*/
 
 static unsigned int alloc_null_binding(struct nf_conn *ct, unsigned int hooknum)
@@ -93,7 +120,7 @@ static unsigned int alloc_null_binding(struct nf_conn *ct, unsigned int hooknum)
 	return nf_nat_setup_info_ipv6(ct, &range, HOOK2MANIP(hooknum));
 }
 
-static unsigned int nf_nat_rule_find(struct sk_buff *skb, unsigned int hooknum,
+static unsigned int ipv6_nf_nat_rule_find(struct sk_buff *skb, unsigned int hooknum,
 				     const struct net_device *in,
 				     const struct net_device *out,
 				     struct nf_conn *ct)
@@ -157,7 +184,12 @@ huangjing##2013-9-23
 			return NF_ACCEPT;
 		}
 	}
-    
+	/*huangjing##add for debug*/
+    if(ip6table_nat_debug)
+    {
+		printk(KERN_DEBUG"Function:nf_nat_ipv6_fn;ctinfo=%d\n",ctinfo);
+    }
+	
 	switch (ctinfo) {
 	case IP_CT_RELATED:
 	case IP_CT_RELATED_REPLY:
@@ -187,7 +219,7 @@ huangjing##2013-9-23
 		if (!nf_nat_initialized(ct, maniptype)) {
 			unsigned int ret;
 
-			ret = nf_nat_rule_find(skb, hooknum, in, out, ct);
+			ret = ipv6_nf_nat_rule_find(skb, hooknum, in, out, ct);
 			if (ret != NF_ACCEPT)
 				return ret;
 		} else {
@@ -214,28 +246,6 @@ oif_changed:
 	return NF_DROP;
 }
 
- /**
-  * Display a buffer in hex
-  *
-  * @param buffer	  Data buffer to display
-  * @param buffer_len Length of the buffer
-  */
- static void hex_dump(const void *buffer, int buffer_len)
- {
-	 const uint8_t *ptr = (const uint8_t*)buffer;
-	 int i;
-	 printk(KERN_DEBUG"SKB BUFFER:==========================\n");
-	 for (i=0;i<buffer_len;i++) 
-	 	{
-//		 if (i % 16 == 0) printk("\n%04x: ", i);
-		 if (i % 16 == 0) printk("\n");
-		   printk("%02X ", (unsigned int)*ptr);
-		   ptr++;
-		}
-	 printk(KERN_DEBUG"\n");
-	 printk(KERN_DEBUG"SKB BUFFER:==========================\n");
- }
-
 static unsigned int
 nf_nat_ipv6_in(unsigned int hooknum,
 	       struct sk_buff *skb,
@@ -245,8 +255,13 @@ nf_nat_ipv6_in(unsigned int hooknum,
 {
 	unsigned int ret;
 	struct in6_addr daddr = ipv6_hdr(skb)->daddr;
-
-    //hex_dump(skb->data, skb->len);
+	
+    if(ip6table_nat_debug)
+    {
+		printk(KERN_DEBUG"Function:nf_nat_ipv6_in;hooknum=%d\n",hooknum);
+        hex_dump(skb->data, skb->len);
+    }
+	
 	ret = nf_nat_ipv6_fn(hooknum, skb, in, out, okfn);
 	if (ret != NF_DROP && ret != NF_STOLEN &&
 	    ipv6_addr_cmp(&daddr, &ipv6_hdr(skb)->daddr))
