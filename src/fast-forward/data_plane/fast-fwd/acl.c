@@ -146,10 +146,16 @@ int acl_table_init()
 			break;
 	}
 
-	user_static_tbl_size = (64*1024);
-	user_dynamic_tbl_size = (64*1024);
-	user_ipv6_static_tbl_size = (64*1024);
-	user_ipv6_dynamic_tbl_size = (64*1024);
+	//user_static_tbl_size = (64*1024);
+	//user_dynamic_tbl_size = (64*1024);
+	//user_ipv6_static_tbl_size = (64*1024);
+	//user_ipv6_dynamic_tbl_size = (64*1024);
+
+	user_static_tbl_size = (16*1024);
+	user_dynamic_tbl_size = (16*1024);
+	user_ipv6_static_tbl_size = (16*1024);
+	user_ipv6_dynamic_tbl_size = (16*1024);
+
 
 	printf("acl_static_tbl_size = 0x%x\n", acl_static_tbl_size);
 	printf("acl_dynamic_tbl_size = 0x%x\n", acl_dynamic_tbl_size);
@@ -2676,6 +2682,14 @@ int fastfwd_show_fau64(fau64_info_t *fau64_info)
     fau64_info->fau_large_cw8023_rpa_fwd_packets = cvmx_fau_fetch_and_add64(CVM_FAU_LARGE_CW8023_RPA_FWD_PACKET,0);
     fau64_info->fau_spe_tcp_hdr = cvmx_fau_fetch_and_add64(CVM_FAU_SPE_TCP_HDR,0);
     fau64_info->fau_cw_spe_tcp_hdr = cvmx_fau_fetch_and_add64(CVM_FAU_CW_SPE_TCP_HDR,0);
+	fau64_info->fau_ipv6 = cvmx_fau_fetch_and_add64(CVM_FAU_IPV6,0);
+	fau64_info->fau_capwap_ipv6 = cvmx_fau_fetch_and_add64(CVM_FAU_CAPWAP_IPV6,0);
+	fau64_info->fau_ipv6_not_tcpudp = cvmx_fau_fetch_and_add64(CVM_FAU_IPV6_NOT_TCPUDP,0);
+	fau64_info->fau_capwap_ipv6_not_tcpudp = cvmx_fau_fetch_and_add64(CVM_FAU_CAPWAP_IPV6_NOT_TCPUDP,0);
+	fau64_info->fau_ipv6_mcast = cvmx_fau_fetch_and_add64(CVM_FAU_IPV6_MCAST,0);
+	fau64_info->fau_ipv6_flowtable_hit_packets = cvmx_fau_fetch_and_add64(CVM_FAU_IPV6_HIT_ACL,0);
+	fau64_info->fau_ipv6_acl_lookup = cvmx_fau_fetch_and_add64(CVM_FAU_IPV6_ACL_LOOKUP,0);
+	fau64_info->fau_ipv6_acl_reg = cvmx_fau_fetch_and_add64(CVM_FAU_IPV6_ACL_REG,0);
 
     return RETURN_OK;
 }

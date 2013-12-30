@@ -42,6 +42,7 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 	}
 	else if ((FUNC_ENABLE == pure_ipv6_forward_enable) && (CVM_IP_IPVERSION_V6 == ip->ip_v))
 	{
+		cvmx_fau_atomic_add64(CVM_FAU_IPV6_ACL_LOOKUP, 1);
 		ipv6 = (cvm_common_ipv6_hdr_t *)ip;
 		hash_v6_pure_ip(ipv6->ip_dst.s6_addr64[0],ipv6->ip_dst.s6_addr64[1],ipv6->ip_src.s6_addr64[0],ipv6->ip_src.s6_addr64[1]);
 		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
@@ -104,6 +105,7 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 				head_rule->rules.ipv6_sip64[0] = ipv6->ip_src.s6_addr64[0];
 				head_rule->rules.ipv6_sip64[1] = ipv6->ip_src.s6_addr64[1];
 				head_rule->rules.ipv6_flag = 1;
+				cvmx_fau_atomic_add64(CVM_FAU_IPV6_ACL_REG, 1);
 			}
 			head_rule->rules.rule_state = RULE_IS_LEARNING;
 			head_rule->rules.action_type = FLOW_ACTION_TOLINUX;
@@ -214,6 +216,7 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 						free_rule->rules.ipv6_sip64[0] = ipv6->ip_src.s6_addr64[0];
 						free_rule->rules.ipv6_sip64[1] = ipv6->ip_src.s6_addr64[1];
 						free_rule->rules.ipv6_flag = 1;
+						cvmx_fau_atomic_add64(CVM_FAU_IPV6_ACL_REG, 1);
 					}
 					free_rule->rules.rule_state = RULE_IS_LEARNING;
 					free_rule->rules.action_type = FLOW_ACTION_TOLINUX;
@@ -245,9 +248,13 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_FLOWTABLE, FASTFWD_COMMON_DBG_LVL_DEBUG,
 					"acl_table_pure_ip_lookup: Find the rule=0x%p\n",rule);
 
-			if(rule->rules.rule_state== RULE_IS_STATIC) 
+			if(rule->rules.rule_state == RULE_IS_STATIC) 
 			{
 				cvmx_fau_atomic_add64(CVM_FAU_FLOWTABLE_HIT_PACKETS, 1);
+				if (1 == rule->rules.ipv6_flag)
+				{
+					cvmx_fau_atomic_add64(CVM_FAU_IPV6_HIT_ACL, 1);
+				}
 				cvmx_spinlock_unlock(head_lock);
 				return rule;
 			}
@@ -258,13 +265,21 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 
 			if(rule->rules.rule_state == RULE_IS_LEARNED)
 			{
-				cvmx_fau_atomic_add64(CVM_FAU_FLOWTABLE_HIT_PACKETS, 1);		
+				cvmx_fau_atomic_add64(CVM_FAU_FLOWTABLE_HIT_PACKETS, 1);	
+				if (1 == rule->rules.ipv6_flag)
+				{
+					cvmx_fau_atomic_add64(CVM_FAU_IPV6_HIT_ACL, 1);
+				}
 				cvmx_spinlock_unlock(head_lock);
 				return rule;
 			}
 			else if(rule->rules.rule_state == RULE_IS_LEARNING)
 			{
 				cvmx_fau_atomic_add64(CVM_FAU_ACL_REG, 1);
+				if (1 == rule->rules.ipv6_flag)
+				{
+					cvmx_fau_atomic_add64(CVM_FAU_IPV6_ACL_REG, 1);
+				}
 				cvmx_spinlock_unlock(head_lock);
 				return rule;
 			}
@@ -362,6 +377,7 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 							replace_rule->rules.ipv6_sip64[0] = ipv6->ip_src.s6_addr64[0];
 							replace_rule->rules.ipv6_sip64[1] = ipv6->ip_src.s6_addr64[1];
 							replace_rule->rules.ipv6_flag = 1;
+							cvmx_fau_atomic_add64(CVM_FAU_IPV6_ACL_REG, 1);
 						}
 						replace_rule->rules.rule_state = RULE_IS_LEARNING;
 						replace_rule->rules.action_type = FLOW_ACTION_TOLINUX;
@@ -398,6 +414,7 @@ inline rule_item_t  * acl_table_pure_ip_lookup(cvm_common_ip_hdr_t *ip, cvmx_spi
 					free_rule->rules.ipv6_sip64[0] = ipv6->ip_src.s6_addr64[0];
 					free_rule->rules.ipv6_sip64[1] = ipv6->ip_src.s6_addr64[1];
 					free_rule->rules.ipv6_flag = 1;
+					cvmx_fau_atomic_add64(CVM_FAU_IPV6_ACL_REG, 1);
 				}
 				free_rule->rules.rule_state = RULE_IS_LEARNING;
 				free_rule->rules.action_type = FLOW_ACTION_TOLINUX;

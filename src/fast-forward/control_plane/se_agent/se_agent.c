@@ -1550,7 +1550,15 @@ void se_agent_show_fau_dump_64(char *buf,struct sockaddr_tipc *client_addr,unsig
 	    fau64_info.fau_large_cw8023_rpa_fwd_packets = cvmx_fau_fetch_and_add64(CVM_FAU_LARGE_CW8023_RPA_FWD_PACKET,0);
 	    fau64_info.fau_spe_tcp_hdr = cvmx_fau_fetch_and_add64(CVM_FAU_SPE_TCP_HDR,0);
 	    fau64_info.fau_cw_spe_tcp_hdr = cvmx_fau_fetch_and_add64(CVM_FAU_CW_SPE_TCP_HDR,0);
-
+		fau64_info.fau_ipv6 = cvmx_fau_fetch_and_add64(CVM_FAU_IPV6,0);
+		fau64_info.fau_capwap_ipv6 = cvmx_fau_fetch_and_add64(CVM_FAU_CAPWAP_IPV6,0);
+		fau64_info.fau_ipv6_not_tcpudp = cvmx_fau_fetch_and_add64(CVM_FAU_IPV6_NOT_TCPUDP,0);
+		fau64_info.fau_capwap_ipv6_not_tcpudp = cvmx_fau_fetch_and_add64(CVM_FAU_CAPWAP_IPV6_NOT_TCPUDP,0);
+		fau64_info.fau_ipv6_mcast = cvmx_fau_fetch_and_add64(CVM_FAU_IPV6_MCAST,0);
+		fau64_info.fau_ipv6_flowtable_hit_packets = cvmx_fau_fetch_and_add64(CVM_FAU_IPV6_HIT_ACL,0);
+		fau64_info.fau_ipv6_acl_lookup = cvmx_fau_fetch_and_add64(CVM_FAU_IPV6_ACL_LOOKUP,0);
+		fau64_info.fau_ipv6_acl_reg = cvmx_fau_fetch_and_add64(CVM_FAU_IPV6_ACL_REG,0);
+		
 		memcpy(&se_buf->fccp_cmd.fccp_data.fau64_info, &fau64_info, sizeof(fau64_info_t));
 		se_buf->cmd_result = AGENT_RETURN_OK;
 	}
@@ -1819,7 +1827,7 @@ void se_agent_clear_fau64(char *buf,struct sockaddr_tipc *client_addr,unsigned i
 		else if (CPU_TAG_MASTER == se_buf->cpu_tag)
 		{
 			i = (CVM_FAU_PKO_ERRORS - CVMX_FAU_REG_64_START) >> 3;
-			for(;fau_addr < CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP_PPPOE; i++)
+			for(;fau_addr < CVM_FAU_UP_CLEAR; i++)
 			{
 					fau_addr = CVMX_FAU_REG_64_ADDR(i);
 					cvmx_fau_atomic_write64(fau_addr, 0);

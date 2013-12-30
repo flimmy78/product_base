@@ -384,6 +384,14 @@ typedef struct
 	int64_t fau_enet_capwap_pppoe_nonip_packets;	/*64-bit counter used for total ethernet input capwap pppoe noneip packets*/
 	int64_t fau_enet_output_packets_eth_pppoe;			/*64-bit counter used for total ethernet output eth pppoe packets*/
 	int64_t fau_enet_output_packets_capwap_pppoe;   /*64-bit counter used for total ethernet output capwap pppoe packets*/
+	int64_t fau_ipv6;                               /*64-bit counter used for IPV6 packets*/
+	int64_t fau_capwap_ipv6;                        /*64-bit counter used for Capwap IPV6 packets*/
+	int64_t fau_ipv6_not_tcpudp;                    /*64-bit counter used for IPV6 not tcpudp packets*/
+	int64_t fau_capwap_ipv6_not_tcpudp;             /*64-bit counter used for Capwap IPV6 not tcpudp packets*/
+	int64_t fau_ipv6_mcast;                         /*64-bit counter used for IPV6 mcast packets*/
+	int64_t fau_ipv6_flowtable_hit_packets;         /*64-bit counter used for IPV6 ACL HIT packets number*/
+	int64_t fau_ipv6_acl_lookup;                    /*64-bit counter used for IPV6 acl lookup counter*/
+	int64_t fau_ipv6_acl_reg;                       /*64-bit counter used for IPV6 acl setup and regist packets counter*/
 }fau64_info_t;
 
 typedef struct 

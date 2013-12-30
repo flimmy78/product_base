@@ -2272,9 +2272,18 @@ inline int8_t cw_802_11_decap(cvm_common_udp_hdr_t *ex_uh,
 	}
 	else if (CVM_IP_IPVERSION_V6 == (*in_ip)->ip_v)
 	{
+		cvmx_fau_atomic_add64(CVM_FAU_CAPWAP_IPV6, 1);
 
 		/* decap tcp */
 		ipv6 = (cvm_common_ipv6_hdr_t *)(*in_ip);
+
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+			"Receive the CAPWAP 80211 IPV6 packets %16lx %16lx => %16lx %16lx.\r\n",  
+			ipv6->ip_src.s6_addr64[0], 
+			ipv6->ip_src.s6_addr64[1], 
+			ipv6->ip_dst.s6_addr64[0],
+			ipv6->ip_dst.s6_addr64[1]
+			);
 
 		if (1 == is_pppoe)
 		{
@@ -2297,7 +2306,7 @@ inline int8_t cw_802_11_decap(cvm_common_udp_hdr_t *ex_uh,
 		else if ((FUNC_DISABLE == pure_ipv6_forward_enable) && (ipv6->ip_nexthdr != CVM_COMMON_IPPROTO_UDP))
 		{	
 			/*ipv6 not tcp udp dont support expand head temporary*/
-			cvmx_fau_atomic_add64(CVM_FAU_CW_SPE_TCP_HDR, 1);
+			cvmx_fau_atomic_add64(CVM_FAU_CAPWAP_IPV6_NOT_TCPUDP, 1);
 	        return RETURN_ERROR;
 		}
 	}
@@ -2406,8 +2415,17 @@ inline int8_t cw_802_3_decap(cvm_common_udp_hdr_t *ex_uh,
 	}
 	else if (CVM_IP_IPVERSION_V6 == (*in_ip)->ip_v)
 	{
+		cvmx_fau_atomic_add64(CVM_FAU_CAPWAP_IPV6, 1);
 		/* decap tcp */
 		ipv6 = (cvm_common_ipv6_hdr_t *)(*in_ip);
+
+		FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+			"Receive the CW8023 IPV6 packets !%16lx %16lx => %16lx %16lx.\r\n",  
+			ipv6->ip_src.s6_addr64[0], 
+			ipv6->ip_src.s6_addr64[1],
+			ipv6->ip_dst.s6_addr64[0],
+			ipv6->ip_dst.s6_addr64[1]
+			);
 
 		if (1 == is_pppoe)
 		{
@@ -2430,7 +2448,7 @@ inline int8_t cw_802_3_decap(cvm_common_udp_hdr_t *ex_uh,
 		else if ((FUNC_DISABLE == pure_ipv6_forward_enable) && (ipv6->ip_nexthdr != CVM_COMMON_IPPROTO_UDP))
 		{	
 			/*ipv6 not tcp udp dont support expand head temporary*/
-			cvmx_fau_atomic_add64(CVM_FAU_CW_SPE_TCP_HDR, 1);
+			cvmx_fau_atomic_add64(CVM_FAU_CAPWAP_IPV6_NOT_TCPUDP, 1);
 	        return RETURN_ERROR;
 		}
 	}
@@ -4859,6 +4877,8 @@ static void application_main_loop(unsigned int coremask_data)
 		}
 		else if (CVM_IP_IPVERSION_V6 == ip->ip_v)
 		{
+			cvmx_fau_atomic_add64(CVM_FAU_IPV6, 1);
+			
 			if (cvm_ipv6_enable == FUNC_DISABLE)
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
@@ -4866,6 +4886,15 @@ static void application_main_loop(unsigned int coremask_data)
 				action_type = FLOW_ACTION_TOLINUX;			
 				goto scheme_execute; 
 			}
+
+			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+				"Receive the IPV6 packets !%16lx %16lx => %16lx %16lx.\r\n",  
+			ipv6->ip_src.s6_addr64[0], 
+			ipv6->ip_src.s6_addr64[1], 
+			ipv6->ip_dst.s6_addr64[0],
+			ipv6->ip_dst.s6_addr64[1]
+			);
+
 			
 			/* ipv6 check hear 1.address 2... tag */
 
@@ -4874,12 +4903,12 @@ static void application_main_loop(unsigned int coremask_data)
 			{
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 						"IPV6 packet but broadcast address,trap to linux.\n");
+				cvmx_fau_atomic_add64(CVM_FAU_IPV6_MCAST, 1);
 				action_type = FLOW_ACTION_TOLINUX;			
 				goto scheme_execute; 	
 			}
 			
-			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
-    					"Receive the IPV6 packets !\r\n");
+
 
 			if (FUNC_ENABLE == pure_ipv6_forward_enable)
 			{
@@ -4923,6 +4952,7 @@ static void application_main_loop(unsigned int coremask_data)
 				
 				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
 						"IPV6 packet but next header not tcpudp,trap to linux.\n");
+				cvmx_fau_atomic_add64(CVM_FAU_IPV6_NOT_TCPUDP, 1);
 				action_type = FLOW_ACTION_TOLINUX;			
     			goto scheme_execute;
 			}
@@ -4948,6 +4978,14 @@ pure_ip_process:
 			{
 				action_type = FLOW_ACTION_TOLINUX;			
 				goto scheme_execute; 
+			}
+			else if ((CVM_IP_IPVERSION_V6 == true_ip->ip_v) && (0xFF == ((cvm_common_ipv6_hdr_t *)true_ip)->ip_dst.s6_addr[0]))
+			{
+				FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+						"PURE IPV6 packet but broadcast address,trap to linux.\n");
+				cvmx_fau_atomic_add64(CVM_FAU_IPV6_MCAST, 1);
+				action_type = FLOW_ACTION_TOLINUX;			
+				goto scheme_execute; 	
 			}
 			else
 			{
@@ -5031,6 +5069,14 @@ capwap_decap:
 			}
 		}
 
+		if ((CVM_IP_IPVERSION_V6 == true_ip->ip_v) && (0xFF == ipv6->ip_dst.s6_addr[0]))
+		{
+			FASTFWD_COMMON_DBG_MSG(FASTFWD_COMMON_MOUDLE_MAIN, FASTFWD_COMMON_DBG_LVL_DEBUG,
+					"CAPWAP IPV6 packet but broadcast address,trap to linux.\n");
+			cvmx_fau_atomic_add64(CVM_FAU_IPV6_MCAST, 1);
+			action_type = FLOW_ACTION_TOLINUX;			
+			goto scheme_execute; 	
+		}
 
 table_lookup:
 		/***********************************************************************

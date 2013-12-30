@@ -273,6 +273,34 @@
 	fau CVM_FAU_ENET_OUTPUT_PACKETS_CAPWAP_PPPOE
     		size = 8
     		description = "64-bit counter used for total ethernet output capwap pppoe packets";
+	fau CVM_FAU_IPV6
+    		size = 8
+    		description = "64-bit counter used for IPV6 packets";
+	fau CVM_FAU_CAPWAP_IPV6
+    		size = 8
+    		description = "64-bit counter used for Capwap IPV6 packets";
+	fau CVM_FAU_IPV6_NOT_TCPUDP
+    		size = 8
+    		description = "64-bit counter used for IPV6 not tcpudp packets";
+	fau CVM_FAU_CAPWAP_IPV6_NOT_TCPUDP
+    		size = 8
+    		description = "64-bit counter used for Capwap IPV6 not tcpudp packets";
+	fau CVM_FAU_IPV6_MCAST
+    		size = 8
+    		description = "64-bit counter used for IPV6 mcast packets";
+	fau CVM_FAU_IPV6_HIT_ACL
+    		size = 8
+    		description = "64-bit counter used for IPV6 ACL HIT packets number";
+	fau CVM_FAU_IPV6_ACL_LOOKUP
+    		size = 8
+    		description = "64-bit counter used for IPV6 acl lookup counter";
+	fau CVM_FAU_IPV6_ACL_REG
+    		size = 8
+    		description = "64-bit counter used for IPV6 acl setup and regist packets counter";
+	fau CVM_FAU_UP_CLEAR
+    		size = 8
+    		description = "up clear down not clear";
+
 	fau CVM_FAU_ENET_OUTPUT_PACKETS_ETH
     		size = 8
     		description = "64-bit counter used for total ethernet output eth packets";
