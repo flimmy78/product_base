@@ -570,10 +570,13 @@ trap-helper: libnm dcli-pub
 libnm: dcli-pub eag drp
 	@echo "Building libnm..."
 	$(MAKE) -C $(LIBNM_MOD) libnm.so
-	
-asd:
+
+
+asd:dcli
 	@echo "Building asd..."
 	$(MAKE) -C ${ASD_MOD}/src/app
+	@echo "Building dcli_asd..."
+	$(MAKE) -C ${ASD_MOD}/src/dcli/
 	cp ${ASD_MOD}/src/app/asd $(BIN_EXPORT_DIR)
 	cp -P ${ASD_MOD}/src/app/wapi/libw* $(LIB_EXPORT_DIR)
 	chmod 755 $(LIB_EXPORT_DIR)/libwssl.so*
@@ -590,7 +593,9 @@ wsm: wcpsspub_ac
 	$(MAKE) -C ${WCPSS_MOD}/src/app/wsm
 	cp ${WCPSS_MOD}/src/app/wsm/wsm $(BIN_EXPORT_DIR)
 
-wid: wcpsspub_ac
+wid: wcpsspub_ac dcli
+	@echo "Building wid_dcli ..."
+	@$(checkquagga) && $(MAKE) -C ${WCPSS_MOD}/src/dcli/
 	@echo "Building wid ..."
 	$(MAKE) -C ${WCPSS_MOD}/src/app/wid
 	cp ${WCPSS_MOD}/src/app/wid/wid $(BIN_EXPORT_DIR)
@@ -1463,6 +1468,7 @@ cleansnmp:cleanlibnm cleanacmanage cleantrap-helper cleanacsample
 	$(MAKE) -C ${SUBAGENT_MOD} clean
 
 cleanwcpss:
+	$(MAKE) -C ${WCPSS_MOD}/src/dcli/ clean
 	$(MAKE) -C ${WCPSS_MOD}/src/app/pub clean
 	$(MAKE) -C ${WCPSS_MOD}/src/app/wid clean
 	$(MAKE) -C ${WCPSS_MOD}/src/app/wsm clean
@@ -1504,6 +1510,9 @@ cleankpppoe:
 	$(MAKE) -C ${PPPOE_KERNEL_MOD} clean
 	
 cleanasd:
+	@echo "Cleaning dcli_asd..."
+	$(MAKE) -C ${ASD_MOD}/src/dcli/ clean
+	@echo "Cleaning asd..."
 	$(MAKE) -C ${ASD_MOD}/src/app clean
 
 cleanhad:
