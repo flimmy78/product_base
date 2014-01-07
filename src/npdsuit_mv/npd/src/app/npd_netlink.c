@@ -253,7 +253,22 @@ void npd_netlink_recv_thread(void)
                                         	    nam_enable_device(1,1);   	
 												*/
                                             }
-                    						npd_syslog_info("Enable asic after system-running OK.\n");											
+											/*yjl added :disable the asic of Standby-MCB */
+										    if((0 == IS_ACTIVE_MASTER_NPD)&&(1 == IS_MASTER_NPD))
+                                    	    {								
+                                                ret = nam_enable_device(0,0);   /* disable asic 0 */
+											    if (0 != ret)
+                                                {
+                                                    syslog_ax_board_dbg("disable asic 0 of Standby-MCB error !\n");
+    				                                return ret;
+                                                }
+    			                                else
+    			                                {
+    		                                        syslog_ax_board_dbg("disable asic 0 of Standby-MCB OK !\n");
+    			                                }
+										    }
+										    /*yjl added :disable the asic of Standby-MCB */
+											npd_syslog_info("Enable asic after system-running OK.\n");											
 										}
 										
 										/* 2. Set aw.state aftet system running */
@@ -429,40 +444,43 @@ void npd_netlink_recv_thread(void)
                             	#endif									
                  				case ACTIVE_STDBY_SWITCH_OCCUR_EVENT:   /* switch start */
             					    npd_syslog_info("###### from sem : ACTIVE_STDBY_SWITCH_OCCUR_EVENT \n");
-            						/* enable cscd port of Standby-MCB on AX8610 & AX8603 */
+								    /* enable asic of Standby-MCB on AX8610 & AX8800 */
                                     if((PRODUCT_TYPE==AUTELAN_PRODUCT_AX8610)||(PRODUCT_TYPE==AUTELAN_PRODUCT_AX8606)\
 										|| (PRODUCT_TYPE == AUTELAN_PRODUCT_AX8800))
                                     {
-										/* Disable cscd port if local board is Active-MCB */
+										
+										/*yjl modified : disable/enable cscd_port  change to disable/enable asic */
+										/* Disable asic if local board is Active-MCB */
                                     	if(1 == IS_ACTIVE_MASTER_NPD)
                                     	{
-                                         	ret = npd_disable_cscd_port();
+                                         	ret = nam_enable_device(0,0);   /* disable asic 0 */
                                             if (0 != ret)
                                             {
-                                                syslog_ax_board_dbg("disable cscd port on Active-MCB error !\n");
+                                                syslog_ax_board_dbg("disable asic 0 of Active-MCB error !\n");
                                             }
                                     		else
                                     		{
 												/* Change to be standby master */
                                     			board_info.is_active_master = 0;
-                                    	        syslog_ax_board_dbg("disable cscd port on Active-MCB OK !\n");
+                                    	        syslog_ax_board_dbg("disable asic 0 of Active-MCB OK !\n");
                                     		}																				
                                     	}
-										else
+										else if((0 == IS_ACTIVE_MASTER_NPD)&&(1 == IS_MASTER_NPD))
                                     	{
-                                            /* Enable the cscd port on Standby-MCB */											
-                                         	ret = npd_enable_cscd_port();
+                                            /* Enable the asic of Standby-MCB */											
+                                         	ret = nam_enable_device(0,1);   /* enable asic 0 */
                                             if (0 != ret)
                                             {
-                                                syslog_ax_board_dbg("enable cscd port on Standby-MCB error !\n");
+                                                syslog_ax_board_dbg("enable asic 0 of Standby-MCB error !\n");
                                             }
                                     		else
                                     		{
 												/* Change to be active master */
                                     			board_info.is_active_master = 1;
-                                    	        syslog_ax_board_dbg("enable cscd port on Standby-MCB OK !\n");
-                                    		}																				
+                                    	        syslog_ax_board_dbg("enable asic 0 of Standby-MCB OK !\n");
+                                    		}
                                     	}
+										/*yjl modified end : disable/enable cscd_port  change to disable/enable asic */
                                     }
 									else
 									{
@@ -1096,22 +1114,27 @@ int npd_init_second_stage(void)
 
    	if(1 == IS_MASTER_NPD)    /* if local board is Master, update the default vlan info. */
    	{		    	
-		/* 1.Disable the cscd port of Stanby-MCB on AX8610 & AX8606, need not on AX8603. */
+		/* 1.Disable the asic 0 of Stanby-MCB on AX8610 & AX8606, need not on AX8603. */
 		if((PRODUCT_TYPE==AUTELAN_PRODUCT_AX8610)||(PRODUCT_TYPE==AUTELAN_PRODUCT_AX8606)\
 			||(PRODUCT_TYPE == AUTELAN_PRODUCT_AX8800))
     	{
         	if(0 == IS_ACTIVE_MASTER_NPD)    /* if local board is not Active-MCB */
         	{
-           		ret = npd_disable_cscd_port();
+				/* do nothing, asic is disable in appDemoDxTrafficEnable(). */
+				#if 0
+				/*yjl modified : disable cscd_port  change to disable asic */
+           		ret = nam_enable_device(0,0);   /* disable asic 0 */
                 if (0 != ret)
                 {
-                    syslog_ax_board_dbg("disable cscd port on Standby-MCB error !\n");
+                    syslog_ax_board_dbg("disable asic 0 of Standby-MCB error !\n");
     				return ret;
                 }
     			else
     			{
-    		        syslog_ax_board_dbg("disable cscd port on Standby-MCB OK !\n");
+    		        syslog_ax_board_dbg("disable asic 0 of Standby-MCB OK !\n");
     			}
+				/*yjl modified : disable cscd_port  change to disable asic */
+				#endif
     		}
     	}
 		else    /* AX7605i & AX8603 */

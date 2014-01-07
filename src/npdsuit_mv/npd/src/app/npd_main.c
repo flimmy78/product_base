@@ -196,7 +196,7 @@ int main(int argc,char **argv)
 	syslog_ax_main_dbg("system software version %d.%d.%d build %d\n",sw_maj_v,sw_min_v,sw_comp_v,sw_build_v);
 
 /*
-	Get board info from /proc/board/
+	Get board info from /proc/product_info/
 */	
 	syslog_ax_main_dbg("init board info\n");
 	npd_init_boardinfo();

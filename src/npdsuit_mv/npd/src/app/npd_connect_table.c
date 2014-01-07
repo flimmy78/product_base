@@ -171,7 +171,7 @@ int npd_get_default_connect_table(void)
 						g_bportlist[slot_id].asic_cscd_bports[i].trunk_id = asic_8c_8610_cscd_bports[slot_id][i].trunk_id;
 					}
 					break;                 
-					case   	AX81_AC12C_BOARD_CODE:
+				case   	AX81_AC12C_BOARD_CODE:
 					g_bportlist[slot_id].board_type = AUTELAN_BOARD_AX81_AC12C;
 				    g_bportlist[slot_id].slot_id = (slot_id<=AX8610_SLOT_HALF?slot_id:slot_id+2)+1;
 					g_bportlist[slot_id].slot_num = slotNum;
