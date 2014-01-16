@@ -6439,6 +6439,19 @@ int npd_eth_port_notifier
 	unsigned long last_link_change, link_keep_time;
     struct sysinfo info = {0};      /* for mobile test */
 	memset(&portInfo,0,sizeof(struct eth_port_s));	/* code optimize: Uninitialized scalar variable houxx@autelan.com  2013-1-17 */
+
+	/*yjl added for delete fdb of asic port*/
+	if(1 == event)
+	{
+		ret = nam_fdb_table_delete_entry_with_port(eth_g_index);
+		if (ret != NPD_SUCCESS)
+		{
+            syslog_ax_eth_port_err("link down-fdb delete with port %#x::return value %d\n",eth_g_index,ret);
+        }
+        syslog_ax_eth_port_dbg("delete fdb of port %#x OK\n", eth_g_index);
+	}
+	/*yjl added end for delete fdb of asic port*/
+	
 	
 	/*by zhangcl@autelan.com on 01/31/2012 - to  force trunk port event report*/
 	if(BOARD_TYPE == BOARD_TYPE_AX81_SMU)
