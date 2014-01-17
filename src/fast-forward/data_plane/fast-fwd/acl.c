@@ -977,6 +977,8 @@ inline int32_t fwd_get_user_idx(rule_param_t *rule_param)
 	
 	uint8_t sip_user_flag = 0;
 	uint8_t dip_user_flag = 0;
+	uint8_t snat_flag = 0;
+    uint8_t dnat_flag = 0;
 
     if(rule_param == NULL)
     {
@@ -997,14 +999,53 @@ inline int32_t fwd_get_user_idx(rule_param_t *rule_param)
 	}
 	else
 	{
-		if(fwd_find_user_idx(rule_param->ipv4_sip, &sip_usr_idx, &sip_usr_link_idx) == RETURN_OK)
+		if (0 == rule_param->nat_flag)
 		{
-			sip_user_flag = 1;
-		}
+			if(fwd_find_user_idx(rule_param->ipv4_sip, &sip_usr_idx, &sip_usr_link_idx) == RETURN_OK)
+			{
+				sip_user_flag = 1;
+			}
 
-		if(fwd_find_user_idx(rule_param->ipv4_dip, &dip_usr_idx, &dip_usr_link_idx) == RETURN_OK)
+			if(fwd_find_user_idx(rule_param->ipv4_dip, &dip_usr_idx, &dip_usr_link_idx) == RETURN_OK)
+			{
+				dip_user_flag = 1;
+			}
+		}
+		else if (1 == rule_param->nat_flag)
 		{
-			dip_user_flag = 1;
+			if ((rule_param->nat_sip == rule_param->ipv4_sip)
+		        && (rule_param->nat_dip != rule_param->ipv4_dip))
+		    {
+		        dnat_flag = 1;
+		    } 
+		    else if ((rule_param->nat_sip != rule_param->ipv4_sip)
+		        && (rule_param->nat_dip == rule_param->ipv4_dip))
+		    {
+		        snat_flag = 1;
+		    }
+
+		    if (1 == snat_flag)
+		    {
+		        if(fwd_find_user_idx(rule_param->ipv4_sip, &sip_usr_idx, &sip_usr_link_idx) == RETURN_OK)
+		        {
+			        sip_user_flag = 1;
+		        }
+		        if(fwd_find_user_idx(rule_param->nat_dip, &dip_usr_idx, &dip_usr_link_idx) == RETURN_OK)
+		        {
+			        dip_user_flag = 1;
+		        }
+		    }
+		    else if (1 == dnat_flag)
+		    {
+		        if(fwd_find_user_idx(rule_param->nat_sip, &sip_usr_idx, &sip_usr_link_idx) == RETURN_OK)
+		        {
+			        sip_user_flag = 1;
+		        }
+		        if(fwd_find_user_idx(rule_param->nat_dip, &dip_usr_idx, &dip_usr_link_idx) == RETURN_OK)
+		        {
+			        dip_user_flag = 1;
+		        }    
+		    }
 		}
 	}
 
