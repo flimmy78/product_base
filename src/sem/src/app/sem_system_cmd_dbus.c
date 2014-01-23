@@ -1503,8 +1503,14 @@ DBusMessage *sem_dbus_delete_img_or_fastfwd_slot(DBusConnection *conn, DBusMessa
 					if(*buf != 0)	
 					{							
 						sprintf(cmdstr,"sor.sh rm %s 120",file_name);
-						system(cmdstr);
-						status=0;/*Delete success*/	
+						ret=system(cmdstr);
+						if(WEXITSTATUS(ret)==0)
+						 status=0;/*Delete success*/
+						else
+						{
+						  /*sem_syslog_err("return is [%d] ",WEXITSTATUS(ret));*/
+						  status=-1;/*Delete failed*/
+						}
 					}
 					else
 					{
