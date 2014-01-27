@@ -72,7 +72,7 @@ struct eth_port_counter_s ax81_ac12c_counters=
 {
 };
 
-asic_eth_port_t ax81_ac12c_eth_ports[6]={   \
+asic_eth_port_t ax81_ac12c_eth_ports[10]={   \
 	{
 		ETH_GTX,0xFFFFFFFF,1536,0x0,0x0,4,0x0, \
 		&ax81_ac12c_attr_ge,
@@ -108,7 +108,31 @@ asic_eth_port_t ax81_ac12c_eth_ports[6]={   \
 		&ax81_ac12c_attr_ge,
 		&ax81_ac12c_funcs,
 		&ax81_ac12c_counters
-	}		
+	},
+	{
+		ETH_XGE_FIBER,0xFFFFFFFF,1536,0x0,0x0,0x18,0x0, \
+		NULL,
+		&ax81_ac12c_funcs,
+		&ax81_ac12c_counters
+	},
+	{
+		ETH_XGE_FIBER,0xFFFFFFFF,1536,0x0,0x0,0x19,0x0, \
+		NULL,
+		&ax81_ac12c_funcs,
+		&ax81_ac12c_counters
+	},
+	{
+		ETH_XGE_FIBER,0xFFFFFFFF,1536,0x0,0x0,0x1A,0x0, \
+		NULL,
+		&ax81_ac12c_funcs,
+		&ax81_ac12c_counters
+	},
+	{
+		ETH_XGE_FIBER,0xFFFFFFFF,1536,0x0,0x0,0x1B,0x0, \
+		NULL,
+		&ax81_ac12c_funcs,
+		&ax81_ac12c_counters
+	}	
 };
 
 /* panle port to virtual port map array */
@@ -298,7 +322,7 @@ asic_board_t ax81_ac12c_board_t =
     .capbmp = ASIC_CAPBMP,
 	.runbmp = ASIC_RUNBMP,
 	
-    .asic_port_cnt = 6,
+    .asic_port_cnt = 10,
     .asic_cscd_port_cnt = 2,    
     .asic_port_cnt_visable = 6, /* asic port on panel */        
     .asic_port_start_no = 7,
