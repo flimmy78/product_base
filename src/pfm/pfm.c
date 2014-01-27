@@ -8,6 +8,7 @@
 #include <syslog.h>
 #include <linux/if.h>
 #include <linux/sockios.h>
+#include <sys/wait.h>	
 
 
 #include "dbus/dbus.h"
@@ -22,6 +23,7 @@
 #define PFM_DBUS_OBJPATH				"/pfm/daemon"
 #define PFM_DBUS_INTERFACE				"pfm.daemon"
 #define PFM_DBUS_METHOD_PFM_TABLE 	"pfm_maintain_table"
+#define PFM_DBUS_METHOD_PFM_DEAL_SERVICE 	"pfm_deal_service"
 	
 DBusConnection *pfm_dbus_connection = NULL;
 int product_serial = 0;
@@ -1692,6 +1694,174 @@ int get_ifindex_of_subinterface(char* ifname)
 }
 
 
+#if 1
+static int service_ssh_enable(void)
+{
+	char cmd[128];
+	int ret;
+	memset(cmd,0,128);
+	sprintf(cmd,"sudo /etc/init.d/ssh restart > /dev/null 2> /dev/null");
+	ret = system(cmd);
+	if(WEXITSTATUS(ret)== 0)
+	{
+		return 0;
+	}
+	else
+	{
+		pfm_system_log(PFM_SYSTEM_LOG_FATAL,"SSH,some thing is Wrong when enable.\n");
+		return 1;
+	}
+}
+
+
+static int service_ssh_disable(void)
+{
+	
+	char cmd[128];
+	int ret;
+	memset(cmd,0,128);
+	sprintf(cmd,"ps -ef | grep \"sshd:\" | grep -v \"sh -c ps -ef | grep\" | grep -v \"grep sshd:\"");
+	ret = system(cmd);
+	if(WEXITSTATUS(ret)== 0)
+	{
+		pfm_system_log(PFM_SYSTEM_LOG_INFO,"SSH can not be shut down because someone has logged into the system using it. If you want, please use the 'kick user' command to kick the user off first.\n");
+		return 2;
+	}
+	memset(cmd,0,128);
+	sprintf(cmd,"sudo /etc/init.d/ssh stop > /dev/null 2> /dev/null");
+	ret = system(cmd);
+	if(WEXITSTATUS(ret)== 0)
+	{
+		return 0;
+	}else{
+		pfm_system_log(PFM_SYSTEM_LOG_FATAL,"SSH,some thing is Wrong when disable.\n");
+		return 1;
+	}
+	
+}
+
+
+static int service_telnet_enable(void)
+{
+   pfm_system_log(PFM_SYSTEM_LOG_INFO,"To enable inetd for Telnet.\n");
+  /* system("pkill inetd;sudo inetd >/dev/null 2>/dev/null");*/
+   char cmd[128];
+   int ret;
+   memset(cmd,0,128);
+   sprintf(cmd,"pkill inetd;sudo inetd >/dev/null 2>/dev/null");
+   system(cmd);
+   return 0;
+}
+
+static int service_telnet_dsiable(void)
+{
+	pfm_system_log(PFM_SYSTEM_LOG_INFO,"To disable inetd for Telnet.\n");
+	/*system("pkill inetd 2>/dev/null");*/
+	char cmd[128];
+	memset(cmd,0,128);
+	sprintf(cmd,"pkill inetd;pkill telnet 2>/dev/null");
+	system(cmd);
+	return 0;
+}
+
+#endif
+
+
+DBusMessage *
+pfm_parse_service_message(DBusConnection	*conn,\
+				DBusMessage  *msg,\
+   				void		*user_data  )
+{
+		DBusMessage 		*reply = NULL;
+		DBusMessageIter iter;
+		DBusMessageIter iter_array;
+		DBusMessageIter iter_struct;
+		DBusError				err;
+		
+		
+		unsigned int opt_ret = 0;
+
+		char *service=NULL;
+		int slot = -1;
+		char *operation = NULL;
+
+		dbus_error_init(&err);
+		if(!(dbus_message_get_args(msg,&err,
+							DBUS_TYPE_STRING, &service,
+							DBUS_TYPE_INT32, &slot,
+							DBUS_TYPE_STRING, &operation,
+							DBUS_TYPE_INVALID)))
+ 
+		
+		{
+			pfm_system_log(PFM_SYSTEM_LOG_FATAL,"Unable to get input args\n");
+			if (dbus_error_is_set(&err)){
+				pfm_system_log(PFM_SYSTEM_LOG_FATAL,"%s raised: %s",err.name,err.message);
+				dbus_error_free(&err);
+			}
+		}
+		
+		#if 1
+			pfm_system_log(PFM_SYSTEM_LOG_INFO,"PFM recv data from DCLI are :\n");
+			pfm_system_log(PFM_SYSTEM_LOG_INFO," service   is [%s] ....\n",service);
+			pfm_system_log(PFM_SYSTEM_LOG_INFO," slot      is [%d] ....\n",slot);
+			pfm_system_log(PFM_SYSTEM_LOG_INFO," operation is [%s] ....\n",operation);
+        #endif
+
+		if(strncmp(service,"telnet",6)==0)
+		 {
+            /*deal telnet service*/
+			if(strncmp(operation,"enable",6)==0)
+			 {
+			   opt_ret = service_telnet_enable();
+			  }
+			else if(strncmp(operation,"disable",7)==0)
+			 {
+			   opt_ret = service_telnet_dsiable();
+			   }
+			else
+			{
+			  pfm_system_log(PFM_SYSTEM_LOG_INFO," Unkown serivce telnet operation[%s]!\n",operation);
+			  opt_ret = 1;
+			  goto done;
+			  }
+		   }
+		else if(strncmp(service,"ssh",3)==0)
+		 {
+			/*deal ssh service*/
+			if(strncmp(operation,"enable",6)==0)
+			 {
+			   opt_ret = service_ssh_enable();
+			  }
+			else if(strncmp(operation,"disable",7)==0)
+			 {
+			   opt_ret = service_ssh_disable();
+			   }
+			else
+			{
+			  pfm_system_log(PFM_SYSTEM_LOG_INFO," Unkown serivce ssh operation[%s]!\n",operation);
+			  opt_ret = 1;
+			  goto done;
+			  }
+		   }
+		else
+		 {
+			pfm_system_log(PFM_SYSTEM_LOG_INFO," Unkown serivce [%s]!\n",service);
+			opt_ret = 1;
+			goto done;
+		 
+			}
+			
+		
+		done:
+		reply = dbus_message_new_method_return(msg);
+		dbus_message_iter_init_append(reply,&iter);
+		dbus_message_iter_append_basic(&iter,DBUS_TYPE_UINT32, &opt_ret);
+		
+		return reply;
+		
+}	
+
 
 DBusMessage *
 pfm_parse_message(DBusConnection	*conn,\
@@ -1951,6 +2121,12 @@ pfm_dbus_demon_message_handler (DBusConnection *connection,
 			{
 				reply = pfm_parse_message(connection, message, user_data);/**gjd: parse the message**/
 			}
+			else if (dbus_message_is_method_call(message,						/**gjd: get message**/
+												PFM_DBUS_INTERFACE,
+												PFM_DBUS_METHOD_PFM_DEAL_SERVICE))
+				{
+					reply = pfm_parse_service_message(connection, message, user_data);/**gjd: parse the message**/
+				}
 		
 		if (reply) {
 			dbus_connection_send (connection, reply, NULL);
