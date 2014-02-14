@@ -11,6 +11,7 @@ INCLUDES += -I../../../dg/dcli/src/lib/
 DRPLIB_PATH = -L$(LIB_EXPORT_DIR)
 DRPLIB_FLAGS = -ldrpintf
 LIB_DCLI = $(LIB_EXPORT_DIR)/libdcli.so.0.1
+LIB_SEM_PUB = $(LIB_EXPORT_DIR)/libsem_dbus_pub.so.0.1
 LDFLAGS = -shared -Wl,-soname,$@
 #-lxml2 -ldcliiuhcli -ldcliiuhmapi -ldclipub -lrt...... -lrt   -lnm -lz -lpam
 
@@ -32,7 +33,7 @@ libdcli_main:
 	$(MAKE) -C ${DCLI_MAIN_PATH}
 	
 $(DCLI_SHLIB_REALNAME): $(DCLI_OBJS)
-	$(CC) ${LDFLAGS} $(LD_PATH) -o $@ $^ $(DBUS_LIBS) $(CCFLAGS) $(LIB_DCLI)
+	$(CC) $(LDFLAGS) $(LD_PATH) -o $@ $^ $(DBUS_LIBS) $(CCFLAGS) $(LIB_DCLI) $(LIB_SEM_PUB)
 	mv $(DCLI_SHLIB_REALNAME) $(LIB_EXPORT_DIR)/
 	ln -sf $(DCLI_SHLIB_REALNAME) $(LIB_EXPORT_DIR)/$(DCLI_SHLIB_SONAME) 
 	ln -sf $(DCLI_SHLIB_SONAME) $(LIB_EXPORT_DIR)/$(DCLI_SHLIB_LINKERNAME) 	

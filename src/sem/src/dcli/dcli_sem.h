@@ -63,6 +63,15 @@ void dcli_sem_init(void);
 #define SEM_MASTER_SLOT_COUNT_PATH "/dbm/product/master_slot_count"
 #define SEM_ACTIVE_MASTER_SLOT_ID_PATH "/dbm/product/active_master_slot_id"
 
+
+extern char BSD_DBUS_BUSNAME[PATH_LEN];
+extern char BSD_DBUS_OBJPATH[PATH_LEN];
+extern char BSD_DBUS_INTERFACE[PATH_LEN];
+
+extern char BSD_COPY_FILES_BETEWEEN_BORADS[PATH_LEN];
+extern char BSD_SYNCHRONIZE_FILES_TO_OTHER_BOARDS[PATH_LEN];
+
+
 #endif
 
 

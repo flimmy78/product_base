@@ -712,8 +712,12 @@ nbmbcm:
 mcpss: mvkmod kap
 	@echo "Building mcpss..."
 	$(MAKE) -C ${NPDSUIT_MV_MOD}/${MCPSSPATH}/src/drv
-	
-sem:
+
+sempub:
+	@echo "Building sem_pub"
+	$(MAKE) -C ${SEM_MOD}/src/pub/
+
+sem:sempub
 	@echo "Building sem ..."
 	$(MAKE) -C ${SEM_MOD}/src/app/
 	@echo "Building dcli_sem..."
@@ -1643,6 +1647,7 @@ cleanksem:
 cleansem:
 	$(MAKE) -C ${SEM_MOD}/src/app/ clean
 	$(MAKE) -C ${SEM_MOD}/src/dcli clean
+	$(MAKE) -C ${SEM_MOD}/src/pub clean
 
 clean_e1000e:
 	@echo "Cleanning e1000e module ... "

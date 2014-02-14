@@ -39,17 +39,18 @@ This software file is owned and distributed by Autelan Technology
 #include "dcli_system.h"
 #include "board/board_define.h"
 #include "bsd/bsdpub.h"
+#include "../pub/sem_interface.h"
 
-#define MAX_MASTER_SLOT_NUM 2
-#define PRODUCT_NAME_LEN 30
-
+//#define MAX_MASTER_SLOT_NUM 2
+//#define PRODUCT_NAME_LEN 30
+#if 0
 extern char BSD_DBUS_BUSNAME[PATH_LEN];
 extern char BSD_DBUS_OBJPATH[PATH_LEN];
 extern char BSD_DBUS_INTERFACE[PATH_LEN];
 
 extern char BSD_COPY_FILES_BETEWEEN_BORADS[PATH_LEN];
 extern char BSD_SYNCHRONIZE_FILES_TO_OTHER_BOARDS[PATH_LEN];
-
+#endif
 extern int is_distributed;
 
 /*
@@ -220,16 +221,15 @@ int atoi(const char *str)
     return value;
 }
 
+
+
 DEFUN(config_tipc_cmd_func,
 		config_tipc_cmd,
 		"send tipc to slot SLOT_ID NUM USLEEP_TM",
 		"send tipc to slot SLOT_ID NUM USLEEP_TM\n")
 {
-	DBusMessage *query = NULL, *reply = NULL;
-	DBusMessageIter iter;
-	DBusError err;
-	
 	int slot_id, num, usleep_tm;
+	int ret;
 	if (argc != 3)
 	{
 		vty_out(vty, "input:send tipc to slot SLOT_ID NUM USLEEP_TM BUF\n");
@@ -243,82 +243,34 @@ DEFUN(config_tipc_cmd_func,
 	}
 	num = atoi(argv[1]);
 	usleep_tm = atoi(argv[2]);
-	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-										 SEM_DBUS_INTERFACE, SEM_DBUS_CONF_TIPC);
-	if (!query)
-	{
-		vty_out(vty, "show slot id query failed\n");
+
+    ret = sem_dbus_config_tipc(dcli_dbus_connection, slot_id, num, usleep_tm);
+
+	if (ret != SEM_DBUS_SUCCESS){
+		vty_out(vty,"sem_dbus_config_tipc error\n");
 		return CMD_FAILURE;
 	}
 
-	dbus_error_init(&err);
-	
-	dbus_message_append_args(query,
-							 DBUS_TYPE_INT32,&slot_id,
-							 DBUS_TYPE_INT32,&num,
-							 DBUS_TYPE_INT32,&usleep_tm,
-							 DBUS_TYPE_INVALID);
-	
-	reply = dbus_connection_send_with_reply_and_block(dcli_dbus_connection, query, -1, &err);
-	
-	dbus_message_unref(query);
-
-	if (!reply)
-	{
-		vty_out(vty, "<error> failed get reply.\n");
-		if (dbus_error_is_set(&err))
-		{
-			vty_out(vty,"%s raised: %s",err.name,err.message);
-			dbus_error_free_for_dcli(&err);
-		}
-		
-		return CMD_SUCCESS;
-	}
-	
-	dbus_message_iter_init(reply,&iter);
-	
-	dbus_message_unref(reply);
 	return CMD_SUCCESS;
 }
+
+
+
 DEFUN(config_send_file_func,
 		config_send_file,
 		"send file",
 		"send file")
 {
-	DBusMessage *query = NULL, *reply = NULL;
-	DBusMessageIter iter;
-	DBusError err;
-
+	int ret;
+	
 	system("sor.sh imgmd5 /home/admin/testfile 120 > md5");
-	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-										 SEM_DBUS_INTERFACE, SEM_DBUS_SEND_FILE);
-	if (!query)
-	{
-		vty_out(vty, "show slot id query failed\n");
+	ret = sem_dbus_send_file(dcli_dbus_connection);
+
+	if (ret != SEM_DBUS_SUCCESS){
+		vty_out(vty,"sem_dbus_send_file error\n");
 		return CMD_FAILURE;
 	}
 
-	dbus_error_init(&err);
-
-	reply = dbus_connection_send_with_reply_and_block(dcli_dbus_connection, query, -1, &err);
-	
-	dbus_message_unref(query);
-
-	if (!reply)
-	{
-		vty_out(vty, "<error> failed get reply.\n");
-		if (dbus_error_is_set(&err))
-		{
-			vty_out(vty,"%s raised: %s",err.name,err.message);
-			dbus_error_free_for_dcli(&err);
-		}
-		
-		return CMD_SUCCESS;
-	}
-	
-	dbus_message_iter_init(reply,&iter);
-	
-	dbus_message_unref(reply);
 	return CMD_SUCCESS;
 }
 
@@ -384,40 +336,14 @@ DEFUN(config_48GE_cmd_func,
 		"config 48GE",
 		"config 48GE")
 {
-	DBusMessage *query = NULL, *reply = NULL;
-	DBusMessageIter iter;
-	DBusError err;
-
+	int ret;
 	char* name;
 
-	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-										 SEM_DBUS_INTERFACE, SEM_DBUS_CONF_48GE);
-	if (!query)
-	{
-		vty_out(vty, "show slot id query failed\n");
+	ret = sem_dbus_config_48GE(dcli_dbus_connection, &name);
+	if (SEM_DBUS_SUCCESS != ret){
+		vty_out(vty,"sem_dbus_config_48GE error\n");
 		return CMD_FAILURE;
 	}
-
-	dbus_error_init(&err);
-
-	reply = dbus_connection_send_with_reply_and_block(dcli_dbus_connection, query, -1, &err);
-	
-	dbus_message_unref(query);
-
-	if (!reply)
-	{
-		vty_out(vty, "<error> failed get reply.\n");
-		if (dbus_error_is_set(&err))
-		{
-			vty_out(vty,"%s raised: %s",err.name,err.message);
-			dbus_error_free_for_dcli(&err);
-		}
-		
-		return CMD_SUCCESS;
-	}
-	
-	dbus_message_iter_init(reply,&iter);
-	dbus_message_iter_get_basic(&iter,&name);
 
 	if (!strcmp(name, "AS6648"))
 	{
@@ -429,7 +355,6 @@ DEFUN(config_48GE_cmd_func,
 		return CMD_FAILURE;
 	}
 	
-	dbus_message_unref(reply);
 	return CMD_SUCCESS;
 }
 
@@ -457,46 +382,23 @@ DEFUN(show_slot_id_func,
 	"slot id\n"
 	)
 {
-	DBusMessage *query = NULL, *reply = NULL;
-	DBusMessageIter iter;
-	DBusError err;
 
 	int slot_id;
+	int ret;
 	
-	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-										 SEM_DBUS_INTERFACE, SEM_DBUS_SHOW_SLOT_ID);
-	if (!query)
-	{
-		vty_out(vty, "show slot id query failed\n");
+	ret = sem_dbus_show_slot_id(dcli_dbus_connection, &slot_id);
+
+	if (ret != SEM_DBUS_SUCCESS){
+		vty_out(vty,"sem_show_slot_id error\n");
 		return CMD_FAILURE;
 	}
-
-	dbus_error_init(&err);
-
-	reply = dbus_connection_send_with_reply_and_block(dcli_dbus_connection, query, -1, &err);
-	
-	dbus_message_unref(query);
-
-	if (!reply)
-	{
-		vty_out(vty, "<error> failed get reply.\n");
-		if (dbus_error_is_set(&err))
-		{
-			vty_out(vty,"%s raised: %s",err.name,err.message);
-			dbus_error_free_for_dcli(&err);
-		}
-		
-		return CMD_SUCCESS;
-	}
-	
-	dbus_message_iter_init(reply,&iter);
-	dbus_message_iter_get_basic(&iter,&slot_id);
 	
 	vty_out(vty, "%d\n", slot_id);
 	
-	dbus_message_unref(reply);
 	return CMD_SUCCESS;	
 }
+
+
 __inline__ int parse_slot_no(char *str, int *slot_no)
 {
 	int i = 0, len = 0;
@@ -536,14 +438,12 @@ DEFUN(show_slot_n_info_func,
 	"show slot n info\n"
 	)
 {
-	DBusMessage *query = NULL, *reply = NULL;
-	DBusMessageIter iter;
-	DBusError err;
 
 	int board_code;
 	int is_master, is_active_master;
 	unsigned int function_type;
 	char *name;
+	int ret;
 	
 	int slot_id;
 
@@ -559,57 +459,19 @@ DEFUN(show_slot_n_info_func,
 		return CMD_FAILURE;
 	}
 
-	// TODO: the slot id should be smaller than some value
 
-	//vty_out(vty, "slot id %d\n", slot_id);
+	ret = sem_dbus_show_one_slot_info(dcli_dbus_connection,
+								&slot_id,
+								&board_code,
+								&function_type,
+								&is_master,
+								&is_active_master,
+								&name);
 	
-	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-										 SEM_DBUS_INTERFACE, SME_DBUS_SHOW_SLOT_N_INFO);
-	if (!query)
-	{
-		vty_out(vty, "show slot id query failed\n");
+	if (SEM_DBUS_SUCCESS != ret){
+		vty_out(vty, "sem_dbus_show_one_slot_info error\n");
 		return CMD_FAILURE;
 	}
-
-	dbus_error_init(&err);
-
-	dbus_message_append_args(query,
-							 DBUS_TYPE_INT32,&slot_id,
-							 DBUS_TYPE_INVALID);
-
-	//vty_out(vty, "slot id %d\n", slot_id);
-	
-	reply = dbus_connection_send_with_reply_and_block(dcli_dbus_connection, query, -1, &err);
-	
-	dbus_message_unref(query);
-
-	if (!reply)
-	{
-		vty_out(vty, "<error> failed get reply.\n");
-		if (dbus_error_is_set(&err))
-		{
-			vty_out(vty,"%s raised: %s",err.name,err.message);
-			dbus_error_free_for_dcli(&err);
-		}
-		
-		return CMD_SUCCESS;
-	}
-
-	dbus_message_iter_init(reply,&iter);
-
-	dbus_message_iter_get_basic(&iter, &board_code);
-	dbus_message_iter_next(&iter);
-
-	dbus_message_iter_get_basic(&iter, &function_type);
-	dbus_message_iter_next(&iter);
-	
-	dbus_message_iter_get_basic(&iter, &is_master);
-	dbus_message_iter_next(&iter);
-
-	dbus_message_iter_get_basic(&iter, &is_active_master);
-	dbus_message_iter_next(&iter);
-	
-	dbus_message_iter_get_basic(&iter, &name);
 
 	vty_out(vty, "BOARD_CODE:\t\t0x%x\n", board_code);
 	vty_out(vty, "FUNCTION_TYPE:\t\t0x%x\n", function_type);
@@ -617,10 +479,10 @@ DEFUN(show_slot_n_info_func,
 	vty_out(vty, "IS_ACTIVE_MASTER:\t%s\n", is_active_master ? "YES" : "NO");
 	vty_out(vty, "BOARD_NAME:\t\t%s\n", name);
 	
-	dbus_message_unref(reply);
-
 	return CMD_SUCCESS;
 }
+
+
 
 DEFUN(show_board_info_func,
 	show_board_info_cmd,
@@ -628,283 +490,124 @@ DEFUN(show_board_info_func,
 	"show board info"
 	)
 {
-	DBusMessage *query = NULL, *reply = NULL;
-	DBusMessageIter iter;
-	DBusError err;
 
-	int board_code;
-	char *name;
-	int slot_id;
-	int is_master, is_active_master;
-	unsigned int port_num_on_panel, function_type, obc_port_num, cscd_port_num;
+	int ret;	
+	sem_interface_board_info_t board_info;
+	memset(&board_info,0, sizeof(board_info));
 	
-	
-	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-											 SEM_DBUS_INTERFACE, SEM_DBUS_SHOW_BOARD_INFO);
-	if (!query)
-	{
-		vty_out(vty, "show slot id query failed\n");
+	ret = sem_dbus_get_board_info(dcli_dbus_connection, &board_info);
+	if (SEM_DBUS_ERROR == ret){
+		vty_out(vty, "sem_dbus_get_board_info error!\n");
 		return CMD_FAILURE;
 	}
 
-	dbus_error_init(&err);
-
-	reply = dbus_connection_send_with_reply_and_block(dcli_dbus_connection, query, -1, &err);
+	vty_out(vty, "BOARD_CODE:\t\t%d\n", board_info.board_code);
+	vty_out(vty, "CSCD_PORT_NUM:\t\t0x%x\n", board_info.cscd_port_num);
+	vty_out(vty, "FUNCTION_TYPE:\t\t0x%x\n", board_info.function_type);
+	vty_out(vty, "IS_ACTIVE_MASTER:\t%s\n", board_info.is_active_master ? "yes" : "no");
+	vty_out(vty, "IS_MASTER:\t\t%s\n", board_info.is_master ? "yes" : "no");
+	vty_out(vty, "NAME:\t\t\t%s\n", board_info.name);
+	vty_out(vty, "OBC_PORT_NUM:\t\t0x%x\n", board_info.obc_port_num);
+	vty_out(vty, "PORT_NUM_ON_PANEL:\t0x%x\n", board_info.port_num_on_panel);
+	vty_out(vty, "SLOT_ID:\t\t%d\n", board_info.slot_id);
 	
-	dbus_message_unref(query);
-
-	if (!reply)
-	{
-		vty_out(vty, "<error> failed get reply.\n");
-		if (dbus_error_is_set(&err))
-		{
-			vty_out(vty,"%s raised: %s",err.name,err.message);
-			dbus_error_free_for_dcli(&err);
-		}
-		
-		return CMD_SUCCESS;
-	}
-
-	dbus_message_iter_init(reply,&iter);
-
-	dbus_message_iter_get_basic(&iter, &board_code);
-	dbus_message_iter_next(&iter);
-
-	dbus_message_iter_get_basic(&iter, &cscd_port_num);
-	dbus_message_iter_next(&iter);
-	
-	dbus_message_iter_get_basic(&iter, &function_type);
-	dbus_message_iter_next(&iter);
-	
-	dbus_message_iter_get_basic(&iter, &is_active_master);
-	dbus_message_iter_next(&iter);
-
-	dbus_message_iter_get_basic(&iter, &is_master);
-	dbus_message_iter_next(&iter);
-
-	dbus_message_iter_get_basic(&iter, &name);
-	dbus_message_iter_next(&iter);
-
-	dbus_message_iter_get_basic(&iter, &obc_port_num);
-	dbus_message_iter_next(&iter);
-
-	dbus_message_iter_get_basic(&iter, &port_num_on_panel);
-	dbus_message_iter_next(&iter);
-
-	dbus_message_iter_get_basic(&iter, &slot_id);
-
-	vty_out(vty, "BOARD_CODE:\t\t%d\n", board_code);
-	vty_out(vty, "CSCD_PORT_NUM:\t\t0x%x\n", cscd_port_num);
-	vty_out(vty, "FUNCTION_TYPE:\t\t0x%x\n", function_type);
-	vty_out(vty, "IS_ACTIVE_MASTER:\t%s\n", is_active_master ? "yes" : "no");
-	vty_out(vty, "IS_MASTER:\t\t%s\n", is_master ? "yes" : "no");
-	vty_out(vty, "NAME:\t\t\t%s\n", name);
-	vty_out(vty, "OBC_PORT_NUM:\t\t0x%x\n", obc_port_num);
-	vty_out(vty, "PORT_NUM_ON_PANEL:\t0x%x\n", port_num_on_panel);
-	vty_out(vty, "SLOT_ID:\t\t%d\n", slot_id);
-	
-	dbus_message_unref(reply);
 	return CMD_SUCCESS;
 }
 
-
+/**wangchao changed***/
 DEFUN(show_product_info_func,
 	show_product_info_cmd,
 	"show product info",
 	"show product info"
 	)
 {
-	DBusMessage *query = NULL, *reply = NULL;
-	DBusMessageIter iter;
-	DBusError err;
-
-	int product_type, slotcount, master_slot_count, default_master_slot_id;
-	int more_than_one_master_board_on, is_distributed;
-	int fan_num, master_slot_id[MAX_MASTER_SLOT_NUM];
-	unsigned int board_on_mask;
-	char *name;
 	int i;
-
-	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-											 SEM_DBUS_INTERFACE, SEM_DBUS_SHOW_PRODUCT_INFO);
-	if (!query)
+	sem_interface_product_info_t product_info;
+	
+	for(i = 0; i < SEM_DBUS_MAX_BOARD_NUM; i++)
 	{
-		vty_out(vty, "show slot id query failed\n");
-		return CMD_FAILURE;
+		product_info.name = malloc(SEM_DBUS_MAX_BOARD_NAME);
+		memset(product_info.name, 0, SEM_DBUS_MAX_BOARD_NAME);	
 	}
 
-	dbus_error_init(&err);
+    sem_dbus_get_product_info(dcli_dbus_connection, &product_info);
 
-	reply = dbus_connection_send_with_reply_and_block(dcli_dbus_connection, query, -1, &err);
-	
-	dbus_message_unref(query);
-
-	if (!reply)
-	{
-		vty_out(vty, "<error> failed get reply.\n");
-		if (dbus_error_is_set(&err))
-		{
-			vty_out(vty,"%s raised: %s",err.name,err.message);
-			dbus_error_free_for_dcli(&err);
-		}
-		
-		return CMD_SUCCESS;
-	}
-
-	dbus_message_iter_init(reply,&iter);
-
-	dbus_message_iter_get_basic(&iter, &board_on_mask);
-	dbus_message_iter_next(&iter);
-	
-	dbus_message_iter_get_basic(&iter, &default_master_slot_id);
-	dbus_message_iter_next(&iter);
-
-	dbus_message_iter_get_basic(&iter, &fan_num);
-	dbus_message_iter_next(&iter);
-
-	dbus_message_iter_get_basic(&iter, &is_distributed);
-	dbus_message_iter_next(&iter);
-
-	dbus_message_iter_get_basic(&iter, &master_slot_count);
-	dbus_message_iter_next(&iter);
-
-	for (i=0; i<MAX_MASTER_SLOT_NUM; i++)
-	{
-		dbus_message_iter_get_basic(&iter, &master_slot_id[i]);
-		dbus_message_iter_next(&iter);
-	}
-	
-	dbus_message_iter_get_basic(&iter, &more_than_one_master_board_on);
-	dbus_message_iter_next(&iter);
-
-	dbus_message_iter_get_basic(&iter, &name);
-	dbus_message_iter_next(&iter);
-
-	dbus_message_iter_get_basic(&iter, &product_type);
-	dbus_message_iter_next(&iter);
-
-	dbus_message_iter_get_basic(&iter, &slotcount);
-	dbus_message_iter_next(&iter);
-
-	vty_out(vty, "BOARD_ON_MASK:\t\t\t0x%x\n", board_on_mask);
-	vty_out(vty, "DEFAULT_MASTER_SLOT_ID:\t\t0x%x\n", default_master_slot_id);
-	vty_out(vty, "FAN_NUM:\t\t\t0x%x\n", fan_num);
-	vty_out(vty, "IS_DISTRIBUTED:\t\t\t%s\n", is_distributed ? "distributed" : "not distributed");
-	vty_out(vty, "MASTER_SLOT_COUNT:\t\t0x%x\n", master_slot_count);
+	vty_out(vty, "BOARD_ON_MASK:\t\t\t0x%x\n", product_info.board_on_mask);
+	vty_out(vty, "DEFAULT_MASTER_SLOT_ID:\t\t0x%x\n", product_info.default_master_slot_id);
+	vty_out(vty, "FAN_NUM:\t\t\t0x%x\n", product_info.fan_num);
+	vty_out(vty, "IS_DISTRIBUTED:\t\t\t%s\n", product_info.is_distributed ? "distributed" : "not distributed");
+	vty_out(vty, "MASTER_SLOT_COUNT:\t\t0x%x\n", product_info.master_slot_count);
 	vty_out(vty, "MASTER_SLOT_ID:\t\t\t");
-	for (i=0; i<MAX_MASTER_SLOT_NUM; i++)
+	for (i=0; i<SEM_DBUS_MAX_MASTER_SLOT_NUM; i++)
 	{
-		vty_out(vty, "0x%x ", master_slot_id[i]);
+		vty_out(vty, "0x%x ", product_info.master_slot_id[i]);
 	}
 	vty_out(vty, "\n");
-	vty_out(vty, "MORE_THAN_ONE_MSATER_BOARD_ON:\t%s\n", more_than_one_master_board_on ? "yes" : "no");
-	vty_out(vty, "BOARD_NAME:\t\t\t%s\n", name);
-	vty_out(vty, "PRODUCT_TYPE:\t\t\t0x%x\n", product_type);
-	vty_out(vty, "SLOT_COUNT:\t\t\t0x%x\n", slotcount);
-	dbus_message_unref(reply);
+	vty_out(vty, "MORE_THAN_ONE_MSATER_BOARD_ON:\t%s\n", product_info.more_than_one_master_board_on ? "yes" : "no");
+	vty_out(vty, "BOARD_NAME:\t\t\t%s\n", product_info.name);
+	vty_out(vty, "PRODUCT_TYPE:\t\t\t0x%x\n", product_info.product_type);
+	vty_out(vty, "SLOT_COUNT:\t\t\t0x%x\n", product_info.slotcount);
+	
 	return CMD_SUCCESS;
 }
 
-
+/**wangchao_changed***/
 DEFUN(show_slot_info_func,
 	show_slot_info_cmd,
 	"show slot info",
 	"show slot info"
 	)
 {
-	DBusMessage *query = NULL, *reply = NULL;
-	DBusMessageIter iter;
-	DBusError err;
 
-	int i;
+	int i, ret;
 	int board_code;
 	int is_master, is_active_master;
 	unsigned int function_type;
-	char *name;
 	int slot_count;
 	unsigned int board_on_mask;
-	int board_state;
-	
-	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-										 SEM_DBUS_INTERFACE, SEM_DBUS_SHOW_SLOT_INFO);
-	if (!query)
-	{
-		vty_out(vty, "show slot id query failed\n");
+	sem_interface_board_info_t board_info[SEM_DBUS_MAX_BOARD_NUM];
+
+	ret = sem_dbus_show_all_slot_info(dcli_dbus_connection, board_info, &slot_count, &board_on_mask);
+
+	if (SEM_DBUS_ERROR == ret){
+		vty_out(vty, "sem_dbus_show_all_slot_info error!");
+ 			
+    	for(i = 0; i < SEM_DBUS_MAX_BOARD_NUM; i++){
+    		free(board_info[i].name);	
+    	}
+
 		return CMD_FAILURE;
 	}
-
-	dbus_error_init(&err);
-
-	reply = dbus_connection_send_with_reply_and_block(dcli_dbus_connection, query, -1, &err);
 	
-	dbus_message_unref(query);
 
-	if (!reply)
-	{
-		vty_out(vty, "<error> failed get reply.\n");
-		if (dbus_error_is_set(&err))
-		{
-			vty_out(vty,"%s raised: %s",err.name,err.message);
-			dbus_error_free_for_dcli(&err);
-		}
-		
-		return CMD_SUCCESS;
-	}
-
-	dbus_message_iter_init(reply,&iter);
-	
-	dbus_message_iter_get_basic(&iter, &slot_count);	
-	dbus_message_iter_next(&iter);
-
-	dbus_message_iter_get_basic(&iter, &board_on_mask);	
-	dbus_message_iter_next(&iter);
-	
 	for (i=0; i<slot_count; i++)
 	{	
-		dbus_message_iter_get_basic(&iter, &board_state);	
-		dbus_message_iter_next(&iter);
+    	if (board_on_mask & (0x1<<i))
+    	{		
+    		if (board_info[i].board_state <= 1)
+    		{
+    			vty_out(vty, "slot %d:not work normal\n", i+1);
+    			continue;
+    		}
+    		vty_out(vty, "slot %d:\n", i+1);
+    		vty_out(vty, "\tBOARD_CODE:\t\t0x%x\n", board_info[i].board_code);
+    		vty_out(vty, "\tFUNCTION_TYPE:\t\t0x%x\n",  board_info[i].function_type);
+    		vty_out(vty, "\tIS_MASTER:\t\t%s\n",  board_info[i].is_master ? "YES" : "NO");
+    		vty_out(vty, "\tIS_ACTIVE_MASTER:\t%s\n",  board_info[i].is_active_master ? "YES" : "NO");
+    		vty_out(vty, "\tBOARD_NAME:\t\t%s\n",  board_info[i].name);
+    	}
+    	else
+    	{
+    		vty_out(vty, "slot %d is empty\n", i+1);
+    	}
 
-		dbus_message_iter_get_basic(&iter, &board_code);
-		dbus_message_iter_next(&iter);
-
-		dbus_message_iter_get_basic(&iter, &function_type);
-		dbus_message_iter_next(&iter);
-		
-		dbus_message_iter_get_basic(&iter, &is_master);
-		dbus_message_iter_next(&iter);
-
-		dbus_message_iter_get_basic(&iter, &is_active_master);
-		dbus_message_iter_next(&iter);
-		
-		dbus_message_iter_get_basic(&iter, &name);
-		if (i < slot_count-1)
-		{
-			dbus_message_iter_next(&iter);
-		}
-		
-		if (board_on_mask & (0x1<<i))
-		{
-			
-			if (board_state <= 1)
-			{
-				vty_out(vty, "slot %d:not work normal\n", i+1);
-				continue;
-			}
-			vty_out(vty, "slot %d:\n", i+1);
-			vty_out(vty, "\tBOARD_CODE:\t\t0x%x\n", board_code);
-			vty_out(vty, "\tFUNCTION_TYPE:\t\t0x%x\n", function_type);
-			vty_out(vty, "\tIS_MASTER:\t\t%s\n", is_master ? "YES" : "NO");
-			vty_out(vty, "\tIS_ACTIVE_MASTER:\t%s\n", is_active_master ? "YES" : "NO");
-			vty_out(vty, "\tBOARD_NAME:\t\t%s\n", name);
-		}
-		else
-		{
-			vty_out(vty, "slot %d is empty\n", i+1);
-		}
 	}
-	dbus_message_unref(reply);
+
 	return CMD_SUCCESS;
 }
+
+
+
 
 DEFUN(show_slot_info_history_func,
 	show_slot_info_history_cmd,
@@ -912,11 +615,7 @@ DEFUN(show_slot_info_history_func,
 	"show slot info history"
 	)
 {
-	DBusMessage *query = NULL, *reply = NULL;
-	DBusMessageIter iter;
-	DBusError err;
-
-	int i;
+	int i, ret;
 	int board_code;
 	int is_master, is_active_master;
 	unsigned int function_type;
@@ -924,89 +623,50 @@ DEFUN(show_slot_info_history_func,
 	int slot_count;
 	unsigned int board_on_mask;
 	int board_state;
+
+	sem_interface_board_info_t board_info[SEM_DBUS_MAX_BOARD_NUM];
 	
-	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-										 SEM_DBUS_INTERFACE, SEM_DBUS_SHOW_SLOT_INFO);
-	if (!query)
-	{
-		vty_out(vty, "show slot id query failed\n");
+	ret = sem_dbus_show_all_slot_info(dcli_dbus_connection, board_info, &slot_count, &board_on_mask);
+
+	if (SEM_DBUS_ERROR == ret){
+		vty_out(vty, "sem_dbus_show_all_slot_info error!");
+ 			
+    	for(i = 0; i < SEM_DBUS_MAX_BOARD_NUM; i++){
+    		free(board_info[i].name);	
+    	}
+
 		return CMD_FAILURE;
 	}
 
-	dbus_error_init(&err);
-
-	reply = dbus_connection_send_with_reply_and_block(dcli_dbus_connection, query, -1, &err);
-	
-	dbus_message_unref(query);
-
-	if (!reply)
-	{
-		vty_out(vty, "<error> failed get reply.\n");
-		if (dbus_error_is_set(&err))
-		{
-			vty_out(vty,"%s raised: %s",err.name,err.message);
-			dbus_error_free_for_dcli(&err);
-		}
-		
-		return CMD_SUCCESS;
-	}
-
-	dbus_message_iter_init(reply,&iter);
-	
-	dbus_message_iter_get_basic(&iter, &slot_count);	
-	dbus_message_iter_next(&iter);
-
-	dbus_message_iter_get_basic(&iter, &board_on_mask);	
-	dbus_message_iter_next(&iter);
 	
 	for (i=0; i<slot_count; i++)
 	{	
-		dbus_message_iter_get_basic(&iter, &board_state);	
-		dbus_message_iter_next(&iter);
-
-		dbus_message_iter_get_basic(&iter, &board_code);
-		dbus_message_iter_next(&iter);
-
-		dbus_message_iter_get_basic(&iter, &function_type);
-		dbus_message_iter_next(&iter);
-		
-		dbus_message_iter_get_basic(&iter, &is_master);
-		dbus_message_iter_next(&iter);
-
-		dbus_message_iter_get_basic(&iter, &is_active_master);
-		dbus_message_iter_next(&iter);
-		
-		dbus_message_iter_get_basic(&iter, &name);
-		if (i < slot_count-1)
-		{
-			dbus_message_iter_next(&iter);
-		}
 			
 		if (board_on_mask & (0x1<<i))
 		{
 			
-			if (board_state <= 1)
+			if (board_info[i].board_state <= 1)
 			{
 				vty_out(vty, "slot %d:not work normal\n", i+1);
 				continue;
 			}
 			vty_out(vty, "slot %d:\n", i+1);
-			vty_out(vty, "\tBOARD_CODE:\t\t0x%x\n", board_code);
-			vty_out(vty, "\tFUNCTION_TYPE:\t\t0x%x\n", function_type);
-			vty_out(vty, "\tIS_MASTER:\t\t%s\n", is_master ? "YES" : "NO");
-			vty_out(vty, "\tIS_ACTIVE_MASTER:\t%s\n", is_active_master ? "YES" : "NO");
-			vty_out(vty, "\tBOARD_NAME:\t\t%s\n", name);
+			vty_out(vty, "\tBOARD_CODE:\t\t0x%x\n", board_info[i].board_code);
+			vty_out(vty, "\tFUNCTION_TYPE:\t\t0x%x\n", board_info[i].function_type);
+			vty_out(vty, "\tIS_MASTER:\t\t%s\n", board_info[i].is_master ? "YES" : "NO");
+			vty_out(vty, "\tIS_ACTIVE_MASTER:\t%s\n", board_info[i].is_active_master ? "YES" : "NO");
+			vty_out(vty, "\tBOARD_NAME:\t\t%s\n", board_info[i].name);
 		}
 		else
 		{
-			if (board_state == BOARD_INSERTED_AND_REMOVED)
+			if (board_info[i].board_state == BOARD_INSERTED_AND_REMOVED)
 			{
 				vty_out(vty, "slot %d:\t\thistory board\n", i+1);
-    			vty_out(vty, "\tBOARD_CODE:\t\t0x%x\n", board_code);
-    			vty_out(vty, "\tFUNCTION_TYPE:\t\t0x%x\n", function_type);
-    			vty_out(vty, "\tIS_MASTER:\t\t%s\n", is_master ? "YES" : "NO");
-    			vty_out(vty, "\tIS_ACTIVE_MASTER:\t%s\n", is_active_master ? "YES" : "NO");
-    			vty_out(vty, "\tBOARD_NAME:\t\t%s\n", name);
+    			vty_out(vty, "\tBOARD_CODE:\t\t0x%x\n", board_info[i].board_code);
+    			vty_out(vty, "\tFUNCTION_TYPE:\t\t0x%x\n", board_info[i].function_type);
+    			vty_out(vty, "\tIS_MASTER:\t\t%s\n", board_info[i].is_master ? "YES" : "NO");
+    			vty_out(vty, "\tIS_ACTIVE_MASTER:\t%s\n", board_info[i].is_active_master ? "YES" : "NO");
+    			vty_out(vty, "\tBOARD_NAME:\t\t%s\n", board_info[i].name);
 			}
 			else{
 			    vty_out(vty, "slot %d is empty\n", i+1);
@@ -1014,7 +674,7 @@ DEFUN(show_slot_info_history_func,
 		}
 
 	}
-	dbus_message_unref(reply);
+
 	return CMD_SUCCESS;
 }
 
@@ -1039,6 +699,7 @@ DEFUN (system_sync_version_file_to_slot,
 	int tar_switch = 0;
 	int op = BSD_TYPE_BOOT_IMG;
 	char *resultMd5 = NULL;
+	int ret_value;
 
 	if(strncasecmp((argv[0]+strlen(argv[0])-4),".IMG",4))
 	{
@@ -1072,42 +733,20 @@ DEFUN (system_sync_version_file_to_slot,
 		vty_out(vty,"<error> file path name is too long,should be less than 64\n");
 		return CMD_SUCCESS;
 	}
-    
-    //printf("dbus_name = %s\ndbus_objpath = %s\ndbus_interface = %s\n",BSD_DBUS_BUSNAME,BSD_DBUS_OBJPATH,BSD_DBUS_INTERFACE);
-    query = dbus_message_new_method_call(BSD_DBUS_BUSNAME,BSD_DBUS_OBJPATH,\
-						BSD_DBUS_INTERFACE,BSD_COPY_FILES_BETEWEEN_BORADS);
-    
-	dbus_error_init(&err);
-    
-	dbus_message_append_args(query,
-							 DBUS_TYPE_UINT32,&slot_id,
-							 DBUS_TYPE_STRING,&src_file_path,
-							 DBUS_TYPE_STRING,&dst_file_path,
-							 DBUS_TYPE_UINT32,&tar_switch,
-							 DBUS_TYPE_UINT32,&op,
-							 DBUS_TYPE_INVALID);
-
+	
     vty_out(vty, "Copying version file to slot %d, please wait ...\n", slot_id);
-    
-	reply = dbus_connection_send_with_reply_and_block (dcli_dbus_connection, query, 120000, &err);
+
+	ret = sem_dbus_copy_files(dcli_dbus_connection, slot_id, src_file_path, 
+								dst_file_path, tar_switch, op, &ret_value, &resultMd5);
 	
-	dbus_message_unref(query);
-	
-	if (NULL == reply) {
-		vty_out(vty,"<error> failed get reply.\n");
-		if (dbus_error_is_set(&err)) {
-			vty_out(vty,"%s raised: %s",err.name,err.message);
-			dbus_error_free_for_dcli(&err);
-		}
-		return CMD_SUCCESS;
-	}
-	
-	if (dbus_message_get_args ( reply, &err,
-					DBUS_TYPE_UINT32,&ret,
-					DBUS_TYPE_STRING,&resultMd5,
-					DBUS_TYPE_INVALID)) {
+	if (SEM_DBUS_ERROR == ret){
+		vty_out(vty, "sem_dbus_copy_files error!\n");
+		return CMD_FAILURE;
+	}	
+	else	
+ 	{
 		vty_out(vty, "File md5 value on dest board is %s\n", resultMd5);
-		if(ret == 0){
+		if(ret_value == 0){
 			vty_out(vty,"Copy version file %s to slot %d done.\n", version_file, slot_id);
 		}
 		else{
@@ -1118,35 +757,16 @@ DEFUN (system_sync_version_file_to_slot,
 
 	if (dbus_connection_dcli[slot_id]->dcli_dbus_connection)
 	{
-		query_sem = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-												 SEM_DBUS_INTERFACE, SEM_DBUS_SET_BOOT_IMG);
-		dbus_error_init(&err_sem);
-	    
-		dbus_message_append_args(query_sem,
-								 DBUS_TYPE_UINT32,&slot_id,
-								 DBUS_TYPE_STRING,&version_file,
-								 DBUS_TYPE_INVALID);
-
-		vty_out(vty, "Setting boot img on slot %d, please wait ...\n", slot_id);
+		ret = sem_dbus_interface_set_boot_img(dbus_connection_dcli[slot_id]->dcli_dbus_connection,\
+												slot_id, version_file, &ret_value);
 		
-		reply_sem = dbus_connection_send_with_reply_and_block (dbus_connection_dcli[slot_id]->dcli_dbus_connection,\
-			query_sem, 60000, &err_sem);
-		
-		dbus_message_unref(query_sem);
-		
-		if (NULL == reply_sem){
-			vty_out(vty,"<error> failed get reply.\n");
-			if (dbus_error_is_set(&err_sem)) {
-				vty_out(vty,"%s raised: %s",err_sem.name,err_sem.message);
-				dbus_error_free_for_dcli(&err_sem);
-			}
-			return CMD_SUCCESS;
-		}
-
-		if (dbus_message_get_args ( reply_sem, &err_sem,
-						DBUS_TYPE_UINT32,&ret,
-						DBUS_TYPE_INVALID)) {
-			if(ret == 0){
+    	if (SEM_DBUS_ERROR == ret){
+    		vty_out(vty, "sem_dbus_interface_set_boot_img error!\n");
+    		return CMD_FAILURE;
+    	}			
+		else
+ 		{
+			if(ret_value == 0){
 				vty_out(vty,"Set boot img %s on slot %d done.\n", version_file, slot_id);
 			}
 			else{
@@ -1164,43 +784,29 @@ DEFUN (system_sync_version_file_to_slot,
 	return CMD_SUCCESS;	
 }
 
+
+
 DEFUN (sem_mcb_active_standby_switch,
        sem_mcb_active_standby_switch_cmd,
        "mcb_active_standby_switch",
        "Master Control Board active and standby function switch\n")
 {
-	DBusMessage *query, *reply;
-	DBusError err;
-	int ret;
 
-	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-												 SEM_DBUS_INTERFACE, SEM_DBUS_MCB_ACTIVE_STANDBY_SWITCH);
-	dbus_error_init(&err);
-    
-	reply = dbus_connection_send_with_reply_and_block(dcli_dbus_connection, query, 60000, &err);
-	
-	dbus_message_unref(query);
-
-	if (NULL == reply){
-		vty_out(vty,"<error> failed get reply.\n");
-		if (dbus_error_is_set(&err)) {
-			vty_out(vty,"%s raised: %s",err.name,err.message);
-			dbus_error_free_for_dcli(&err);
-		}
-		return CMD_SUCCESS;
+	int ret, ret_value;
+	ret = sem_dbus_interface_mcb_active_standby_switch(dcli_dbus_connection, &ret_value);
+	if (SEM_DBUS_ERROR == ret){
+		vty_out(vty, "sem_dbus_interface_mcb_active_standby_switch error!\n");
+		return CMD_FAILURE;
 	}
 
-	if (dbus_message_get_args (reply, &err,
-					DBUS_TYPE_UINT32,&ret,
-					DBUS_TYPE_INVALID)) {
-		if(ret == 0){
-			vty_out(vty,"MCB active standby switch success.\n");
-		}
-		else{
-			vty_out(vty,"MCB active standby switch failed.\n");
-			return CMD_WARNING;
-		}
+
+	if(ret_value == 0){
+		vty_out(vty,"MCB active standby switch success.\n");
 	}
+	else{
+		vty_out(vty,"MCB active standby switch failed.\n");
+		return CMD_WARNING;
+	}	
 	
 	return CMD_SUCCESS;
 }
@@ -1213,9 +819,8 @@ DEFUN (sem_disable_keep_alive_temporarily,
        "Disable sem keep_alive function temporarily\n"
        "Time(second) for disabling sem keep_alive function\n")
 {
-	DBusMessage *query, *reply;
-	DBusError err;
-	int ret;
+
+	int ret, ret_value;
 	FILE *fd;
 	int time;
 
@@ -1240,43 +845,26 @@ DEFUN (sem_disable_keep_alive_temporarily,
 		return CMD_SUCCESS;
 	}
 
-	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-												 SEM_DBUS_INTERFACE, SEM_DBUS_DISABLE_KEEP_ALIVE_TEMPORARILY);
-	
-	dbus_error_init(&err);
-	
-	dbus_message_append_args(query,
-							DBUS_TYPE_UINT32, &time,
-							DBUS_TYPE_INVALID);
-
-	reply = dbus_connection_send_with_reply_and_block(dcli_dbus_connection, query, -1, &err);
-	
-	dbus_message_unref(query);
-
-	if (NULL == reply){
-		vty_out(vty,"<error> failed get reply.\n");
-		if (dbus_error_is_set(&err)) {
-			vty_out(vty,"%s raised: %s",err.name,err.message);
-			dbus_error_free_for_dcli(&err);
-		}
-		return CMD_SUCCESS;
+	ret = sem_dbus_interface_disable_keep_alive(dcli_dbus_connection, time, &ret_value);
+	if (SEM_DBUS_ERROR == ret){
+		vty_out(vty, "sem_dbus_interface_disable_keep_alive error!\n");
+		return CMD_FAILURE;
 	}
+	
 
-	if (dbus_message_get_args (reply, &err,
-					DBUS_TYPE_UINT32, &ret,
-					DBUS_TYPE_INVALID)) {
-		if(ret == 0){
-			vty_out(vty,"Disable sem keep_alive function for %d seconds successfully\n", time);
-		}
-		else{
-			vty_out(vty,"Disable sem keep_alive function for %d seconds failed\n", time);
-			return CMD_WARNING;
-		}
-	}
+     if(ret_value == 0){
+         vty_out(vty,"Disable sem keep_alive function for %d seconds successfully\n", time);
+     }
+     else{
+         vty_out(vty,"Disable sem keep_alive function for %d seconds failed\n", time);
+         return CMD_WARNING;
+     }
 
 	return CMD_SUCCESS;
 }
 
+
+/*Wangchao: This command can not work */
 DEFUN(sem_execute_system_command,
 	sem_execute_system_command_cmd,
 	"sem_exec slot (all|SLOT_NUM) .LINE",
@@ -1446,7 +1034,7 @@ DEFUN(wan_out_set,
 	"not from wan out\n"
 	)
 {
-	int ret;
+	int ret, ret_value;
 	int wan_state = 1;
 	char *dev_name = NULL;
 	int arglen;
@@ -1487,8 +1075,6 @@ DEFUN(wan_out_set,
 	vty_out(vty, "set the FPGA CFI,wait...\n");
 	if((strncmp(dev_name,"ve",2)==0))
 	{
-		DBusMessage *query, *reply;
-		DBusError err;
 		int ret;
         #if 0
 		ret = parse_slot_id_from_ifname(dev_name, &dest_slot_id);
@@ -1511,41 +1097,26 @@ DEFUN(wan_out_set,
 			
 			if (function_type != SWITCH_BOARD)
 		    {
-        		query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-        													 SEM_DBUS_INTERFACE, SEM_DBUS_SET_IF_WAN_STATE);
-        		dbus_error_init(&err);
-
-        		dbus_message_append_args(query,
-        							DBUS_TYPE_UINT32, &wan_state,
-        							DBUS_TYPE_STRING, &dev_name,
-        							DBUS_TYPE_INVALID);
-
+				
         		if (dbus_connection_dcli[slot]->dcli_dbus_connection) 
 				{
-        			reply = dbus_connection_send_with_reply_and_block (dbus_connection_dcli[slot]->dcli_dbus_connection,\
-        				query, 60000, &err);
-        			dbus_message_unref(query);
-
-        			if (NULL == reply){
-        				vty_out(vty,"<error> failed get reply.\n");
-        				if (dbus_error_is_set(&err)) {
-        					vty_out(vty,"%s raised: %s",err.name,err.message);
-        					dbus_error_free_for_dcli(&err);
-        				}
-        				continue;
-        			}
-
-        			if (dbus_message_get_args (reply, &err,
-        							DBUS_TYPE_UINT32,&ret,
-        							DBUS_TYPE_INVALID)) 
-        			{
-        				if(ret == 0){
+					
+    				ret = sem_dbus_set_if_wan_state(dbus_connection_dcli[slot]->dcli_dbus_connection,\
+    												wan_state, dev_name, &ret_value);
+                	if (ret == SEM_DBUS_ERROR){
+                		vty_out(vty,"sem_dbus_set_if_wan_state error\n");
+                		return CMD_FAILURE;
+                	}
+					else
+                	{
+        				if(ret_value == 0){
         				}
         				else{
         					vty_out(vty,"mode CFI set failed.\n");
         					continue;
         				}
-        			}
+        			}			
+					        			
 			    }
 	            else 
 			    {
@@ -1579,9 +1150,7 @@ DEFUN(debug_sem_info ,
 		MODULE_DEBUG_LEVEL_STR(sem,event)
 )
 {	
-	DBusMessage *query = NULL, *reply = NULL;
-	DBusError err;
-	
+	int val;
 	unsigned int re_value = 0;
 	unsigned int ret = 0;
 	unsigned int flag = 0;
@@ -1610,41 +1179,18 @@ DEFUN(debug_sem_info ,
 		vty_out(vty,"%% Command parameter %s error!\n",argv[0]);
 		return CMD_WARNING;
 	}
-	
-	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-											 SEM_DBUS_INTERFACE, SEM_DBUS_INTERFACE_METHOD_SYSTEM_DEBUG_STATE);
-    dbus_error_init(&err);
-	dbus_message_append_args(query,
-							DBUS_TYPE_UINT32,&flag,
-							DBUS_TYPE_INVALID);
-	reply = dbus_connection_send_with_reply_and_block (dcli_dbus_connection,query,-1, &err);
-	dbus_message_unref(query);
-	if (NULL == reply) {		
-		vty_out(vty,"failed get reply.\n");	
-		if (dbus_error_is_set(&err)) {
-			vty_out(vty,"%s raised: %s",err.name,err.message);
-			dbus_error_free_for_dcli(&err);
-		}
-		return CMD_SUCCESS;
+
+	val = sem_dbus_debug_sem(dcli_dbus_connection, flag, &re_value, &ret);
+	if (val != SEM_DBUS_SUCCESS){
+		vty_out(vty,"sem_dbus_debug_sem error\n");
+		return CMD_FAILURE;
+	}	
+
+	if(ret == 0)
+	{
+	    vty_out(vty," operation success!\n");
 	}
-	if (dbus_message_get_args ( reply, &err,
-									DBUS_TYPE_UINT32,&re_value,
-									DBUS_TYPE_UINT32,&ret,
-									DBUS_TYPE_INVALID)) {
-		if(ret == 0)
-		{
-		    vty_out(vty," operation success!\n");
-		}
-	}
-	else {		
-		vty_out(vty,"Failed get args.\n");		
-		if (dbus_error_is_set(&err)) {
-				vty_out(vty,"%s raised: %s",err.name,err.message);
-				dbus_error_free_for_dcli(&err);
-		}
-	}
-		
-	dbus_message_unref(reply);
+
 	return CMD_SUCCESS;
 }
 
@@ -1662,9 +1208,7 @@ DEFUN(no_debug_sem_info ,
 		MODULE_DEBUG_LEVEL_STR(sem,event)
 )
 {	
-	DBusMessage *query = NULL, *reply = NULL;
-	DBusError err;
-	
+	int val;
 	unsigned int re_value = 0;
 	unsigned int ret = 0;
 	unsigned int flag = 0;
@@ -1693,44 +1237,18 @@ DEFUN(no_debug_sem_info ,
 		vty_out(vty,"%% Command parameter %s error!\n",argv[0]);
 		return CMD_WARNING;
 	}
-	
-	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-											 SEM_DBUS_INTERFACE, SEM_DBUS_INTERFACE_METHOD_SYSTEM_UNDEBUG_STATE);
 
-    dbus_error_init(&err);
-	dbus_message_append_args(query,
-									DBUS_TYPE_UINT32,&flag,
-									DBUS_TYPE_INVALID);
-	
-	reply = dbus_connection_send_with_reply_and_block (dcli_dbus_connection,query,-1, &err);
-	dbus_message_unref(query);
-	if (NULL == reply) {		
-		vty_out(vty,"failed get reply.\n");	
-		if (dbus_error_is_set(&err)) {
-			vty_out(vty,"%s raised: %s",err.name,err.message);
-			dbus_error_free_for_dcli(&err);
-		}
-		return CMD_SUCCESS;
-	}
-	if (dbus_message_get_args ( reply, &err,
-									DBUS_TYPE_UINT32,&re_value,
-									DBUS_TYPE_UINT32,&ret,
-									DBUS_TYPE_INVALID)) {
+	val = sem_dbus_no_debug_sem(dcli_dbus_connection, flag, &re_value, &ret);
+	if (val != SEM_DBUS_SUCCESS){
+		vty_out(vty,"sem_dbus_debug_sem error\n");
+		return CMD_FAILURE;
+	}	
 
-		if(ret != 0)
-		{
-		    vty_out(vty," operation success!\n");
-		}
-	}
-	else {		
-		vty_out(vty,"Failed get args.\n");		
-		if (dbus_error_is_set(&err)) {
-				vty_out(vty,"%s raised: %s",err.name,err.message);
-				dbus_error_free_for_dcli(&err);
-		}
-	}
-		
-	dbus_message_unref(reply);
+	if(ret == 0)
+	{
+	    vty_out(vty," operation success!\n");
+	}	
+	
 	return CMD_SUCCESS;
 }
 
@@ -1741,11 +1259,8 @@ DEFUN (sem_apply_patch,
        "patch name\n"
        "patch name string\n")
 {
-	DBusMessage *query=NULL; 
-	DBusMessage *reply=NULL;
-	DBusError err;
 	DBusMessageIter  iter;
-	int ret;
+	int ret, ret_value;
 	int slot_id;
 	char *endptr = NULL;
 	char *patchname = NULL;
@@ -1771,42 +1286,23 @@ DEFUN (sem_apply_patch,
 		
 		if (dbus_connection_dcli[i]->dcli_dbus_connection) 
     	{
-        	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-        												 SEM_DBUS_INTERFACE, SEM_DBUS_APPLY_PATCH);
-        	dbus_error_init(&err);
-        	
-        	dbus_message_append_args(query,
-        					 		DBUS_TYPE_STRING,&patchname,
-        					 		DBUS_TYPE_INVALID);
 
-
-
-    		reply = dbus_connection_send_with_reply_and_block (dbus_connection_dcli[i]->dcli_dbus_connection,\
-    			query, -1, &err);
-    		dbus_message_unref(query);
-
-    		if (NULL == reply)
-    		{
-    			vty_out(vty,"<error> failed get reply.\n");
-    			if (dbus_error_is_set(&err))
-    			{
-    				vty_out(vty,"%s raised: %s",err.name,err.message);
-    				dbus_error_free_for_dcli(&err);
-    			}
+    		ret = sem_dbus_interface_apply_patch(dbus_connection_dcli[i]->dcli_dbus_connection, 
+    											patchname, &ret_value, &patch_result);
+    		if (SEM_DBUS_ERROR == ret){
+    			vty_out(vty, "sem_dbus_interface_apply_patch error\n");
+    			return CMD_FAILURE;
     		}
-
-        	if (dbus_message_get_args ( reply, &err,
-        		                     DBUS_TYPE_INT32,&ret,
-        		                     DBUS_TYPE_STRING,&patch_result,
-        		                     DBUS_TYPE_INVALID))
+			
+    		if (SEM_DBUS_SUCCESS == ret)
         	{
                 //vty_out(vty, "SLOT %d retun result %d,look at corresponding slot /blk/patch.log for the patch result!\n",i,ret);
 				vty_out(vty, "SLOT %d execute result:\n", i);
-				if (ret == 2) {
+				if (ret_value == 2) {
 					vty_out(vty, "patch is not exist\n");
-				} else if (ret == 1) {
+				} else if (ret_value == 1) {
 					vty_out(vty, "patch exec failed\n");
-				} else if (ret == 3) {
+				} else if (ret_value == 3) {
 					vty_out(vty, "failed get execute result,you must check it manually\n");
 				} else {
 					vty_out(vty, "%s\n", patch_result);
@@ -1816,7 +1312,6 @@ DEFUN (sem_apply_patch,
     		{
     		    vty_out(vty, "SLOT %d get args from replay fail\n",i);
     		}
-    		dbus_message_unref(reply);
     	}
     	else 
     	{
@@ -1826,49 +1321,28 @@ DEFUN (sem_apply_patch,
 
 	if (dbus_connection_dcli[active_master_slot]->dcli_dbus_connection) 
 	{
-    	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-    												 SEM_DBUS_INTERFACE, SEM_DBUS_APPLY_PATCH);
-    	dbus_error_init(&err);
-    	dbus_message_append_args(query,
-    					 		DBUS_TYPE_STRING,&patchname,
-    					 		DBUS_TYPE_INVALID);
-
-
-		reply = dbus_connection_send_with_reply_and_block (dbus_connection_dcli[active_master_slot]->dcli_dbus_connection,\
-			query, -1, &err);
-		dbus_message_unref(query);
-		if (NULL == reply)
-		{
-			vty_out(vty,"<error> failed get reply.\n");
-			if (dbus_error_is_set(&err))
-			{
-				vty_out(vty,"%s raised: %s",err.name,err.message);
-				dbus_error_free_for_dcli(&err);
-			}
-		}
-
-    	if (dbus_message_get_args ( reply, &err,
-    		                     DBUS_TYPE_INT32,&ret,
-    		                     DBUS_TYPE_STRING,&patch_result,
-    		                     DBUS_TYPE_INVALID))
+		
+		ret = sem_dbus_interface_apply_patch(dbus_connection_dcli[active_master_slot]->dcli_dbus_connection, 
+											patchname, &ret_value, &patch_result);
+		if (SEM_DBUS_ERROR == ret){
+			vty_out(vty, "sem_dbus_interface_apply_patch error\n");
+			return CMD_FAILURE;
+		}		
+		else
     	{
             //vty_out(vty, "SLOT %d retun result %d,look at corresponding slot /blk/patch.log for the patch result!\n",i,ret);
 			vty_out(vty, "SLOT %d execute result:\n", active_master_slot);
-			if (ret == 2) {
+			if (ret_value == 2) {
 				vty_out(vty, "patch is not exist\n");
-			} else if (ret == 1) {
+			} else if (ret_value == 1) {
 				vty_out(vty, "patch exec failed\n");
-			} else if (ret == 3) {
+			} else if (ret_value == 3) {
 				vty_out(vty, "failed get execute result,you must check it manually\n");
 			} else {
 				vty_out(vty, "%s\n", patch_result);
 			}
 		}
-		else
-		{
-		    vty_out(vty, "SLOT %d get args from replay fail\n",active_master_slot);
-		}
-		dbus_message_unref(reply);
+
 	}
 	else 
 	{
@@ -1886,10 +1360,9 @@ DEFUN(config_sem_sendto_trap,
 	"send signal number\n"
 	"send signal number\n")
 {
-    DBusMessage *query, *reply;
-	DBusError err;
+
 	struct in_addr userip_val;
-	int ret;
+	int ret, ret_value;
 	int slot_id;
 	unsigned int num = 1;
 	
@@ -1899,42 +1372,24 @@ DEFUN(config_sem_sendto_trap,
 	
     num = strtoul(argv[0], &endptr, 10);
 
-	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-												 SEM_DBUS_INTERFACE, SEM_DBUS_CONFIG_SEM_TO_TRAP);
-	dbus_error_init(&err);
-
-	dbus_message_append_args(query,
-		                DBUS_TYPE_UINT32, &num,
-						DBUS_TYPE_INVALID);
+	ret = sem_dbus_config_sem_sendto_trap(dcli_dbus_connection, num, &ret_value);
+	if (SEM_DBUS_ERROR == ret){
+		vty_out(vty, "sem_dbus_interface_apply_patch error\n");
+		return CMD_FAILURE;
+	}		
 	
-		reply = dbus_connection_send_with_reply_and_block (dcli_dbus_connection,\
-			query, -1, &err);
-		dbus_message_unref(query);
-
-		if (NULL == reply){
-			vty_out(vty,"<error> failed get reply.\n");
-			if (dbus_error_is_set(&err)) {
-				vty_out(vty,"%s raised: %s",err.name,err.message);
-				dbus_error_free_for_dcli(&err);
-			}
+	if (SEM_DBUS_SUCCESS == ret)
+    {
+		if(ret_value == 0){
+			vty_out(vty,".    ");
+		}
+		else{
+			vty_out(vty,"config sem send to trap dbus failed.\n");
 			return CMD_WARNING;
 		}
-
-		if (dbus_message_get_args (reply, &err,
-						DBUS_TYPE_UINT32,&ret,
-						DBUS_TYPE_INVALID)) {
-			if(ret == 0){
-				vty_out(vty,".    ");
-			}
-			else{
-				vty_out(vty,"config sem send to trap dbus failed.\n");
-				dbus_message_unref(reply);
-				return CMD_WARNING;
-			}
-		}
-		vty_out(vty, "\nconfig sem send to trap dbus success!\n");
-		dbus_message_unref(reply);
-		return CMD_SUCCESS;
+	}
+	vty_out(vty, "\nconfig sem send to trap dbus success!\n");
+	return CMD_SUCCESS;
 }
 DEFUN (sem_apply_patch_single,
        sem_apply_patch_single_cmd,
@@ -1949,7 +1404,8 @@ DEFUN (sem_apply_patch_single,
 	int slot_id;
 	char *endptr = NULL;
 	char *patchname = NULL;
-	char *patch_result;
+	char *patch_result ;
+	int ret_value = -1;
 	int i=0;
 	int slotNum = get_product_info(SEM_SLOT_COUNT_PATH);
     
@@ -1970,52 +1426,27 @@ DEFUN (sem_apply_patch_single,
 
 	//vty_out(vty, "SLOT %d **********\n",i);
 	if (dbus_connection_dcli[slot_id]->dcli_dbus_connection) 
-	{
-    	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-    												 SEM_DBUS_INTERFACE, SEM_DBUS_APPLY_PATCH);
-    	dbus_error_init(&err);
-    	
-    	dbus_message_append_args(query,
-    					 		DBUS_TYPE_STRING,&patchname,
-    					 		DBUS_TYPE_INVALID);
-
-
-
-		reply = dbus_connection_send_with_reply_and_block (dbus_connection_dcli[slot_id]->dcli_dbus_connection,\
-			query, -1, &err);
-		dbus_message_unref(query);
-
-		if (NULL == reply)
-		{
-			vty_out(vty,"<error> failed get reply.\n");
-			if (dbus_error_is_set(&err))
-			{
-				vty_out(vty,"%s raised: %s",err.name,err.message);
-				dbus_error_free_for_dcli(&err);
-			}
-		}
-		//vty_out(vty, "SLOT %d !!!!!!!!!!!!!!!!!!!!!!!!!\n",i);
-    	if (dbus_message_get_args ( reply, &err,
-    		                     DBUS_TYPE_INT32,&ret,
-    		                     DBUS_TYPE_STRING,&patch_result,
-    		                     DBUS_TYPE_INVALID))
+	{		
+		ret = sem_dbus_interface_apply_patch(dbus_connection_dcli[slot_id]->dcli_dbus_connection, 
+											patchname, &ret_value, &patch_result);
+		if (SEM_DBUS_ERROR == ret){
+			vty_out(vty, "sem_dbus_interface_apply_patch error\n");
+			return CMD_FAILURE;
+		}		
+		
+		if (SEM_DBUS_SUCCESS == ret)
     	{
             //vty_out(vty, "SLOT %d retun result %d,look at corresponding slot /blk/patch.log for the patch result!\n",slot_id,ret);
-            if (ret == 2) {
+            if (ret_value == 2) {
 				vty_out(vty, "patch is not exist\n");
-			} else if (ret == 1) {
+			} else if (ret_value == 1) {
 				vty_out(vty, "patch exec failed\n");
-			} else if (ret == 3) {
+			} else if (ret_value == 3) {
 				vty_out(vty, "failed get execute result,you must check it manually\n");
 			} else {
 				vty_out(vty, "%s\n", patch_result);
 			}
 		}
-		else
-		{
-		    vty_out(vty, "SLOT %d get args from replay fail\n",slot_id);
-		}
-		dbus_message_unref(reply);
 	}
 	else 
 	{
@@ -2030,8 +1461,6 @@ DEFUN(sem_clean_messageoftoday_command,
 	"clean function\n"
 	"clean the messageoftoday file\n")
 {
-	DBusMessage *query, *reply;
-	DBusError err;
 	int ret;
 
 	char cmdstr[128] = "sudo echo Auteware > /etc/motd";
@@ -2068,6 +1497,7 @@ DEFUN(sem_clean_messageoftoday_command,
 
 xu
 **************************************/
+#if 0
 DEFUN (sem_flash_erase,
 		   sem_flash_erase_cmd,
 		   "flash_erase SLOT_ID  PATH_NAME",
@@ -2184,121 +1614,98 @@ DEFUN (sem_flash_erase,
 	
 	return CMD_SUCCESS;
 }
-
+#endif
 
 DEFUN (flash_write_bootrom,
-       flash_write_bootrom_cmd,
-       "flash_write_boot SLOT_ID BOOT_NAME",
-       "update_flash_boot\n"
-       "slot id\n"
-       "u-boot file name string\n")
+		flash_write_bootrom_cmd,
+		"flash_write_boot SLOT_ID BOOT_NAME",
+		"update_flash_boot\n"
+		"slot id\n"
+		"u-boot file name string\n")
 {
-		DBusMessage *query, *reply;
-		DBusError err;
-		int slot_id;
-		char *endptr = NULL;
-		char *patchname = NULL;
-		int ret = -1;
-		int i=atoi(argv[0]);
-		char cmd[256];
-		int slotNum = get_product_info(SEM_SLOT_COUNT_PATH);
-		if(2 == argc )
-		{ 
-			
-    		 slot_id = strtoul(argv[0], &endptr, 10);
+	int slot_id;
+	char *endptr = NULL;
+	char *patchname = NULL;
+	int ret = -1;
+	int ret_value = -1;
+	int i=atoi(argv[0]);
+	char cmd[256];
+	int slotNum = get_product_info(SEM_SLOT_COUNT_PATH);
+	if(2 == argc )
+	{ 
+
+		slot_id = strtoul(argv[0], &endptr, 10);
 		if(slot_id > slotNum || slot_id <= 0)
 		{
 			vty_out(vty,"%% NO SUCH SLOT %d!\n", slot_id);
-       		 return CMD_WARNING;
+			return CMD_WARNING;
 		}
-			patchname= (char *)argv[1];
-			if(strncasecmp((patchname + strlen(patchname)-4),".bin",4))
-			{
-				vty_out(vty,"The uboot file should be .bin file\n");
+		patchname= (char *)argv[1];
+		if(strncasecmp((patchname + strlen(patchname)-4),".bin",4))
+		{
+			vty_out(vty,"The uboot file should be .bin file\n");
 
-				return CMD_WARNING;
-			}
-			vty_out(vty, "start writing bootrom to flash SLOT %d *****Just a minute, please\n",i);
-	
-			if (dbus_connection_dcli[slot_id]->dcli_dbus_connection) 
+			return CMD_WARNING;
+		}
+		vty_out(vty, "start writing bootrom to flash SLOT %d *****Just a minute, please\n",i);
+
+		if (dbus_connection_dcli[slot_id]->dcli_dbus_connection) 
+		{
+			ret = sem_dbus_flash_write_boot(dbus_connection_dcli[slot_id]->dcli_dbus_connection, patchname, &ret_value);
+
+			if (SEM_DBUS_ERROR == ret){
+				vty_out(vty, "sem_dbus_flash_write_boot error\n");
+				return CMD_FAILURE;
+			}		
+
+			if (SEM_DBUS_SUCCESS == ret)
 			{
-				query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-															 SEM_DBUS_INTERFACE, WRITE_BOOT_TO_FLASH);
-				dbus_error_init(&err);
-				
-				dbus_message_append_args(query,
-										DBUS_TYPE_STRING,&patchname,
-										DBUS_TYPE_INVALID);
-	
-	
-	
-				reply = dbus_connection_send_with_reply_and_block (dbus_connection_dcli[slot_id]->dcli_dbus_connection,\
-					query, -1, &err);
-				dbus_message_unref(query);
-	
-				if (NULL == reply)
-				{
-					vty_out(vty,"<error> failed get reply.\n");
-					if (dbus_error_is_set(&err))
-					{
-						vty_out(vty,"%s raised: %s",err.name,err.message);
-						dbus_error_free_for_dcli(&err);
-					}
-				}
-				//vty_out(vty, "SLOT %d !!!!!!!!!!!!!!!!!!!!!!!!!\n",i);
-				if (dbus_message_get_args ( reply, &err,
-										 DBUS_TYPE_INT32,&ret,
-										 DBUS_TYPE_INVALID))
-				{
-					vty_out(vty,"remote %d :",slot_id);
-					
-					switch ((ret)) {	
-						case 0: 
-							
-							vty_out(vty,"WRITE SUCCESS\n");			
-							return CMD_SUCCESS; 	
-						case 1: 		
-							vty_out(vty,"writing uboot fialed\n");			
-							break;		
-						case 2: 		
-							vty_out(vty,"open file failed,Please check the  filename, write BOOTROM again\n");			
-							break;		
-						case 3: 		
-							vty_out(vty,"unable to get MTD device\n");			
-							break;		
-						case 4: 		
-							vty_out(vty,"read fiel failed\n");			
-							break;		
-						case 5: 		
-							vty_out(vty,"write file failed\n");			
-							break;
-						case -1:
-							vty_out(vty," file check failed\n");
-							break;
-						default:			
-							vty_out(vty,"writing uboot failed\n");			
-							break;		
-							}	
-					return CMD_WARNING;
-					
-				}
-				else
-				{
-					vty_out(vty, "SLOT %d get args from replay fail\n",slot_id);
-				}
-				dbus_message_unref(reply);
-			}
-			else 
-			{
-				vty_out(vty, "no connection to slot %d\n", slot_id);
-				return CMD_SUCCESS;
-			}
-			}else{
-				vty_out(vty, " enter error\n");
+				vty_out(vty,"remote %d :",slot_id);
+
+				switch ((ret_value)) {	
+					case 0: 
+
+						vty_out(vty,"WRITE SUCCESS\n");			
+						return CMD_SUCCESS; 	
+					case 1: 		
+						vty_out(vty,"writing uboot fialed\n");			
+						break;		
+					case 2: 		
+						vty_out(vty,"open file failed,Please check the  filename, write BOOTROM again\n");			
+						break;		
+					case 3: 		
+						vty_out(vty,"unable to get MTD device\n");			
+						break;		
+					case 4: 		
+						vty_out(vty,"read fiel failed\n");			
+						break;		
+					case 5: 		
+						vty_out(vty,"write file failed\n");			
+						break;
+					case -1:
+						vty_out(vty," file check failed\n");
+						break;
+					default:			
+						vty_out(vty,"writing uboot failed\n");			
+						break;		
+				}	
 				return CMD_WARNING;
+
 			}
+
+		}
+		else 
+		{
+			vty_out(vty, "no connection to slot %d\n", slot_id);
 			return CMD_SUCCESS;
-	}	
+		}
+
+	}else{
+		vty_out(vty, " enter error\n");
+		return CMD_WARNING;
+	}
+	return CMD_SUCCESS;
+}	
 	
 DEFUN (delete_patch_single,
        delete_patch_single_cmd,
@@ -2308,8 +1715,6 @@ DEFUN (delete_patch_single,
        "Patch name string\n"
        "Slot id")
 {
-	DBusMessage *query, *reply;
-	DBusError err;
 	int slot_id;
 	int fd;
 	char c;
@@ -2318,6 +1723,7 @@ DEFUN (delete_patch_single,
 	int i=atoi(argv[1]);
 	int local_slot_id = get_product_info("/dbm/local_board/slot_id");
 	int ret = -1;
+	int ret_value;
 	char cmd[256];
 	
    	if(2 == argc)
@@ -2376,80 +1782,55 @@ DEFUN (delete_patch_single,
 
 		//vty_out(vty, "SLOT %d **********\n",i);
 
-		if (dbus_connection_dcli[slot_id]->dcli_dbus_connection) 
-		{
-	    	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-	    												 SEM_DBUS_INTERFACE, SEM_DBUS_DELETE_PATCH);
-	    	dbus_error_init(&err);
-	    	
-	    	dbus_message_append_args(query,
-	    					 		DBUS_TYPE_STRING,&patchname,
-	    					 		DBUS_TYPE_INVALID);
+		ret = sem_dbus_interface_delete_patch(dbus_connection_dcli[slot_id] -> dcli_dbus_connection, patchname, &ret_value);
 
+    	if (SEM_DBUS_ERROR == ret){
+    		vty_out(vty, "sem_dbus_interface_delete_patch error\n");
+    		return CMD_FAILURE;
+    	}		
 
-
-			reply = dbus_connection_send_with_reply_and_block (dbus_connection_dcli[slot_id]->dcli_dbus_connection,\
-				query, -1, &err);
-			dbus_message_unref(query);
-
-			if (NULL == reply)
-			{
-				vty_out(vty,"<error> failed get reply.\n");
-				if (dbus_error_is_set(&err))
-				{
-					vty_out(vty,"%s raised: %s",err.name,err.message);
-					dbus_error_free_for_dcli(&err);
-				}
-			}
-			//vty_out(vty, "SLOT %d !!!!!!!!!!!!!!!!!!!!!!!!!\n",i);
-	    	if (dbus_message_get_args ( reply, &err,
-	    		                     DBUS_TYPE_INT32,&ret,
-	    		                     DBUS_TYPE_INVALID))
-	    	{
-				vty_out(vty,"remote %d :",slot_id);
-	            
-				switch ((ret)) { 	
-					case 0: 
-						
-						vty_out(vty,"SUCCESS\n");			
-						return CMD_SUCCESS; 	
-					case 1: 		
-						vty_out(vty,"Sysetm internal error (1).\n");			
-						break;		
-					case 2: 		
-						vty_out(vty,"Sysetm internal error (2).\n");			
-						break;		
-					case 3: 		
-						vty_out(vty,"Storage media is busy.\n");			
-						break;		
-					case 4: 		
-						vty_out(vty,"Storage operation time out.\n");			
-						break;		
-					case 5: 		
-						vty_out(vty,"No left space on storage media.\n");			
-						break;		
-					case 6: 		
-						vty_out(vty,"Not found\n");			
-						break;		
-					default:			
-						vty_out(vty,"Sysetm internal error (3).\n");			
-						break;		
-						}	
-				return CMD_WARNING;
-	            
-			}
-			else
-			{
-			    vty_out(vty, "SLOT %d get args from replay fail\n",slot_id);
-			}
-			dbus_message_unref(reply);
+		if (SEM_DBUS_NO_CONN == ret){
+			 vty_out(vty, "no connection to slot %d\n",slot_id);
+    		 return CMD_SUCCESS;	 
 		}
-		else 
+
+		if (SEM_DBUS_SUCCESS == ret)
 		{
-	    	vty_out(vty, "no connection to slot %d\n", slot_id);
-			return CMD_SUCCESS;
-		}
-   	}else{
+			vty_out(vty,"remote %d :",slot_id);
+            
+			switch ((ret_value)) { 	
+				case 0: 			
+					vty_out(vty,"SUCCESS\n");			
+					return CMD_SUCCESS; 	
+				case 1: 		
+					vty_out(vty,"Sysetm internal error (1).\n");			
+					break;		
+				case 2: 		
+					vty_out(vty,"Sysetm internal error (2).\n");			
+					break;		
+				case 3: 		
+					vty_out(vty,"Storage media is busy.\n");			
+					break;		
+				case 4: 		
+					vty_out(vty,"Storage operation time out.\n");			
+					break;		
+				case 5: 		
+					vty_out(vty,"No left space on storage media.\n");			
+					break;		
+				case 6: 		
+					vty_out(vty,"Not found\n");			
+					break;		
+				default:			
+					vty_out(vty,"Sysetm internal error (3).\n");			
+					break;		
+					}	
+			return CMD_WARNING;
+	            
+		}			
+			
+   	}
+	else
+	{
 
 		patchname= (char *)argv[0];
 		ret = strlen(patchname);
@@ -2492,77 +1873,45 @@ DEFUN (delete_patch_single,
     	for(i = 1;i < MAX_SLOT ; i++)
     	{
     		if(NULL != (dbus_connection_dcli[i] -> dcli_dbus_connection))
-    		{
+    		{	
     			if (i != HostSlotId)
-    			{
-    		    	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-    		    												 SEM_DBUS_INTERFACE, SEM_DBUS_DELETE_PATCH);
-    		    	dbus_error_init(&err);
-    		    	
-    		    	dbus_message_append_args(query,
-    		    					 		DBUS_TYPE_STRING,&patchname,
-    		    					 		DBUS_TYPE_INVALID);
-
-
-
-    				reply = dbus_connection_send_with_reply_and_block (dbus_connection_dcli[i]->dcli_dbus_connection,\
-    					query, -1, &err);
-
-    				if (NULL == reply)
-    				{
-    					vty_out(vty,"<error> failed get reply.\n");
-    					if (dbus_error_is_set(&err))
-    					{
-    						vty_out(vty,"%s raised: %s",err.name,err.message);
-    						dbus_error_free_for_dcli(&err);
-    					}
-    				}
-    				
-    		    	if (dbus_message_get_args ( reply, &err,
-    		    		                     DBUS_TYPE_INT32,&ret,
-    		    		                     DBUS_TYPE_INVALID))
-    			   	{
-    					vty_out(vty,"remote %d :",i);
-    		            
-    					switch ((ret)) { 	
-    						case 0: 
-    							
-    							vty_out(vty,"Delete slot %d patch success\n",i);
-    							break;
-    						case 1: 		
-    							vty_out(vty,"Sysetm internal error (1).\n");			
-    							break;		
-    						case 2: 		
-    							vty_out(vty,"Sysetm internal error (2).\n");			
-    							break;		
-    						case 3: 		
-    							vty_out(vty,"Storage media is busy.\n");			
-    							break;		
-    						case 4: 		
-    							vty_out(vty,"Storage operation time out.\n");			
-    							break;		
-    						case 5: 		
-    							vty_out(vty,"No left space on storage media.\n");			
-    							break;		
-    						case 6: 		
-    							vty_out(vty,"Not found\n");			
-    							break;		
-    						default:			
-    							vty_out(vty,"Sysetm internal error (3).\n");			
-    							break;		
-    						}	
-    					//return CMD_WARNING;
-    		            
-    				}
-    				else
-    				{
-    				    vty_out(vty, "SLOT %d get args from replay fail\n",i);
-    				}
-    				dbus_message_unref(reply);
-    			}
-    		}else{
-                //vty_out(vty, "NO connection with slot %d\n",i);
-			}
+    			{	
+            		ret = sem_dbus_interface_delete_patch(dbus_connection_dcli[i] -> dcli_dbus_connection, patchname, &ret_value);
+                	if (SEM_DBUS_ERROR == ret){
+                		vty_out(vty, "sem_dbus_interface_delete_patch error\n");
+                		return CMD_FAILURE;
+                	}					
+    				vty_out(vty,"remote %d :",i);
+    	            
+    				switch ((ret_value)) { 	
+    					case 0: 
+    						
+    						vty_out(vty,"Delete slot %d patch success\n",i);
+    						break;
+    					case 1: 		
+    						vty_out(vty,"Sysetm internal error (1).\n");			
+    						break;		
+    					case 2: 		
+    						vty_out(vty,"Sysetm internal error (2).\n");			
+    						break;		
+    					case 3: 		
+    						vty_out(vty,"Storage media is busy.\n");			
+    						break;		
+    					case 4: 		
+    						vty_out(vty,"Storage operation time out.\n");			
+    						break;		
+    					case 5: 		
+    						vty_out(vty,"No left space on storage media.\n");			
+    						break;		
+    					case 6: 		
+    						vty_out(vty,"Not found\n");			
+    						break;		
+    					default:			
+    						vty_out(vty,"Sysetm internal error (3).\n");			
+    						break;		
+    					}	 
+        		}
+    		}
     	}
     return CMD_SUCCESS;
     }
@@ -2653,56 +2002,26 @@ DEFUN(show_6185_reg,
 	"88E6185 register address\n"
 	)
 {
-	DBusMessage *query = NULL, *reply = NULL;
-	DBusMessageIter iter;
-	DBusError err;
     unsigned int dev_addr;
 	unsigned int reg_addr;
 	unsigned int phy_addr;
 	unsigned int val;
+	int ret;
 
 	phy_addr = strtol(argv[0],NULL,16);
 	dev_addr = strtol(argv[1],NULL,16);
     reg_addr = strtol(argv[2],NULL,16);
-	
-	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-										 SEM_DBUS_INTERFACE, SEM_DBUS_SHOW_6185);
-	if (!query)
-	{
-		vty_out(vty, "show slot id query failed\n");
+
+	ret = sem_dbus_show_88E6185(dcli_dbus_connection, dev_addr, reg_addr, &val, phy_addr);
+
+	if (ret != SEM_DBUS_SUCCESS){
+		vty_out(vty,"sem_dbus_config_tipc error\n");
 		return CMD_FAILURE;
-	}
-
-	dbus_error_init(&err);
-
-	dbus_message_append_args(query,
-				 		DBUS_TYPE_UINT32, &dev_addr,
-				 		DBUS_TYPE_UINT32, &reg_addr,
-				 		DBUS_TYPE_UINT32, &phy_addr,
-				 		DBUS_TYPE_INVALID);
-
-	reply = dbus_connection_send_with_reply_and_block(dcli_dbus_connection, query, -1, &err);
+	}	
 	
-	dbus_message_unref(query);
-
-	if (!reply)
-	{
-		vty_out(vty, "<error> failed get reply.\n");
-		if (dbus_error_is_set(&err))
-		{
-			vty_out(vty,"%s raised: %s",err.name,err.message);
-			dbus_error_free_for_dcli(&err);
-		}
-		
-		return CMD_SUCCESS;
-	}
-	
-	dbus_message_iter_init(reply,&iter);
-	dbus_message_iter_get_basic(&iter,&val);
 	vty_out(vty, "dev_addr = 0x%x,reg_addr = 0x%x\n", dev_addr,reg_addr);
 	vty_out(vty, "read val = 0x%x\n", val);
 	
-	dbus_message_unref(reply);
 	return CMD_SUCCESS;	
 }
 
@@ -2717,58 +2036,28 @@ DEFUN(set_6185_reg,
 	"write val\n"
 	)
 {
-	DBusMessage *query = NULL, *reply = NULL;
-	DBusMessageIter iter;
-	DBusError err;
     unsigned int dev_addr;
 	unsigned int reg_addr;
 	unsigned int phy_addr;
 	unsigned short val;
-	int ret;
+	int ret,ret_value;
 	
 	phy_addr = strtol(argv[0],NULL,16);
 	dev_addr = strtol(argv[1],NULL,16);
     reg_addr = strtol(argv[2],NULL,16);
 	val = strtol(argv[3],NULL,16);
-	query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
-										 SEM_DBUS_INTERFACE, SEM_DBUS_SET_6185);
-	if (!query)
-	{
-		vty_out(vty, "show slot id query failed\n");
+
+	ret = sem_dbus_set_88E6185(dcli_dbus_connection, dev_addr, reg_addr, &val, phy_addr, &ret_value);
+
+	if (ret != SEM_DBUS_SUCCESS){
+		vty_out(vty,"sem_dbus_config_tipc error\n");
 		return CMD_FAILURE;
 	}
-
-	dbus_error_init(&err);
-
-	dbus_message_append_args(query,
-				 		DBUS_TYPE_UINT32, &dev_addr,
-				 		DBUS_TYPE_UINT32, &reg_addr,
-				 		DBUS_TYPE_UINT16, &val,
-				 		DBUS_TYPE_UINT32, &phy_addr,
-				 		DBUS_TYPE_INVALID);
-
-	reply = dbus_connection_send_with_reply_and_block(dcli_dbus_connection, query, -1, &err);
 	
-	dbus_message_unref(query);
-
-	if (!reply)
-	{
-		vty_out(vty, "<error> failed get reply.\n");
-		if (dbus_error_is_set(&err))
-		{
-			vty_out(vty,"%s raised: %s",err.name,err.message);
-			dbus_error_free_for_dcli(&err);
-		}
-		
-		return CMD_SUCCESS;
-	}
-	
-	dbus_message_iter_init(reply,&iter);
-	dbus_message_iter_get_basic(&iter,&ret);
-	if(!ret){
+	if(!ret_value){
 	    vty_out(vty, "dev_addr = 0x%x,reg_addr = 0x%x,val = 0x%x,write done!\n", dev_addr,reg_addr,val);
 	}
-	dbus_message_unref(reply);
+
 	return CMD_SUCCESS;	
 }
 
