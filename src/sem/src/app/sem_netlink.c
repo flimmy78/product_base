@@ -698,8 +698,8 @@ void sem_netlink_recv_thread(void)
         		
         		switch(nl_msg->msgType)
         		{
-        			#if 0
-        			case ACTIVE_STDBY_SWITCH_EVENT:
+        		#if 1  //use "ACTIVE_STDBY_SWITCH_OCCUR_EVENT" again,yjl modified 2014-2-12 
+        			case ACTIVE_STDBY_SWITCH_OCCUR_EVENT:
         				chTemp = NLMSG_DATA(ks_nlh);	
                     	sem_syslog_dbg("\tNetlink Sem MCB Active Standby Switch\n");
 						sem_syslog_dbg("\tSlot ID : %d\n", nl_msg->msgData.swInfo.active_slot_id);
@@ -743,6 +743,8 @@ void sem_netlink_recv_thread(void)
         					sem_syslog_dbg("\tBoard Inserting Slot ID %d\n", nl_msg->msgData.boardInfo.slotid);
         				else if(nl_msg->msgData.boardInfo.action_type == BOARD_REMOVED) {
 							sem_syslog_dbg("\tBoard Removing Slot ID %d\n", nl_msg->msgData.boardInfo.slotid);
+							
+					        #if 0 //here is no use, use "ACTIVE_STDBY_SWITCH_OCCUR_EVENT" again.yjl modified 2014-2-12 
 							sem_syslog_dbg("\tActive MCB : %d\n", product->active_master_slot_id);
 							if (((nl_msg->msgData.boardInfo.slotid - 1) == product->active_master_slot_id) && \
 								local_board->is_master) {
@@ -771,13 +773,14 @@ void sem_netlink_recv_thread(void)
 										retval = product->active_stby_switch((void *)(&mcb_switch_arg));
 								}
 							}
-							else {
+							#endif
+							//else { 
 								sem_syslog_warning("SEM:slot %d is removed\n", nl_msg->msgData.boardInfo.slotid);
 								if (local_board->is_active_master)
 									set_dbm_effective_flag(INVALID_DBM_FLAG);
 									product->board_removed(nl_msg->msgData.boardInfo.slotid - 1);
 									set_dbm_effective_flag(VALID_DBM_FLAG);
-							}
+							//}
 						}
         				else
         					sem_syslog_dbg("Error board state notifier\n");

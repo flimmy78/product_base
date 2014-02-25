@@ -444,49 +444,56 @@ void npd_netlink_recv_thread(void)
                             	#endif									
                  				case ACTIVE_STDBY_SWITCH_OCCUR_EVENT:   /* switch start */
             					    npd_syslog_info("###### from sem : ACTIVE_STDBY_SWITCH_OCCUR_EVENT \n");
-								    /* enable asic of Standby-MCB on AX8610 & AX8800 */
-                                    if((PRODUCT_TYPE==AUTELAN_PRODUCT_AX8610)||(PRODUCT_TYPE==AUTELAN_PRODUCT_AX8606)\
-										|| (PRODUCT_TYPE == AUTELAN_PRODUCT_AX8800))
-                                    {
-										
-										/*yjl modified : disable/enable cscd_port  change to disable/enable asic */
-										/* Disable asic if local board is Active-MCB */
-                                    	if(1 == IS_ACTIVE_MASTER_NPD)
-                                    	{
-                                         	ret = nam_enable_device(0,0);   /* disable asic 0 */
-                                            if (0 != ret)
-                                            {
-                                                syslog_ax_board_dbg("disable asic 0 of Active-MCB error !\n");
-                                            }
-                                    		else
-                                    		{
-												/* Change to be standby master */
-                                    			board_info.is_active_master = 0;
-                                    	        syslog_ax_board_dbg("disable asic 0 of Active-MCB OK !\n");
-                                    		}																				
-                                    	}
-										else if((0 == IS_ACTIVE_MASTER_NPD)&&(1 == IS_MASTER_NPD))
-                                    	{
-                                            /* Enable the asic of Standby-MCB */											
-                                         	ret = nam_enable_device(0,1);   /* enable asic 0 */
-                                            if (0 != ret)
-                                            {
-                                                syslog_ax_board_dbg("enable asic 0 of Standby-MCB error !\n");
-                                            }
-                                    		else
-                                    		{
-												/* Change to be active master */
-                                    			board_info.is_active_master = 1;
-                                    	        syslog_ax_board_dbg("enable asic 0 of Standby-MCB OK !\n");
-                                    		}
-                                    	}
-										/*yjl modified end : disable/enable cscd_port  change to disable/enable asic */
-                                    }
-									else
-									{
-										/* On AX7605i & AX8603 do nothing */
+									
+									/*On HOTPLUG_MODE,ACTIVE_STDBY_SWITCH have done by dealing with KSEM netlink message. yjl add 2014-2-12*/
+									if(nl_msg->msgData.swInfo.action_type == HOTPLUG_MODE){ 
+										npd_syslog_info("Hotplug mode,do nothing!\n");
 									}
-            					    npd_syslog_info("npd make CMD switch change OK !\n");									
+									else{
+									    /* enable asic of Standby-MCB on AX8610 & AX8800 */
+                                        if((PRODUCT_TYPE==AUTELAN_PRODUCT_AX8610)||(PRODUCT_TYPE==AUTELAN_PRODUCT_AX8606)\
+										    || (PRODUCT_TYPE == AUTELAN_PRODUCT_AX8800))
+                                        {
+										
+										    /*yjl modified : disable/enable cscd_port  change to disable/enable asic */
+										    /* Disable asic if local board is Active-MCB */
+                                    	    if(1 == IS_ACTIVE_MASTER_NPD)
+                                    	    {
+                                         	    ret = nam_enable_device(0,0);   /* disable asic 0 */
+                                                if (0 != ret)
+                                                {
+                                                    syslog_ax_board_dbg("disable asic 0 of Active-MCB error !\n");
+                                                }   
+                                    		    else
+                                    		    {
+												    /* Change to be standby master */
+                                    			    board_info.is_active_master = 0;
+                                    	            syslog_ax_board_dbg("disable asic 0 of Active-MCB OK !\n");
+                                    		    }																				
+                                    	    }
+										    else if((0 == IS_ACTIVE_MASTER_NPD)&&(1 == IS_MASTER_NPD))
+                                    	    {
+                                                /* Enable the asic of Standby-MCB */											
+                                         	    ret = nam_enable_device(0,1);   /* enable asic 0 */
+                                                if (0 != ret)
+                                                {
+                                                    syslog_ax_board_dbg("enable asic 0 of Standby-MCB error !\n");
+                                                }
+                                    		    else
+                                    		    {
+												    /* Change to be active master */
+                                    			    board_info.is_active_master = 1;
+                                    	            syslog_ax_board_dbg("enable asic 0 of Standby-MCB OK !\n");
+                                    		    }
+                                    	    }
+										    /*yjl modified end : disable/enable cscd_port  change to disable/enable asic */
+                                        }
+									    else
+									    {
+										    /* On AX7605i & AX8603 do nothing */
+									    }
+            					        npd_syslog_info("npd make CMD switch change OK !\n");
+									}
             						break;                               
                 				case ACTIVE_STDBY_SWITCH_COMPLETE_EVENT:    /* switch OK, update the master info */
             					    npd_syslog_info("##### from sem : ACTIVE_STDBY_SWITCH_COMPLETE_EVENT \n");
@@ -637,23 +644,27 @@ void npd_netlink_recv_thread(void)
                                 syslog_ax_board_dbg("Board removing\n");
     						}
     						break;
-        				case ACTIVE_STDBY_SWITCH_EVENT:
-							#if 0   /* here is no use, change to ACTIVE_STDBY_SWITCH_OCCUR_EVENT zhangdi 2012-03-23 */
-        					npd_syslog_info("############ from ksem to npd: ACTIVE_STDBY_SWITCH_EVENT ############\n");
-    						/* enable cscd port of Standby-MCB */
-                            if(BOARD_TYPE == BOARD_TYPE_AX81_SMU)
-                            {
-                            	if(1 != is_active_master)    /* if local board is not Active-MCB */
-                            	{
-                                 	ret = npd_enable_cscd_port();
+        				case ACTIVE_STDBY_SWITCH_OCCUR_EVENT: //yjl modified 2014-2-12
+							#if 1  /*used again: yjl 2014-1-24*/ 
+							/* here is no use, change to ACTIVE_STDBY_SWITCH_OCCUR_EVENT zhangdi 2012-03-23 */
+        					npd_syslog_info("############ from ksem to npd: ACTIVE_STDBY_SWITCH_OCCUR_EVENT ############\n");
+    					
+                            if((PRODUCT_TYPE==AUTELAN_PRODUCT_AX8610)||(PRODUCT_TYPE==AUTELAN_PRODUCT_AX8606)\
+										|| (PRODUCT_TYPE == AUTELAN_PRODUCT_AX8800))
+							{
+								if((0 == IS_ACTIVE_MASTER_NPD)&&(1 == IS_MASTER_NPD))
+                                {
+                                    /* Enable the asic of Standby-MCB */
+                                    ret = nam_enable_device(0,1);   /* enable asic 0 */
                                     if (0 != ret)
                                     {
-                                        syslog_ax_board_dbg("enable cscd port on Standby-MCB error !\n");
+                                        syslog_ax_board_dbg("enable asic 0 of Standby-MCB error !\n");
                                     }
-                            		else
-                            		{
-                            			is_active_master = 1;
-                            	        syslog_ax_board_dbg("enable cscd port on Standby-MCB OK !\n");
+                                    else
+                                    {
+									    /* Change to be active master */
+                                    	board_info.is_active_master = 1;
+                                    	syslog_ax_board_dbg("enable asic 0 of Standby-MCB OK !\n");
                             		}																				
                             	}
                             }

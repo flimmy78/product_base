@@ -511,8 +511,9 @@ void check_on_intState2_for_ax86xx(unsigned long intState2)
 	ksemDBG("fanState          = %#lx\n", fanState);
 
 	if (product_id == PRODUCT_AX8610 || product_id == PRODUCT_AX8603 || product_id == PRODUCT_AX8800){
-		if(test_bit(0, &intState2)) {
-			#if 0
+		if(test_bit(0, &intState2)) {			
+			#if 1
+			/*use "ACTIVE_STDBY_SWITCH_EVENT " again: yjl modified 2014-1-24*/
 			if((local_board_state&1) == preState) {
 	    		nl_msg->msgType = BOARD_STATE_NOTIFIER_EVENT;
 				if(test_bit(0, &master_slot_id))
@@ -521,37 +522,42 @@ void check_on_intState2_for_ax86xx(unsigned long intState2)
 					nl_msg->msgData.boardInfo.slotid = default_standby_slot_id;	
 	            if(test_bit(0, &remoteState)){
 					nl_msg->msgData.boardInfo.action_type = BOARD_REMOVED;
-					ksemERR("Slot [%d] Borad Removed\n", nl_msg->msgData.boardInfo.slotid);
+					ksemERR("Slot [%d] Board Removed\n", nl_msg->msgData.boardInfo.slotid);
 	            }else {
 					nl_msg->msgData.boardInfo.action_type = BOARD_INSERTED;
-					ksemERR("Slot [%d] Borad Inserted\n", nl_msg->msgData.boardInfo.slotid);
+					ksemERR("Slot [%d] Board Inserted\n", nl_msg->msgData.boardInfo.slotid);
 	            }
 			}else {
 			    preState = local_board_state&1;
-			    nl_msg->msgType = ACTIVE_STDBY_SWITCH_EVENT;
+			    nl_msg->msgType = ACTIVE_STDBY_SWITCH_OCCUR_EVENT;
 				nl_msg->msgData.swInfo.action_type = HOTPLUG_MODE;
 				if(test_bit(0, &master_slot_id))
 				    nl_msg->msgData.swInfo.active_slot_id = default_standby_slot_id;
 				else
 					nl_msg->msgData.swInfo.active_slot_id = default_active_slot_id;
 				
-				ksemERR("Active_MCB and Standby_MCB switch. Now active_master_slot_id is [%d]\n", nl_msg->msgData.boardInfo.slotid);
+				ksemERR("Active_MCB and Standby_MCB switch. Now active_master_slot_id is [%d]\n", nl_msg->msgData.swInfo.active_slot_id);
 			}
 			sem_kern_netlink_notifier(sendBuf, msgLen);	
 			#endif
+			
+			#if 0
 			nl_msg->msgType = BOARD_STATE_NOTIFIER_EVENT;
-			if(test_bit(0, &master_slot_id))
+			if(test_bit(0, &master_slot_id)){
 				nl_msg->msgData.boardInfo.slotid = default_active_slot_id;
-			else
+			}
+			else{
 				nl_msg->msgData.boardInfo.slotid = default_standby_slot_id;
+			}
 			if(test_bit(0, &remoteState)){
 				nl_msg->msgData.boardInfo.action_type = BOARD_REMOVED;
-				ksemERR("Slot [%d] Borad Removed\n", nl_msg->msgData.boardInfo.slotid);
+				ksemERR("Slot [%d] Board Removed\n", nl_msg->msgData.boardInfo.slotid);
 			}else {
 				nl_msg->msgData.boardInfo.action_type = BOARD_INSERTED;
-				ksemERR("Slot [%d] Borad Inserted\n", nl_msg->msgData.boardInfo.slotid);
+				ksemERR("Slot [%d] Board Inserted\n", nl_msg->msgData.boardInfo.slotid);
 			}
 			sem_kern_netlink_notifier(sendBuf, msgLen);
+			#endif
 		}
 	}
 	else if (product_id == PRODUCT_AX8606){
@@ -563,10 +569,10 @@ void check_on_intState2_for_ax86xx(unsigned long intState2)
 				nl_msg->msgData.boardInfo.slotid = default_standby_slot_id;	
 	        if(test_bit(0, &remoteState)){
 				nl_msg->msgData.boardInfo.action_type = BOARD_REMOVED;
-				ksemERR("Slot [%d] Borad Removed\n", nl_msg->msgData.boardInfo.slotid);
+				ksemERR("Slot [%d] Board Removed\n", nl_msg->msgData.boardInfo.slotid);
 	        }else {
 				nl_msg->msgData.boardInfo.action_type = BOARD_INSERTED;
-				ksemERR("Slot [%d] Borad Inserted\n", nl_msg->msgData.boardInfo.slotid);
+				ksemERR("Slot [%d] Board Inserted\n", nl_msg->msgData.boardInfo.slotid);
 	        }
 		}
 		sem_kern_netlink_notifier(sendBuf, msgLen);	
@@ -726,7 +732,7 @@ void init_board(void)
 {
 	unsigned long flags;
 	unsigned long local_board_state;
-	//cvmx_gpio_bit_cfgx_t gpio_cfg;
+	cvmx_gpio_bit_cfgx_t gpio_cfg;
 	
 	switch(product_id)
 	{
@@ -740,7 +746,7 @@ void init_board(void)
 		case PRODUCT_AX8610:
 			if(board_id == AX81_CRSMU || board_id == AX81_CRSMUE)
 			{
-				#if 0
+				#if 1
             	read_lock_irqsave(&octeon_gpio_cfg_rwlock, flags);
                 gpio_cfg.u64 = 0;
                 gpio_cfg.u64 = cvmx_read64_uint64(GPIO_BIT_CFG5);

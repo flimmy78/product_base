@@ -41,7 +41,7 @@ module_param(ksem_debug, int, 0644);
 
 extern void ksem_netlink_rcv(struct sk_buff *skb);
 
-#if 0
+#if 1
 /**
  * Interrupt handler function that is scheduled on a core when an interrupt occurs.
  */
@@ -53,6 +53,10 @@ static irqreturn_t sem_irq_interrupt(int irq, void *dev_id)
 	
 	ksemDBG("**********************start*******************\n");
     ksemDBG("GPIO5 INTERRUPT  irq = %d\n", irq);
+
+	printk(KERN_ERR"**********************start*******************\n");
+    printk(KERN_ERR"GPIO5 INTERRUPT  irq = %d\n", irq);
+       
        
     switch(product_id)
     {
@@ -168,20 +172,20 @@ void check_on_hwState_for_ax86xx(void)
 	udelay(10000);
 	
     intState1 = cvmx_read64_uint8(CPLD_BASE_ADDR + CPLD_INT_STATE_REG1);
-	udelay(1);
-	intState2 = cvmx_read64_uint8(CPLD_BASE_ADDR + CPLD_INT_STATE_REG2);
+	//udelay(1);
+	//intState2 = cvmx_read64_uint8(CPLD_BASE_ADDR + CPLD_INT_STATE_REG2);
 	udelay(1);
 	intState3 = cvmx_read64_uint8(CPLD_BASE_ADDR + CPLD_INT_STATE_REG3);
 
     ksemDBG("intState1 = %#lx\n", intState1);
-	ksemDBG("intState2 = %#lx\n", intState2);
+	//ksemDBG("intState2 = %#lx\n", intState2);
 	ksemDBG("intState3 = %#lx\n", intState3);
 	if(intState1) {
 	    check_on_intState1_for_ax86xx(intState1);
 	}
-	if(intState2) {
-	    check_on_intState2_for_ax86xx(intState2);
-	}
+	//if(intState2) {
+	//    check_on_intState2_for_ax86xx(intState2);
+	//}
 	if(intState3) {
 	    check_on_intState3_for_ax86xx(intState3);
 	}
@@ -296,7 +300,7 @@ static int __init sem_init_module(void)
 		goto fail_kmalloc;
 	}
 
-//	sem_devices->irq = OCTEON_IRQ_GPIO0+5;
+	sem_devices->irq = OCTEON_IRQ_GPIO0+5;
     sem_setup_cdev(sem_devices);
 	reg_data = cvmx_read64_uint8(CPLD_BASE_ADDR + CPLD_PRODUCT_ID_REG);
 	product_id = (reg_data >> 2) & CPLD_PRODUCT_TYPE_MASK;
@@ -314,26 +318,26 @@ static int __init sem_init_module(void)
 	ksemDBG("board_id = %#lx\n", board_id);
 	
 	init_board();
-#if 0	
+#if 1	
 	/*wc change two macro*/	
 	if ((product_id == PRODUCT_AX8610 || product_id == PRODUCT_AX8606 || product_id == PRODUCT_AX8603)&& board_id != AX81_AC_12X) {	
 		result = request_irq(sem_devices->irq, sem_irq_interrupt, IRQF_SHARED | IRQF_DISABLED, DEVICE_NAME, (void*)sem_devices);
    
      	if(result)
      	{
-             ksemERR("Request_irq failed  [%d].\n", result);
+             printk(KERN_ERR"Request_irq failed  [%d].\n", result);
      	}
      	else
      	{
-             ksemDBG("Request_irq [%d].\n", sem_devices->irq);
+             printk(KERN_ERR"Request_irq [%d].\n", sem_devices->irq);
      	}
 	}
 #endif	
-    init_timer(&sem_devices->semTimer);
-	sem_devices->semTimer.data = 0;
-	sem_devices->semTimer.function = sem_poll_timer;
-	sem_devices->semTimer.expires = jiffies + HZ;
-	add_timer(&sem_devices->semTimer);
+   // init_timer(&sem_devices->semTimer);
+	//sem_devices->semTimer.data = 0;
+	//sem_devices->semTimer.function = sem_poll_timer;
+	//sem_devices->semTimer.expires = jiffies + HZ;
+	//add_timer(&sem_devices->semTimer);
 
 	/*wc change two param*/ 
 	nl_sk_ksem = netlink_kernel_create(&init_net, NETLINK_KSEM, 0, NULL, NULL, THIS_MODULE);   
