@@ -162,6 +162,7 @@ $(info DESTDIR is ${DESTDIR})
 $(info VERSION is $(AWVERSION))
 $(info =========================================================================)
 
+export DG_DIR=src/dg
 #export IBUS_MOD="src/ibus"
 export ACCAPI_DIR=${TOPSRC_DIR}/dg/accapi
 export ACCAPI_PB_DIR=${TOPSRC_DIR}/accapi_pb
@@ -209,6 +210,7 @@ export IPTABLES_MOD=src/dg/iptables
 export EBTABLES_MOD="src/dg/ebtables"
 export CAPTIVE_MOD="src/dg/captive_portal"
 export EAG_MOD="src/dg/eag"
+export FACL_MOD="src/dg/facl"
 export BCM_MOD=${NPDSUIT_BCM_MOD}/bcmd
 export BCM_TOPDIR=${TOPSRC_DIR}/npdsuit_bcm/bcmd
 export SNMP_ROOTDIR=src/dg/net-snmp
@@ -326,6 +328,9 @@ CLEAN_EAG=$(subst eag,cleaneag,${PREREQ_EAG})
 PREREQ_PPPOE=$(shell if [ -d ${PPPOE_MOD} ] ; then echo "pppoe"; fi)
 CLEAN_PPPOE=$(subst pppoe,cleanpppoe,${PREREQ_PPPOE})
 
+PREREQ_FACL=$(shell if [ -d ${FACL_MOD} ] ; then echo "facl"; fi)
+CLEAN_FACL=$(subst facl,cleanfacl,${PREREQ_FACL})
+
 PREREQ_BCM_NPDSUIT=$(shell if [ -d ${NPDSUIT_BCM_MOD} ] ; then echo "npdsuit_bcm"; fi)
 CLEAN_NPDSUIT_BCM=$(subst npdsuit_bcm,cleanbcm_npdsuit,${ PREREQ_BCM_NPDSUIT})
 CLEAN_BCMKMOD=$(shell if [ -d ${NPDSUIT_BCM_MOD} ] ; then echo "cleanbcmkmod"; fi) 
@@ -434,6 +439,12 @@ default:
 	echo "For other possible targets, please try: make TABKEY"
 	echo "==========================================================="
 
+wireless_config_options:
+	@echo "==========================================================="
+	@echo "|          FUNCTION            |       OPTION_ENABLE      |"
+	@echo "|------------------------------|--------------------------|"
+	@echo "|    Station ACL function      |         STA_ACL=1        |"
+	@echo "==========================================================="
 
 updatesrc:
 	@if [ -d .git ] ; then \
@@ -483,7 +494,7 @@ define checkquagga
 	fi 
 endef
 
-dcli:dcli-pub libnm eag drp
+dcli:dcli-pub libnm eag drp facl
 	@echo "Building dcli module..."
 	@$(checkquagga) && $(MAKE) -C ${DCLI_MOD}/src/lib
 	
@@ -804,6 +815,15 @@ pppoe: preparedirs
 	echo "Building pppoe ..."
 	$(MAKE) -C ${PPPOE_MOD}
 	cp ${PPPOE_MOD}/pppoed $(BIN_EXPORT_DIR)
+	
+facl: preparedirs
+	echo "Building facl ..." 
+	$(MAKE) -C ${FACL_MOD}/src
+	-chmod 755 ${FACL_MOD}/res/script/*.sh 
+	cp ${FACL_MOD}/res/script/*.sh ${AUTEWAREFS_DIR}/files/usr/bin/
+	cp ${FACL_MOD}/res/facl_init ${AUTEWAREFS_DIR}/files/etc/init.d/
+	-chmod 755 ${AUTEWAREFS_DIR}/files/etc/init.d/facl_init
+	-ln -sf ../init.d/facl_init  ${AUTEWAREFS_DIR}/files/etc/rc2.d/S70facl
 	
 dhcp: preparedirs
 	@echo "Building dhcp ..."
@@ -1132,6 +1152,8 @@ updatebuildno:
 		cvs commit -m "Build `cat ${BUILDNOFILE}` was performed." ${BUILDNOFILE} ; \
 	fi
 
+	$(MAKE) -C ${DG_DIR} updatebuildno
+
 motd:
 	@if [ -f  allbuildnoflag ] ; then \
 		alreadyupdated=`cat allbuildnoflag` ; \
@@ -1223,6 +1245,20 @@ prepare_config:
 	./link-accapi.sh link
 ifeq (${WEB},1)
 	@echo "#define __WITH_AUTEWARE_WEB 1" >> ${ACCAPI_PB_DIR}/config/auteware_config.h
+endif
+
+ifeq (${NEW12C},1)
+	@echo "#define __SEM_CONFIG_NEW_12C 1" >> ${ACCAPI_PB_DIR}/config/sem_config.h
+endif
+
+ifeq (${STA_ACL},1)
+	@echo " /* Station ACL function */ /* ENABLE */" >> ${ACCAPI_PB_DIR}/config/wireless_config.h
+	@echo "#define __ASD_STA_ACL 1" >> ${ACCAPI_PB_DIR}/config/wireless_config.h
+	@sed -i 's/WIFI_STA_ACL_SUPPORT 0/WIFI_STA_ACL_SUPPORT 1/g' ${WCPSS_MOD}/src/kmod/wifi-ethernet/wifi.h
+endif
+
+ifeq (${APCPUFREQ},1)
+	@echo "#define __WITH_AP_CPU_FREQ 1" >> ${ACCAPI_PB_DIR}/config/auteware_config.h
 endif
 
 ifeq (${AP_MAX_FLAG},1)
@@ -1397,6 +1433,12 @@ endif
 
 ifeq (${EXP},1)
 	make IMGNAME="AW`cat ${VERFILE}`.`cat ${BUILDNOFILE}`.`cat ${PRODUCTFILE}`" compressimg
+else ifeq (${EXP},2)
+	make IMGNAME="AW`cat ${VERFILE}`.`cat ${BUILDNOFILE}`.1.`cat ${PRODUCTFILE}`" compressimg
+else ifeq (${EXP},3)
+	make IMGNAME="AW`cat ${VERFILE}`.`cat ${BUILDNOFILE}`.2.`cat ${PRODUCTFILE}`" compressimg
+else ifeq (${EXP},4)
+	make IMGNAME="AW`cat ${VERFILE}`.`cat ${BUILDNOFILE}`.3.`cat ${PRODUCTFILE}`" compressimg
 else
 	make IMGNAME="AW`cat ${VERFILE}`.`cat ${BUILDNOFILE}`.`cat ${PRODUCTFILE}`.`date +%d%H%M`" compressimg
 endif
@@ -1571,6 +1613,10 @@ cleaneag:
 cleanpppoe:
 	@echo "Cleaning pppoe ..."
 	-$(MAKE) -C ${PPPOE_MOD} clean
+	
+cleanfacl:
+	@echo "Cleaning facl ..."
+	-$(MAKE) -C ${FACL_MOD}/src clean
 
 cleandhcp:
 	@echo "Cleanning dhcp ..."
