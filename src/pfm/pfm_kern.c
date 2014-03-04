@@ -438,6 +438,7 @@ int catch_packet(struct sk_buff* packet)
 				if(unlikely(-1 == copy_sk_buff_to_rpa(packet,forward_slot)))
 				{
 					print_log(KERN_ERR"PFM====send rpa error!\n");
+					return 1;
 				}
 				return 0;
 			}
@@ -500,7 +501,7 @@ int catch_packet(struct sk_buff* packet)
 				if(unlikely(-1 == ret))
 				{
 					print_log(KERN_ERR"PFM_KERN:send rpa error!\n");
-					return 0 ;
+					return 1;
 				}
 				return 0;
 			}
@@ -541,7 +542,7 @@ int catch_packet(struct sk_buff* packet)
 			if(unlikely(-1 == ret))
 			{
 				print_log(KERN_ERR"PFM_KERN:send rpa error!\n");
-				return 0 ;
+				return 1 ;
 			}
 			return 0;
 		}
@@ -611,6 +612,7 @@ int catch_packet(struct sk_buff* packet)
 				if(unlikely(-1 == copy_sk_buff_to_rpa(packet,forward_slot)))
 				{
 					print_log(KERN_ERR"PFM====send rpa error!\n");
+					return 1;
 				}
 				return 0;
 			}
@@ -676,7 +678,7 @@ int catch_packet(struct sk_buff* packet)
 				if(unlikely(-1 == ret))
 				{
 					print_log(KERN_ERR"PFM_KERN:send rpa error!\n");
-					return 0 ;
+					return 1;
 				}
 				return 0;
 			}
@@ -721,7 +723,7 @@ int catch_packet(struct sk_buff* packet)
 			if(unlikely(-1 == ret))
 			{
 				print_log(KERN_ERR"PFM_KERN:send rpa error!\n");
-				return 0 ;
+				return 1;
 			}
 			return 0;
 		}
@@ -830,6 +832,7 @@ int catch_packet(struct sk_buff* packet)
 					if(unlikely(-1 == copy_sk_buff_to_rpa(packet,forward_slot)))
 					{
 						print_log(KERN_ERR"PFM_KERN:send rpa error!\n");
+						return 1;
 					}
 					return 0;
 				}
@@ -894,7 +897,7 @@ int catch_packet(struct sk_buff* packet)
 					if(unlikely(-1 == ret))
 					{
 						print_log(KERN_ERR"PFM====send rpa error!\n");
-						return 0 ;
+						return 1;
 					}
 					return 0;
 				}
@@ -940,7 +943,7 @@ int catch_packet(struct sk_buff* packet)
 				if(unlikely(-1 == ret))
 				{
 					print_log(KERN_ERR"PFM_KERN:send rpa error!\n");
-					return 0 ;
+					return 1;
 				}
 				return 0;
 
@@ -1012,6 +1015,7 @@ int catch_packet(struct sk_buff* packet)
 					if(unlikely(-1 == copy_sk_buff_to_rpa(packet,forward_slot)))
 					{
 						print_log(KERN_ERR"PFM====send rpa error!\n");
+						return 1;
 					}
 					return 0;
 				}
@@ -1080,7 +1084,7 @@ int catch_packet(struct sk_buff* packet)
 					if(unlikely(-1 == ret))
 					{
 						print_log(KERN_ERR"PFM_KERN:send rpa error!\n");
-						return 0 ;
+						return 1;
 					}
 					return 0;
 				}
@@ -1131,7 +1135,7 @@ int catch_packet(struct sk_buff* packet)
 				if(unlikely(-1 == ret))
 				{
 					print_log(KERN_ERR"PFM_KERN:send rpa error!\n");
-					return 0 ;
+					return 1;
 				}
 				return 0;
 			
