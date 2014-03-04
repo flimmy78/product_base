@@ -104,6 +104,8 @@ MAC_PRE_DNAT="MAC_PRE_DNAT"
 MAC_PRE_FILTER="MAC_PRE_FILTER"
 EAP_DNAT="EAP_DNAT"
 EAP_FILTER="EAP_FILTER"
+FACL_DNAT="FACL_DNAT"
+FACL_FILTER="FACL_FILTER"
 
 STRICT_INPUT="STRICT_INPUT"
 STRICT_OUTPUT="STRICT_OUTPUT"
@@ -184,6 +186,20 @@ if [ ! $? -eq 0 ];then
     $IPTABLES -t nat -N $EAP_DNAT
     $IPTABLES -t nat -I PREROUTING -j $EAP_DNAT
     $IPTABLES -t nat -A $EAP_DNAT -j RETURN
+fi
+
+$IPTABLES -nL $FACL_FILTER > /dev/null 2>&1
+if [ ! $? -eq 0 ];then                        
+    $IPTABLES -N $FACL_FILTER
+    $IPTABLES -I FORWARD -j $FACL_FILTER
+    $IPTABLES -A $FACL_FILTER -j RETURN
+fi
+
+$IPTABLES -nL $FACL_DNAT -t nat > /dev/null 2>&1
+if [ ! $? -eq 0 ];then                        
+    $IPTABLES -t nat -N $FACL_DNAT
+    $IPTABLES -t nat -I PREROUTING -j $FACL_DNAT
+    $IPTABLES -t nat -A $FACL_DNAT -j RETURN
 fi
 
 $IPTABLES -nL $STRICT_INPUT > /dev/null 2>&1
