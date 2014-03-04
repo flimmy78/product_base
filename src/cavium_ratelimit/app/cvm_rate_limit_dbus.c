@@ -2464,7 +2464,7 @@ DBusMessage * cvm_rate_limit_dbus_show_running(DBusConnection *conn, DBusMessage
 		}
 		else
 		{
-			sprintf(limitStr, "noimit");
+			sprintf(limitStr, "nolimit");
 		}
 		offset += sprintf(offset + showStr,"config traffic-policer-rules slot %d %s limiter %s\n",slot_id, \
 			rule_struct2.u.protocol_rule.name, limitStr);
@@ -2508,7 +2508,7 @@ DBusMessage * cvm_rate_limit_dbus_show_running(DBusConnection *conn, DBusMessage
 				}
 				else
 				{
-					sprintf(limitStr, "noimit");
+					sprintf(limitStr, "nolimit");
 				}
 				offset += sprintf(offset + showStr, \
 					"add traffic-policer-rules slot %d %s %s %s %s\n",slot_id, \
