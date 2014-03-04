@@ -9,6 +9,7 @@ extern "C"
 #include <string.h>
 #include <time.h>
 
+#include "config/sem_config.h"
 #include "../sem_common.h"
 #include "sem/sem_tipc.h"
 #include "board/board_feature.h"
@@ -1216,8 +1217,13 @@ int ax8603_master_active_or_stby_select(int *sd, board_fix_param_t *board)
 			}
 
 			//remote master is non-active state
+#ifdef __SEM_CONFIG_NEW_12C
 			if (!remote_state)
 			{
+#else
+			if (remote_state)
+			{
+#endif
 				ret = product->force_active_master();
 				if (ret)
 				{
@@ -1572,8 +1578,13 @@ int ax8603_master_active_or_stby_select(int *sd, board_fix_param_t *board)
 			}
 
 			//remote master is act as non-active MCB
+#ifdef __SEM_CONFIG_NEW_12C
 			if (!remote_state)
 			{
+#else
+			if (remote_state)
+			{
+#endif
 				ret = product->force_active_master();
 				if (ret)
 				{
@@ -1913,8 +1924,13 @@ int ax8603_active_stby_switch(void *arg)
 		}
 		
 		//is active master
+#ifdef __SEM_CONFIG_NEW_12C
 		if (remote_board_state)
 		{
+#else
+		if (!remote_board_state)
+		{
+#endif
 			sem_syslog_dbg("remote is active MCB,wait for 3 seconds\n");
 			sleep(1);
 		}
