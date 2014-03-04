@@ -570,6 +570,8 @@ void sem_netlink_recv_thread(void)
 	int slot_id, eth_l_index, action_type;
 	int i = 0, len = 0, maxfd = 0;
 	asic_port_update_t port_info;
+	int ret;
+
 
 	struct timeval tnow;
 	struct timezone tzone;	
@@ -748,8 +750,18 @@ void sem_netlink_recv_thread(void)
         				break;
 				#endif
         			case BOARD_STATE_NOTIFIER_EVENT:
-                        		if(nl_msg->msgData.boardInfo.action_type == BOARD_INSERTED)
-        					sem_syslog_dbg("\tBoard Inserting Slot ID %d\n", nl_msg->msgData.boardInfo.slotid);
+                        if(nl_msg->msgData.boardInfo.action_type == BOARD_INSERTED)
+						{
+							sem_syslog_dbg("\tBoard Inserting Slot ID %d\n", nl_msg->msgData.boardInfo.slotid);
+							if(product->product_type == XXX_YYY_AX7605I)
+							{
+							    ret = sem_dbus_board_state_trap(SEM_BOARD_UP_TRAP, nl_msg->msgData.boardInfo.slotid);
+								if(ret)
+								{
+									sem_syslog_warning("sem_dbus_board_state_trap SEM_BOARD_UP_TRAP failed.\n");
+								}
+							}
+                   		}
         				else if(nl_msg->msgData.boardInfo.action_type == BOARD_REMOVED) {
 							sem_syslog_dbg("\tBoard Removing Slot ID %d\n", nl_msg->msgData.boardInfo.slotid);
 							
