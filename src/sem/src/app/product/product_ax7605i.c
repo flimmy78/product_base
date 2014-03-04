@@ -10,6 +10,7 @@ extern "C"
 #include <string.h>
 #include <time.h>
 
+#include <dbus/sem/sem_dbus_def.h>
 #include "../sem_common.h"
 #include "sem/sem_tipc.h"
 #include "board/board_feature.h"
@@ -485,6 +486,8 @@ int ax71_board_removed(int slot_id)
             sem_tipc_send(i, SEM_NETLINK_MSG, msgbuf, msgLen);
 	   }
 	}
+
+	sem_dbus_board_state_trap(SEM_BOARD_DOWN_TRAP, slot_id + 1);
 
 	return 0;
 }

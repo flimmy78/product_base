@@ -29,7 +29,7 @@ extern "C"
 #include <pthread.h>
 #include <linux/if.h>
 #endif
-
+#include <dbus/sem/sem_dbus_def.h>
 #include "sem_dbus.h"
 #include "sem_common.h"
 #include "sem_fpga.h"
@@ -145,6 +145,10 @@ thread_index_sd_t thread_id_arr[MAX_SLOT_NUM];
 version_sync_t version_sync_arr[MAX_SLOT_NUM];
 
 int temp_arr[MAX_SLOT_COUNT] = {0};
+
+#define LINK_UP             1
+#define LINK_DOWN           0
+
 
 int sem_tipc_send(unsigned int slot_id, int type, char*msgBuf, int len)
 {
@@ -869,6 +873,11 @@ void sem_thread_recv(void *arg)
                     if ((global_ethport[eth_g_index]->attr_bitmap & ETH_ATTR_LINK_STATUS) != (ethport_info->attr_bitmap & ETH_ATTR_LINK_STATUS))
                     {
 				        sem_syslog7_notice("eth%d-%d %-5s", ethport_info->slot_no, ethport_info->local_port_no,link_status_str[(ethport_info->attr_bitmap & ETH_ATTR_LINK_STATUS) >> ETH_LINK_STATUS_BIT]);
+					}
+					if (product->product_type == XXX_YYY_AX7605I) {
+						sem_dbus_port_state_trap(
+							((ethport_info->attr_bitmap & ETH_ATTR_LINK_STATUS) >> ETH_LINK_STATUS_BIT) == LINK_UP ? SEM_PORT_UP_TRAP : SEM_PORT_DOWN_TRAP,
+							ethport_info->slot_no, ethport_info->local_port_no);
 					}
 
 					memcpy(global_ethport[eth_g_index], ethport_info, sizeof(global_ethport_t));

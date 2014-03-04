@@ -23,6 +23,7 @@ extern "C"
 #include <ctype.h>
 #include <sys/sysinfo.h>    /* for sysinfo() */
 
+#include <dbus/sem/sem_dbus_def.h>
 #include "sem_common.h"
 #include "sem/sem_tipc.h"
 #include "product/board/board_feature.h"
@@ -645,6 +646,14 @@ void sem_netlink_recv_thread(void)
             			unsigned int slot_no = local_board->slot_id+1;
             			unsigned int local_port_no = nl_msg->ipgport + 1;
             			unsigned int eth_l_index = SLOT_PORT_COMBINATION(slot_no, local_port_no);
+
+						if (product->product_type == XXX_YYY_AX7605I &&
+							local_board->is_active_master)
+						{
+							sem_dbus_port_state_trap(
+								nl_msg->action_type == LINK_UP ? SEM_PORT_UP_TRAP : SEM_PORT_DOWN_TRAP,
+								slot_no, local_port_no);
+						}
 						
             			usleep(1000);
 						

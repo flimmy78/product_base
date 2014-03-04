@@ -1253,6 +1253,83 @@ unsigned int sem_dbus_fan_state_abnormal
 	return 0;
 }
 
+unsigned int sem_dbus_port_state_trap
+(
+	unsigned int portstate,
+	unsigned int slot_id,
+	unsigned int port_id
+)
+{
+	DBusMessage* msg = NULL;
+	static DBusConnection *sem_trap_conn = NULL;
+	DBusError err;
+	int ret = 0;
+	unsigned int serial = 0;
+
+	/* for debug*/
+	sem_syslog_dbg("\ttrap port state : %d\n", portstate);
+	sem_syslog_dbg("\ttrap port slot_id : %d\n", slot_id);
+	sem_syslog_dbg("\ttrap port port_id : %d\n", port_id);
+
+	dbus_error_init(&err);
+
+	if (NULL == sem_trap_conn) {
+		/* connect to the DBUS system bus, and check for errors */
+		sem_trap_conn = dbus_bus_get_private(DBUS_BUS_SYSTEM, &err);
+		if (dbus_error_is_set(&err)) {
+			sem_syslog_dbg("Connection Error (%s)\n", err.message);
+			dbus_error_free(&err);
+			return 1;
+		}
+		if (NULL == sem_trap_conn) {
+			sem_syslog_dbg("Connection null\n");
+			return 1;
+		}
+	}
+
+	/* register our name on the bus, and check for errors */
+	ret = dbus_bus_request_name(sem_trap_conn,
+								"aw.sem.port.state.signal",
+								0,
+								&err);
+	if (dbus_error_is_set(&err)) {
+		sem_syslog_dbg("Name Error (%s)\n", err.message);
+		dbus_error_free(&err);
+		return 1;
+	}
+	
+	/* create a signal & check for errors */
+	msg = dbus_message_new_signal(SEM_DBUS_OBJPATH,				/* object name of the signal */
+								  SEM_TRAP_INTERFACE, 					/* interface name of the signal */
+								  SEM_TRAP_PORT_STATE); /* name of the signal */
+	if (NULL == msg) {
+		sem_syslog_dbg("Message Null\n");
+		return 1;
+	}
+	
+	/* append arguments onto signal */
+	dbus_message_append_args(msg,
+							DBUS_TYPE_UINT32, &portstate,
+							DBUS_TYPE_UINT32, &slot_id,
+							DBUS_TYPE_UINT32, &port_id,
+							DBUS_TYPE_INVALID);
+	
+	/* send the message and flush the connection */
+	if (!dbus_connection_send(sem_trap_conn, msg, &serial)) {
+		sem_syslog_dbg("Signal send error, Out Of Memory!\n"); 
+		return 1;
+	}
+	
+	dbus_connection_flush(sem_trap_conn);
+	sem_syslog_dbg("\tsent message to trap.\n");
+
+	/* free the message */
+	dbus_message_unref(msg);
+
+	return 0;
+}
+
+
 unsigned int sem_dbus_board_state_trap
 (
 	unsigned int board_state,
@@ -1267,6 +1344,7 @@ unsigned int sem_dbus_board_state_trap
 
 	/* for debug*/
 	sem_syslog_dbg("\ttrap board state : %d\n", board_state);
+	sem_syslog_dbg("\ttrap board slot_id : %d\n", slot_id);
 
 	dbus_error_init(&err);
 
