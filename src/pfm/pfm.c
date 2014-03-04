@@ -8,6 +8,7 @@
 #include <syslog.h>
 #include <linux/if.h>
 #include <linux/sockios.h>
+#include <fcntl.h>
 #include <sys/wait.h>	
 
 
@@ -49,6 +50,8 @@ typedef enum {
   PFM_SYSTEM_LOG_FATAL
 } PfmSystemLogSeverity;
 
+
+netlink_transport_info pfm_table[64] = {0};
 
 
 void 
@@ -582,7 +585,11 @@ int init_netlink()
 		perror("bind:");
 		return -1;
 	}
-	
+	if (fcntl(sd, F_SETFL, O_NONBLOCK) < 0) 
+	{
+	  	pfm_system_log(PFM_SYSTEM_LOG_FATAL,"set_nonblocking(%d) failed\n", sd);
+	 	return -1;
+	}
 	return 1;
 }
 
@@ -700,6 +707,73 @@ int send_netlink_transport_info(int 	opt,\
 	/*show_netlink_transport_info(&data);*/
 	return 0;
 }
+
+int recv_netlink_transport_info()
+{
+	struct nlmsghdr *msg = NULL;
+	struct sockaddr_nl daddr;
+	int socklen = 0, rcvlen = 0, msglen = 0;
+	int i;
+	msglen = NLMSG_SPACE(sizeof(netlink_transport_info));
+	msg = (struct nlmsghdr *)malloc(msglen);
+	socklen = sizeof(struct sockaddr_nl);
+
+	daddr.nl_family = AF_NETLINK;
+	daddr.nl_pid = 0;
+	daddr.nl_groups = 0;
+
+	for(i=0;i<RECORD_MAX;i++) 
+	{
+		rcvlen = recvfrom(sd, msg, msglen,
+							0, (struct sockaddr *)&daddr, &socklen);
+		if(rcvlen != msglen) 
+		{
+	
+			pfm_system_log(PFM_SYSTEM_LOG_FATAL,
+						"recv a broken netlink message, ignored\n");
+					
+			if(msg)
+				free(msg);
+			return -1;
+			
+			/*continue;*/
+		}
+/*
+		pfm_system_log(PFM_SYSTEM_LOG_INFO,
+						"recv a netlink message, length = %u,i=%d\n",
+						rcvlen,i);
+*/		
+		pfm_table[i]= *(netlink_transport_info *)NLMSG_DATA(msg);
+		if(pfm_table[i].opt == -1)
+		{
+			pfm_system_log(PFM_SYSTEM_LOG_INFO,
+						"recv num = %u\n",
+						i);
+			break;
+		}
+#if 0
+			pfm_system_log(PFM_SYSTEM_LOG_INFO,"+++++++++++++++++++proto is %d ++++++++++++++++++\n",pfm_table[i].opt);
+			pfm_system_log(PFM_SYSTEM_LOG_INFO,"opt is \t\t\t :%d\n",pfm_table[i].opt_para);
+			pfm_system_log(PFM_SYSTEM_LOG_INFO,"slot is \t\t :%d\n",pfm_table[i].forward_slot);
+			pfm_system_log(PFM_SYSTEM_LOG_INFO,"proto is \t\t :%d\n",pfm_table[i].protocol);
+			pfm_system_log(PFM_SYSTEM_LOG_INFO,"ifindex is \t\t :%d\n",pfm_table[i].ifindex);
+			pfm_system_log(PFM_SYSTEM_LOG_INFO,"d_port is \t\t :%d\n",pfm_table[i].dest_port);
+			pfm_system_log(PFM_SYSTEM_LOG_INFO,"s_port is \t\t :%d\n",pfm_table[i].src_port);
+			pfm_system_log(PFM_SYSTEM_LOG_INFO,"d_addr is \t\t :%u\n",pfm_table[i].dest_ipaddr);
+			pfm_system_log(PFM_SYSTEM_LOG_INFO,"d_mask is \t\t :%d\n",pfm_table[i].dest_ipmask);
+			pfm_system_log(PFM_SYSTEM_LOG_INFO,"s_addr is \t\t :%u\n",pfm_table[i].src_ipaddr);
+			pfm_system_log(PFM_SYSTEM_LOG_INFO,"s_mask is \t\t :%d\n",pfm_table[i].src_ipmask);
+			
+			pfm_system_log(PFM_SYSTEM_LOG_INFO,"count is \t\t :%d\n",pfm_table[i].forward_opt);
+			
+#endif
+	}
+
+	if(msg)
+		free(msg);
+	return i;
+}
+
 /***************************************************************
 *
 *
@@ -1870,6 +1944,8 @@ pfm_parse_message(DBusConnection	*conn,\
 {
 		DBusMessage 		*reply = NULL;
 		DBusMessageIter iter;
+		DBusMessageIter iter_array;
+		DBusMessageIter iter_struct;
 		DBusError				err;
 		
 		char* ifname;
@@ -1888,7 +1964,7 @@ pfm_parse_message(DBusConnection	*conn,\
 		int forward_opt;
 		int forward_opt_para;
 		int opt_para;
-
+		int i;
 		unsigned int opt_ret = 1;
 		int ret;
 	
@@ -2088,7 +2164,65 @@ pfm_parse_message(DBusConnection	*conn,\
         												  ifindex,slot);
 /*					pfm_system_log(PFM_SYSTEM_LOG_INFO,"################    opt_ret == %d ifindex:%d\n", opt_ret,ifindex);*/
         }
-		else{
+        else if(opt == 5)
+        {
+        		opt_ret = send_netlink_transport_info(opt,opt_para,protocol,src_port,dest_port,
+        										 s_ipaddr,d_ipaddr,s_ipmask,d_ipmask,
+        										  ifindex,slot);
+        
+        		ret = recv_netlink_transport_info();
+        		if(ret < 0)
+					goto err;
+        			
+        		reply = dbus_message_new_method_return(msg);
+        		dbus_message_iter_init_append(reply,&iter);
+        		dbus_message_iter_append_basic(&iter,DBUS_TYPE_INT32, &ret);
+				dbus_message_iter_open_container (&iter,
+										DBUS_TYPE_ARRAY,
+										DBUS_STRUCT_BEGIN_CHAR_AS_STRING
+												DBUS_TYPE_UINT32_AS_STRING  /*opt*/
+												DBUS_TYPE_UINT32_AS_STRING	/*opt_para*/	
+												DBUS_TYPE_UINT32_AS_STRING  /*src_port	*/											
+												DBUS_TYPE_UINT32_AS_STRING  /*dest_port*/
+												DBUS_TYPE_UINT32_AS_STRING  /*protocol*/
+												DBUS_TYPE_UINT32_AS_STRING	/*protocol*/
+												DBUS_TYPE_UINT32_AS_STRING  /*src_ipaddr*/
+												DBUS_TYPE_UINT32_AS_STRING	/*dest_ipaddr*/
+												DBUS_TYPE_UINT32_AS_STRING	/*forward_opt*/
+												DBUS_TYPE_UINT32_AS_STRING	/*forward_slot*/
+												DBUS_TYPE_UINT32_AS_STRING	/*src_ipmask*/
+												DBUS_TYPE_UINT32_AS_STRING	/*dest_ipmask*/
+										DBUS_STRUCT_END_CHAR_AS_STRING,
+										&iter_array);
+
+				for(i=0;i<ret;i++)
+				{		
+					dbus_message_iter_open_container (&iter_array,DBUS_TYPE_STRUCT,NULL,&iter_struct);
+					dbus_message_iter_append_basic(&iter_struct,DBUS_TYPE_UINT32,&(pfm_table[i].opt));
+					dbus_message_iter_append_basic(&iter_struct,DBUS_TYPE_UINT32,&(pfm_table[i].opt_para));
+					dbus_message_iter_append_basic(&iter_struct,DBUS_TYPE_UINT32,&(pfm_table[i].src_port));								  
+					dbus_message_iter_append_basic(&iter_struct,DBUS_TYPE_UINT32, &(pfm_table[i].dest_port));
+					dbus_message_iter_append_basic(&iter_struct,DBUS_TYPE_UINT32,&(pfm_table[i].protocol)); 
+					dbus_message_iter_append_basic(&iter_struct,DBUS_TYPE_UINT32,&(pfm_table[i].ifindex)); 
+					dbus_message_iter_append_basic(&iter_struct,DBUS_TYPE_UINT32,&(pfm_table[i].src_ipaddr));
+					dbus_message_iter_append_basic(&iter_struct,DBUS_TYPE_UINT32,&(pfm_table[i].dest_ipaddr));																  
+					dbus_message_iter_append_basic(&iter_struct,DBUS_TYPE_UINT32,&(pfm_table[i].forward_opt));
+					dbus_message_iter_append_basic(&iter_struct,DBUS_TYPE_UINT32,&(pfm_table[i].forward_slot));				
+					dbus_message_iter_append_basic(&iter_struct,DBUS_TYPE_UINT32,&(pfm_table[i].src_ipmask));
+					dbus_message_iter_append_basic(&iter_struct,DBUS_TYPE_UINT32,&(pfm_table[i].dest_ipmask));
+					dbus_message_iter_close_container(&iter_array,&iter_struct);
+				}
+			
+				dbus_message_iter_close_container(&iter,&iter_array);
+		       return reply;
+		       err:
+        			reply = dbus_message_new_method_return(msg);
+        			dbus_message_iter_init_append(reply,&iter);
+        			dbus_message_iter_append_basic(&iter,DBUS_TYPE_INT32, &ret);
+        			return reply;
+        }
+		else
+		{
         		opt_ret = send_netlink_transport_info(opt,opt_para,protocol,src_port,dest_port,
         										 s_ipaddr,d_ipaddr,s_ipmask,d_ipmask,
         										  ifindex,slot);
@@ -2322,6 +2456,7 @@ return 0 ;
 	if(-1 != init_netlink())
 	{
 		pfm_system_log(PFM_SYSTEM_LOG_SECURITY,"init_netlink ok\n");
+		send_netlink_transport_info(SET_PFM_PID,getpid(),0,0,0,0,0,0,0,0,0);
 	}else{
 
 		pfm_system_log(PFM_SYSTEM_LOG_FATAL,"init_netlink error\n");

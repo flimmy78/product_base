@@ -30,9 +30,11 @@
 #define SET_LOG_OPT					2
 #define SET_PFM_DISABLE				3
 #define SET_PFM_ENABLE				4
+#define SET_PFM_PID					8
+
 
 ////////////////////////////////////////////////////
-
+#define RECORD_MAX 64
 #if 1
 #define GET_LIFT_CHILD_IFINDEX(root) 		((ifindex_dest_ip_tree*)((root) -> tree -> lc))
 #define GET_RIGHT_CHILD_IFINDEX(root)		((ifindex_dest_ip_tree*)((root) -> tree -> rc))

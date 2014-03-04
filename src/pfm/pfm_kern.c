@@ -24,6 +24,12 @@ extern product_info_t autelan_product_info;
 static struct sock *netlink_sock;
 static int exit_flag = 0;
 static int log_enable = 0;
+/*zhaocg add fot show pfm table*/
+static int pfm_pid = 0;
+static int pfm_pro_id = 0;
+int pfm_record_num_limit = 0;
+netlink_transport_info pfm_table_info = {0};
+
 ifindex_dest_ip_tree* forwarding_table[MAX_PROTOCOL][MAX_PORT];
 /*pfm_entry*				pro_table[0xff]; */
 extern int (*cvm_pfm_rx_hook)(struct sk_buff*);
@@ -87,6 +93,15 @@ int print_log(char* format,... )
 	}
 	return 0;
 }
+int print_table_log(char* format,... )
+{
+
+	va_list list;
+	va_start(list,format);
+	vprintk(format,list);
+	va_end(list);
+	return 0;
+}
 
 int print_ip(int mask)
 {
@@ -142,6 +157,18 @@ int print_ip_o(int mask)
 	return 1;
 		
 	}
+int print_ip_o_table(int mask)
+{
+	
+	u_char pnt[4];
+
+	memcpy(pnt,&mask,4);
+	
+
+	print_table_log(KERN_INFO"%d.%d.%d.%d\n",pnt[0],pnt[1],pnt[2],pnt[3]);
+	return 1;
+		
+	}
 
 
 void
@@ -179,7 +206,42 @@ prefix_same (int ipadd1,int ipadd2,int mask)
 		return 1;
 	return 0;
 }
+/*zhaocg add for show pfm table*/
+static int
+send_netlink_msg(int pid, netlink_transport_info *msg)
+{
+	struct sk_buff *skb = NULL;
+	struct nlmsghdr *nlhdr = NULL;
+	sk_buff_data_t old_tail;
+	int ret = 0;
+	int size = 0;
 
+	size = NLMSG_SPACE(sizeof(*msg));
+	skb = alloc_skb(size, GFP_ATOMIC);
+	if(!skb) 
+	{
+		print_log(KERN_ERR,
+					"alloc skb failed!\n");
+		return -1;
+	}
+	old_tail = skb->tail;
+
+	nlhdr = NLMSG_PUT(skb, 0, 0, 1, size - sizeof(*nlhdr));
+	memcpy(NLMSG_DATA(nlhdr), msg, sizeof(*msg));
+	nlhdr->nlmsg_len = skb->tail - old_tail;
+
+	NETLINK_CB(skb).pid = 0;
+	NETLINK_CB(skb).creds.pid = pid;
+	NETLINK_CB(skb).dst_group = 0;
+
+	ret = netlink_unicast(netlink_sock, skb, pid, MSG_DONTWAIT);
+	return ret;
+
+nlmsg_failure:
+	if(skb)
+		kfree_skb(skb);
+	return -1;
+}
 
 
 #if 1
@@ -1676,12 +1738,11 @@ static int insert_netlink_transport_info_to_forward_table(netlink_transport_info
 static int parse_netlink_transport_info(netlink_transport_info* data)
 {
 	entry_info* entry;
+	int i;
 	print_log(KERN_INFO"Enter pase_netlink_transport_info!!!!\n");
 	print_log(KERN_INFO"data->opt == %d\n",data->opt);
 	if(0 != (init_entry_info(&entry)))
 		print_log(KERN_INFO"init_entry_info error\n");
-
-
 	
 	if(unlikely(NULL == data))
 	{
@@ -1807,9 +1868,9 @@ static int parse_netlink_transport_info(netlink_transport_info* data)
 	}
 	if(data -> opt == 5)
 	{
-		int i;
-		print_log(KERN_INFO"get opt from userspace is show all elem\n");
+		print_table_log(KERN_INFO"get opt from userspace is show all elem\n");
 		read_lock(&pfm_table_rwlock);
+		pfm_record_num_limit = 0;
 		for(i=0;i<0x1fe;i++)
 		{
 			if(proto_table[i] != NULL)
@@ -1818,11 +1879,15 @@ static int parse_netlink_transport_info(netlink_transport_info* data)
 				memset(&temp,0,sizeof(struct entry_info));
 				
 				temp.count =1;
-				print_log(KERN_INFO"+++++++++++++++++++proto is %d ++++++++++++++++++\n",i);
+				print_table_log(KERN_INFO"+++++++++++++++++++proto is %d ++++++++++++++++++\n",i);
+				pfm_pro_id = i;
 				list_all_elem(proto_table[i],&temp,1);
 
 			}
 		}
+		memset(&pfm_table_info,0,sizeof(pfm_table_info));
+		pfm_table_info.opt = -1;/*-1:end*/
+		send_netlink_msg(pfm_pid,&pfm_table_info);
 		read_unlock(&pfm_table_rwlock);
 	}
 
@@ -1836,7 +1901,13 @@ static int parse_netlink_transport_info(netlink_transport_info* data)
 		
 		write_unlock(&pfm_table_rwlock);
 	}
-			
+	if(data -> opt == SET_PFM_PID)
+	{
+		
+		print_log(KERN_INFO"get opt from userspace is SET_PFM_PID\n");
+		pfm_pid = data -> opt_para;
+	
+	}		
 		
 	kfree(entry);
 	return 0;
@@ -2591,6 +2662,27 @@ int show_entry_info(struct entry_info* entry)
 		return 1;
 	}
 
+int show_entry_table_info(struct entry_info* entry)
+	{
+		print_table_log(KERN_INFO"***********show entry_info************\n");
+		print_table_log(KERN_INFO"opt is \t\t\t :%d\n",get_opt(entry));
+		print_table_log(KERN_INFO"slot is \t\t :%d\n",get_flag(entry));
+		print_table_log(KERN_INFO"proto is \t\t :%d\n",get_proto(entry));
+		print_table_log(KERN_INFO"ifindex is \t\t :%d\n",get_ifindex(entry));
+		print_table_log(KERN_INFO"d_port is \t\t :%d\n",get_d_port(entry));
+		print_table_log(KERN_INFO"s_port is \t\t :%d\n",get_s_port(entry));
+		print_table_log(KERN_INFO"d_addr is \t\t :");
+		print_ip_o_table(get_d_addr(entry));
+		print_table_log(KERN_INFO"d_mask is \t\t :%d\n",get_d_mask(entry));
+		print_table_log(KERN_INFO"s_addr is \t\t :");
+		print_ip_o_table(get_s_addr(entry));
+		print_table_log(KERN_INFO"s_mask is \t\t :%d\n",get_s_mask(entry));
+		
+		print_table_log(KERN_INFO"count is \t\t :%d\n",get_count(entry));
+		
+		print_table_log(KERN_INFO"**************************************\n");
+		return 1;
+	}
 
 #if HAVE_IPV6_ADDR
 int get_value_from_entry(const struct entry_info* entry,struct in6_addr* temp)
@@ -3461,7 +3553,22 @@ int list_all_elem_mask_addr(struct date *table,struct entry_info* entry)
 		{
 			entry -> opt = table -> opt;
 			entry -> flag = table -> opt_para;
-			show_entry_info(entry);
+			pfm_table_info.opt = pfm_pro_id;/*-1:end*/
+			pfm_table_info.opt_para = entry -> opt;
+			pfm_table_info.src_port = entry->s_port;
+			pfm_table_info.dest_port = entry->d_port;
+			pfm_table_info.protocol = entry->proto;
+			pfm_table_info.ifindex = entry->ifindex;
+			pfm_table_info.src_ipaddr = entry->s_addr;
+			pfm_table_info.dest_ipaddr = entry->d_addr;
+			pfm_table_info.forward_slot =entry -> flag;
+			pfm_table_info.forward_opt = entry->count;
+			pfm_table_info.src_ipmask = entry->s_mask;
+			pfm_table_info.dest_ipmask = entry->d_mask;
+			pfm_record_num_limit++;
+			if(pfm_record_num_limit < RECORD_MAX)
+				send_netlink_msg(pfm_pid,&pfm_table_info);
+			show_entry_table_info(entry);
 
 		}else{
 		/*entry->count ++;*/
