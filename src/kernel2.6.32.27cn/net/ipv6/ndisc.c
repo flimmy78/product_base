@@ -1073,7 +1073,7 @@ static void ndisc_ra_useropt(struct sk_buff *ra, struct nd_opt_hdr *opt)
 	
 #if 1
 	/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
-	if((memcmp(ra->dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
+	if((ra->dev->name)&&(memcmp(ra->dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
 	{
 		/*printk(KERN_DEBUG"%s:****[V6 Nd],dev(%s)****\n",__func__,ra->dev->name);*/
 		return;

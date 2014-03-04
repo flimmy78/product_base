@@ -3148,7 +3148,7 @@ static int dev_ifconf(struct net *net, char __user *arg)
 	for_each_netdev(net, dev) {
 		
 		/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
-		if((memcmp(dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_SOME_ENABLE))
+		if((dev->name)&&(memcmp(dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_SOME_ENABLE))
 		{
 			/*printk(KERN_DEBUG"%s:****[Dev ioctl],dev(%s)****\n",__func__,dev->name);*/
 			continue;

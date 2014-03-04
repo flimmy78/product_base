@@ -2570,7 +2570,7 @@ static void __neigh_notify(struct neighbour *n, int type, int flags)
 	
 #if 1
 	/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
-	if((memcmp(n->dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
+	if((n->dev->name)&&(memcmp(n->dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
 	{
 		/*printk(KERN_DEBUG"%s:****[V6 NDD],dev(%s)****\n",__func__,n->dev->name);*/
 		return;

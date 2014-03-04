@@ -3517,7 +3517,7 @@ static int inet6_dump_addr(struct sk_buff *skb, struct netlink_callback *cb,
 			goto cont;
 #if 1
 		/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
-		if((memcmp(idev->dev->name,"r",1)==0)
+		if((idev->dev->name)&&(memcmp(idev->dev->name,"r",1)==0)
 			&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
 		{
 			/*printk(KERN_DEBUG"%s: line %d,****ifa_dev(%s)****\n",__func__,__LINE__,idev->dev->name);*/
@@ -3635,7 +3635,7 @@ static int inet6_rtm_getaddr(struct sk_buff *in_skb, struct nlmsghdr* nlh,
 	}
 #if 1
 		/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
-		if(((dev&&(memcmp(dev->name,"r",1)==0))||(ifa&&(memcmp(ifa->idev->dev->name,"r",1)==0)))
+		if(((dev&&(dev->name)&&(memcmp(dev->name,"r",1)==0))||(ifa&&(ifa->idev->dev->name)&&(memcmp(ifa->idev->dev->name,"r",1)==0)))
 			&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
 		{
 			/*printk(KERN_DEBUG"%s: line %d,****dev(%s)****\n",__func__,__LINE__,dev->name);
@@ -3672,7 +3672,7 @@ static void inet6_ifa_notify(int event, struct inet6_ifaddr *ifa)
 
 #if 1
 	/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
-	if((memcmp(ifa->idev->dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
+	if((ifa->idev->dev->name)&&(memcmp(ifa->idev->dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
 	{
 		/*printk(KERN_DEBUG"%s:****[V6 addr],dev(%s)****\n",__func__,ifa->idev->dev->name);*/
 		return;
@@ -3893,7 +3893,7 @@ void inet6_ifinfo_notify(int event, struct inet6_dev *idev)
 	
 #if 1
 		/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
-		if((memcmp(idev->dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
+		if((idev->dev->name)&&(memcmp(idev->dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
 		{
 			/*printk(KERN_DEBUG"%s:****[V6 ifinfo],dev(%s)****\n",__func__,idev->dev->name);*/
 			return;
@@ -3972,7 +3972,7 @@ static void inet6_prefix_notify(int event, struct inet6_dev *idev,
 	int err = -ENOBUFS;
 #if 1
 		/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
-		if((memcmp(idev->dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
+		if((idev->dev->name)&&(memcmp(idev->dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
 		{
 			/*printk(KERN_DEBUG"%s:****[V6 prefix],dev(%s)****\n",__func__,idev->dev->name);*/
 			return;

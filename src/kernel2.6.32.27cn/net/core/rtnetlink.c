@@ -692,7 +692,7 @@ static int rtnl_dump_ifinfo(struct sk_buff *skb, struct netlink_callback *cb)
 			goto cont;
 #if 1		
 		/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space(ip link) .*/
-		if((memcmp(dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_SOME_ENABLE))
+		if((dev->name)&&(memcmp(dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_SOME_ENABLE))
 		{
 			/*printk(KERN_DEBUG"%s:****[Rt core dump],dev(%s)****\n",__func__,dev->name);*/
 			continue;
@@ -1233,7 +1233,7 @@ void rtmsg_ifinfo(int type, struct net_device *dev, unsigned change)
 #if 1
 	
 	/*gujd: 2012-10-15, am 11:17 . Add for controlling the kernel netlink info of radio interface sending to user space .*/
-	if((memcmp(dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
+	if((dev->name)&&(memcmp(dev->name,"r",1)==0)&&(radio_interface_level > RADIO_INTERFACE_NETLINK_INFO_ENABLE))
 	{
 		/*printk(KERN_DEBUG"%s:****[Core Link],dev(%s)****\n",__func__,dev->name);*/
 		return;
