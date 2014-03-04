@@ -1463,7 +1463,7 @@ DEFUN(sem_clean_messageoftoday_command,
 {
 	int ret;
 
-	char cmdstr[128] = "sudo echo Auteware > /etc/motd";
+	char cmdstr[128] = "sudo echo OK > /etc/motd1";
 	pid_t status;
 
 	status = system(cmdstr);
@@ -1471,6 +1471,44 @@ DEFUN(sem_clean_messageoftoday_command,
 		if (WIFEXITED(status)) {
 			if (0 == WEXITSTATUS(status)) {
 				vty_out(vty, "Clear motd(messageoftoday) done.\n");
+				return CMD_SUCCESS;
+			}
+			else {
+				vty_out(vty, "Operation failed.\n");
+				return CMD_WARNING;
+			}
+		}
+		else {
+			vty_out(vty, "Operation Failed\n");
+			return CMD_WARNING;
+		}
+	}
+	else {
+		vty_out(vty, "Operation failed\n");
+		return CMD_WARNING;
+	}
+	
+	return CMD_SUCCESS;
+}
+
+DEFUN(sem_show_messageoftoday_command,
+	sem_show_messageoftoday_command_cmd,
+	"show messageoftoday",
+	"show function\n"
+	"show the messageoftoday file\n")
+{
+	DBusMessage *query, *reply;
+	DBusError err;
+	int ret;
+
+	char cmdstr[128] = "sudo cat /etc/motd1";
+	pid_t status;
+
+	status = system(cmdstr);
+	if (status != -1) {
+		if (WIFEXITED(status)) {
+			if (0 == WEXITSTATUS(status)) {
+				vty_out(vty, "Show motd(messageoftoday) done.\n");
 				return CMD_SUCCESS;
 			}
 			else {
@@ -2104,7 +2142,8 @@ void dcli_sem_init(void)
 	install_element(ENABLE_NODE, &sem_disable_keep_alive_temporarily_cmd);
 	install_element(ENABLE_NODE, &sem_execute_system_command_cmd);
 	install_element(ENABLE_NODE, &sem_clean_messageoftoday_command_cmd);
-    install_element(ENABLE_NODE, &cf_card_partition_cmd);
+	install_element(ENABLE_NODE, &sem_show_messageoftoday_command_cmd);
+	install_element(ENABLE_NODE, &cf_card_partition_cmd);
 	
     install_element(CONFIG_NODE, &cf_card_partition_cmd);
 	install_element(CONFIG_NODE, &config_send_file);
