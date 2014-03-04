@@ -1,0 +1,5 @@
+options {
+      directory "/etc/bind";
+      pid-file "named.pid";
+      listen-on port 53 {any;};     
+};

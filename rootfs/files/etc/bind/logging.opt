@@ -1,0 +1,16 @@
+logging {  
+
+    channel syslog{  
+
+        syslog daemon;
+
+        severity warning; 
+
+        print-time yes; 
+    };  
+
+    category queries { 
+        syslog; 
+    }; 
+
+};  

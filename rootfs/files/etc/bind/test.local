@@ -1,0 +1,10 @@
+$TTL 86400
+@ IN SOA autelan923.com. root.autelan923.com.(
+20031001;
+7200;
+3600;
+43200;
+86400);
+@ IN NS autelan923.com.
+82 IN PTR dns.autelan923.com. 
+

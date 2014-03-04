@@ -1,0 +1,42 @@
+
+; <<>> DiG 9.7.3 <<>>
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 19985
+;; flags: qr rd ra; QUERY: 1, ANSWER: 13, AUTHORITY: 0, ADDITIONAL: 10
+
+;; QUESTION SECTION:
+;.				IN	NS
+
+;; ANSWER SECTION:
+.			16423	IN	NS	c.root-servers.net.
+.			16423	IN	NS	h.root-servers.net.
+.			16423	IN	NS	b.root-servers.net.
+.			16423	IN	NS	j.root-servers.net.
+.			16423	IN	NS	m.root-servers.net.
+.			16423	IN	NS	f.root-servers.net.
+.			16423	IN	NS	g.root-servers.net.
+.			16423	IN	NS	l.root-servers.net.
+.			16423	IN	NS	e.root-servers.net.
+.			16423	IN	NS	i.root-servers.net.
+.			16423	IN	NS	a.root-servers.net.
+.			16423	IN	NS	d.root-servers.net.
+.			16423	IN	NS	k.root-servers.net.
+
+;; ADDITIONAL SECTION:
+c.root-servers.net.	83402	IN	A	192.33.4.12
+h.root-servers.net.	83402	IN	A	128.63.2.53
+b.root-servers.net.	83402	IN	A	192.228.79.201
+f.root-servers.net.	83402	IN	A	192.5.5.241
+g.root-servers.net.	83402	IN	A	192.112.36.4
+e.root-servers.net.	83402	IN	A	192.203.230.10
+i.root-servers.net.	16423	IN	A	192.36.148.17
+a.root-servers.net.	2392	IN	A	198.41.0.4
+d.root-servers.net.	83402	IN	A	199.7.91.13
+k.root-servers.net.	83402	IN	A	193.0.14.129
+
+;; Query time: 1 msec
+;; SERVER: 218.2.135.1#53(218.2.135.1)
+;; WHEN: Mon Apr  8 10:32:17 2013
+;; MSG SIZE  rcvd: 401
+

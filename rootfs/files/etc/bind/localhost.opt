@@ -1,0 +1,5 @@
+zone "localhost" IN {
+       type master;
+       file "localhost.zone";
+       allow-update { none; };
+};

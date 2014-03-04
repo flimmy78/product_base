@@ -1,0 +1,13 @@
+$ttl    1D
+@               IN SOA  autelan923.com.  root.autelan923.com. (
+
+                                      1053891162
+                                       3H
+                                       15M
+                                       1W
+                                       1D )
+
+                       IN NS          autelan923.com.
+                       IN MX    5    autelan923.com.
+www                IN A              3.4.5.6 
+aaa		   IN A 	     3.4.5.6
