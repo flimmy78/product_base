@@ -778,6 +778,18 @@ static DBusHandlerResult npd_dbus_message_handler (DBusConnection *connection, D
 			reply = npd_dbus_fdb_delete_static_debug_fdb_with_vlan(connection,message,user_data);
 		}
 		else if(dbus_message_is_method_call(message,NPD_DBUS_FDB_INTERFACE,	\
+								NPD_DBUS_SFD_SHOW_INFO )) {
+			reply = npd_dbus_sfd_show_info(connection,message,user_data);
+		}
+		else if(dbus_message_is_method_call(message,NPD_DBUS_FDB_INTERFACE,	\
+								NPD_DBUS_SFD_SERVICE_DEBUG )) {
+			reply = npd_dbus_sfd_service_debug(connection,message,user_data);
+		}
+		else if(dbus_message_is_method_call(message,NPD_DBUS_FDB_INTERFACE,	\
+								NPD_DBUS_SFD_SERVICE )) {
+			reply = npd_dbus_sfd_service(connection,message,user_data);
+		}
+		else if(dbus_message_is_method_call(message,NPD_DBUS_FDB_INTERFACE,	\
 								NPD_DBUS_FDB_METHOD_CONFIG_FDB_STATIC_DELETE_WITH_PORT)) {
 			reply = npd_dbus_fdb_delete_static_fdb_with_port(connection,message,user_data);
 		}

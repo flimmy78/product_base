@@ -7839,7 +7839,85 @@ DBusMessage *npd_dbus_fdb_show_running_config(DBusConnection *conn, DBusMessage 
 		
 		return reply;
 }
-		
+
+#define SFD_ON		1
+#define SFD_OFF		0
+
+int sfd_flag = SFD_OFF;
+int sfd_debug_flag = SFD_OFF;
+
+/*sfd command*/
+DBusMessage *npd_dbus_sfd_show_info(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply;
+	DBusMessageIter  iter;
+	DBusError err;
+	dbus_error_init(&err);
+	
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append (reply, &iter);
+	
+	dbus_message_iter_append_basic (&iter,DBUS_TYPE_INT32,&sfd_flag);
+	dbus_message_iter_append_basic (&iter,DBUS_TYPE_INT32,&sfd_debug_flag);
+	
+   return reply;
+}
+
+DBusMessage *npd_dbus_sfd_service_debug(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply;
+	DBusMessageIter  iter;
+	DBusError err;
+	int flag=0;
+	int ret=0;
+	dbus_error_init(&err);
+	if (!(dbus_message_get_args ( msg, &err,
+											DBUS_TYPE_INT32,&flag,
+											DBUS_TYPE_INVALID))) {
+			npd_syslog_err("Unable to get input args ");
+			if (dbus_error_is_set(&err)) {
+					npd_syslog_err("%s raised: %s",err.name,err.message);
+					dbus_error_free(&err);
+			}
+			ret=1;
+	}
+	sfd_debug_flag = flag;
+	npd_syslog_dbg("sfd_debug_flag = %d\n",sfd_debug_flag);
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append (reply, &iter);
+	
+	dbus_message_iter_append_basic (&iter,DBUS_TYPE_INT32,&ret);
+	
+   return reply;
+}
+
+DBusMessage *npd_dbus_sfd_service(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply;
+	DBusMessageIter  iter;
+	DBusError err;
+	int flag=0;
+	int ret=0;
+	dbus_error_init(&err);
+	if (!(dbus_message_get_args ( msg, &err,
+											DBUS_TYPE_INT32,&flag,
+											DBUS_TYPE_INVALID))) {
+			npd_syslog_err("Unable to get input args ");
+			if (dbus_error_is_set(&err)) {
+					npd_syslog_err("%s raised: %s",err.name,err.message);
+					dbus_error_free(&err);
+			}
+			ret=1;
+	}
+	sfd_flag = flag;
+	npd_syslog_dbg("sfd_flag = %d\n",sfd_flag);
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append (reply, &iter);
+	
+	dbus_message_iter_append_basic (&iter,DBUS_TYPE_INT32,&ret);
+	
+   return reply;
+}
 
 #ifdef __cplusplus
 }

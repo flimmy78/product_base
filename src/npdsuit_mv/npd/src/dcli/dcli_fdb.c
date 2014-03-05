@@ -60,8 +60,6 @@ extern int is_distributed;
 
 #define SFD_ON		1
 #define SFD_OFF		0
-int sfd_debug_flag=SFD_OFF;
-int sfd_flag=SFD_OFF;
 
 
 extern DBusConnection *dcli_dbus_connection;
@@ -7564,6 +7562,10 @@ DEFUN(show_fdb_number_limit_cmd_func,
 #define SEM_SHOWRUN_CFG_SIZE	(3*1024) /* for all 24GE ports configuration */
 int sfd_show_running_config(struct vty* vty) 
 {	
+	DBusMessage *query, *reply;
+	DBusError err;
+    int sfd_flag = SFD_OFF;
+	int sfd_debug_flag = SFD_OFF;
 	char *showStr = NULL,*cursor = NULL;
 	int totalLen = 0;
 	int i = 0;
@@ -7578,6 +7580,41 @@ int sfd_show_running_config(struct vty* vty)
 	memset(showStr, 0, SEM_SHOWRUN_CFG_SIZE);
 	cursor = showStr;
 	
+	query = dbus_message_new_method_call(	NPD_DBUS_BUSNAME,
+											NPD_DBUS_FDB_OBJPATH,
+											NPD_DBUS_FDB_INTERFACE,
+											NPD_DBUS_SFD_SHOW_INFO );
+	
+	dbus_error_init(&err);
+	
+	reply = dbus_connection_send_with_reply_and_block (dcli_dbus_connection,query,-1, &err);
+	
+	dbus_message_unref(query);
+	if (NULL == reply) 
+	{
+		vty_out(vty,"failed get reply.\n");
+		if (dbus_error_is_set(&err)) 
+		{
+			vty_out(vty,"%s raised: %s",err.name,err.message);
+			dbus_error_free_for_dcli(&err);
+		}
+		return CMD_SUCCESS;
+	}
+	
+	if (!(dbus_message_get_args ( reply, &err,
+		DBUS_TYPE_INT32,&sfd_flag,
+		DBUS_TYPE_INT32,&sfd_debug_flag,
+		DBUS_TYPE_INVALID))) 
+	{
+		vty_out(vty,"Failed get args.\n");
+		if (dbus_error_is_set(&err)) 
+		{
+			vty_out(vty,"%s raised: %s",err.name,err.message);
+			dbus_error_free_for_dcli(&err);
+		}
+		return CMD_FAILURE;
+	}
+
     if(sfd_flag){
 	    length += sprintf(cursor,"service sfd on\n");
 	    cursor = showStr+length;
@@ -8726,6 +8763,7 @@ DEFUN(syn_fdb_cmd_func,
 	return CMD_SUCCESS;	
 }
 
+/*sfd fun command*/
 DEFUN(show_sfd_info_func,
 	show_sfd_info_cmd,
 	"show sfd info",
@@ -8734,19 +8772,62 @@ DEFUN(show_sfd_info_func,
 	"show sfd info\n"
 	)
 {
-	vty_out(vty, "====================================================\n");
-    vty_out(vty, "Wireless SFD info\n");
-	if(sfd_flag)
-	    vty_out(vty, "SFD :ON\n");
-	else
-		vty_out(vty, "SFD :OFF\n");
-	if(sfd_debug_flag)
-	    vty_out(vty, "SFD DEBUG:ON\n");
-	else
-		vty_out(vty, "SFD DEBUG:OFF\n");
-	vty_out(vty, "====================================================\n");
-	return CMD_SUCCESS;	
+	DBusMessage *query, *reply;
+	DBusError err;
+    int sfd_flag = SFD_OFF;
+	int sfd_debug_flag = SFD_OFF;
+	
+	query = dbus_message_new_method_call(	NPD_DBUS_BUSNAME,
+											NPD_DBUS_FDB_OBJPATH,
+											NPD_DBUS_FDB_INTERFACE,
+											NPD_DBUS_SFD_SHOW_INFO );
+	
+	dbus_error_init(&err);
+	
+	reply = dbus_connection_send_with_reply_and_block (dcli_dbus_connection,query,-1, &err);
+	
+	dbus_message_unref(query);
+	if (NULL == reply) 
+	{
+		vty_out(vty,"failed get reply.\n");
+		if (dbus_error_is_set(&err)) 
+		{
+			vty_out(vty,"%s raised: %s",err.name,err.message);
+			dbus_error_free_for_dcli(&err);
+		}
+		return CMD_SUCCESS;
+	}
+	
+	if (!(dbus_message_get_args ( reply, &err,
+		DBUS_TYPE_INT32,&sfd_flag,
+		DBUS_TYPE_INT32,&sfd_debug_flag,
+		DBUS_TYPE_INVALID))) 
+	{
+		vty_out(vty,"Failed get args.\n");
+		if (dbus_error_is_set(&err)) 
+		{
+			vty_out(vty,"%s raised: %s",err.name,err.message);
+			dbus_error_free_for_dcli(&err);
+		}
+	}
+	else 
+	{
+    	vty_out(vty, "====================================================\n");
+        vty_out(vty, "Wireless SFD info\n");
+    	if(sfd_flag)
+    	    vty_out(vty, "SFD :ON\n");
+    	else
+    		vty_out(vty, "SFD :OFF\n");
+    	if(sfd_debug_flag)
+    	    vty_out(vty, "SFD DEBUG:ON\n");
+    	else
+    		vty_out(vty, "SFD DEBUG:OFF\n");
+    	vty_out(vty, "====================================================\n");
+	}
+	dbus_message_unref(reply);
+	return CMD_SUCCESS;
 }
+
 
 DEFUN(service_sfd_debug_func,
 	service_sfd_debug_cmd,
@@ -8766,11 +8847,11 @@ DEFUN(service_sfd_debug_func,
 	
 	if(0 == strncmp("on",argv[0],strlen((char*)argv[0])))
 	{
-		sfd_debug_flag = SFD_ON;
+		flag = SFD_ON;
 	}
 	else if(0 == strncmp("off",argv[0],strlen((char*)argv[0])))
 	{
-		sfd_debug_flag = SFD_OFF;
+		flag = SFD_OFF;
 	}
 	else
 	{
@@ -8778,8 +8859,55 @@ DEFUN(service_sfd_debug_func,
 		return CMD_WARNING;
 	}
 		
-    vty_out(vty, "service sfd debug set successfully\n");
-	return CMD_SUCCESS;	
+	query = dbus_message_new_method_call(	NPD_DBUS_BUSNAME,
+											NPD_DBUS_FDB_OBJPATH,
+											NPD_DBUS_FDB_INTERFACE,
+											NPD_DBUS_SFD_SERVICE_DEBUG );
+	
+	dbus_error_init(&err);
+	
+	dbus_message_append_args(	query,
+								DBUS_TYPE_INT32,&flag,
+								DBUS_TYPE_INVALID);
+	
+	reply = dbus_connection_send_with_reply_and_block (dcli_dbus_connection,query,-1, &err);
+	
+	dbus_message_unref(query);
+	if (NULL == reply) 
+	{
+		vty_out(vty,"failed get reply.\n");
+		if (dbus_error_is_set(&err)) 
+		{
+			vty_out(vty,"%s raised: %s",err.name,err.message);
+			dbus_error_free_for_dcli(&err);
+		}
+		return CMD_SUCCESS;
+	}
+	
+	if (!(dbus_message_get_args ( reply, &err,
+		DBUS_TYPE_INT32,&ret,
+		DBUS_TYPE_INVALID))) 
+	{
+		vty_out(vty,"Failed get args.\n");
+		if (dbus_error_is_set(&err)) 
+		{
+			vty_out(vty,"%s raised: %s",err.name,err.message);
+			dbus_error_free_for_dcli(&err);
+		}
+	} 
+	else 
+	{
+		if( 0 == ret)
+		{
+			vty_out(vty,"service sfd debug set successfully\n");
+		}
+		else
+		{
+            vty_out(vty,"service sfd debug set failed\n");
+		}
+	}
+	dbus_message_unref(reply);
+	return CMD_SUCCESS;
 }
 
 DEFUN(service_sfd_func,
@@ -8791,26 +8919,74 @@ DEFUN(service_sfd_func,
 	"debug sfd off\n"
 	)
 {	
+	DBusMessage *query, *reply;
+	DBusError err;
+    int ret;
+	int flag;
+	
 	if(0 == strncmp("on",argv[0],strlen((char*)argv[0])))
 	{
-		sfd_flag = 1;
+		flag = SFD_ON;
 	}
 	else if(0 == strncmp("off",argv[0],strlen((char*)argv[0])))
 	{
-		sfd_flag = 0;
+		flag = SFD_OFF;
 	}
 	else
 	{
-    	vty_out(vty, "service sfd set failed\n");
+    	vty_out(vty, "service sfd debug set failed\n");
 		return CMD_WARNING;
 	}
-	
-
-    vty_out(vty, "service sfd set successfully\n");
-
 		
-
-	return CMD_SUCCESS;	
+	query = dbus_message_new_method_call(	NPD_DBUS_BUSNAME,
+											NPD_DBUS_FDB_OBJPATH,
+											NPD_DBUS_FDB_INTERFACE,
+											NPD_DBUS_SFD_SERVICE );
+	
+	dbus_error_init(&err);
+	
+	dbus_message_append_args(	query,
+								DBUS_TYPE_INT32,&flag,
+								DBUS_TYPE_INVALID);
+	
+	reply = dbus_connection_send_with_reply_and_block (dcli_dbus_connection,query,-1, &err);
+	
+	dbus_message_unref(query);
+	if (NULL == reply) 
+	{
+		vty_out(vty,"failed get reply.\n");
+		if (dbus_error_is_set(&err)) 
+		{
+			vty_out(vty,"%s raised: %s",err.name,err.message);
+			dbus_error_free_for_dcli(&err);
+		}
+		return CMD_SUCCESS;
+	}
+	
+	if (!(dbus_message_get_args ( reply, &err,
+		DBUS_TYPE_INT32,&ret,
+		DBUS_TYPE_INVALID))) 
+	{
+		vty_out(vty,"Failed get args.\n");
+		if (dbus_error_is_set(&err)) 
+		{
+			vty_out(vty,"%s raised: %s",err.name,err.message);
+			dbus_error_free_for_dcli(&err);
+		}
+	} 
+	else 
+	{
+		if( 0 == ret)
+		{
+			vty_out(vty,"service sfd set successfully\n");
+		}
+		else
+		{
+            vty_out(vty,"service sfd set failed\n");
+		}
+	}
+	dbus_message_unref(reply);
+	return CMD_SUCCESS;
 }
 
 struct cmd_node fdb_node = 
