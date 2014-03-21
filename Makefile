@@ -810,6 +810,8 @@ eag:captive iptables
 	-rm -rf ${AUTEWAREFS_DIR}/files/opt/eag/www/wisprp/CVS
 	cp ${EAG_MOD}/res/eag/radius_errorcode_profile_CMCC ${AUTEWAREFS_DIR}/files/opt/eag/
 	-chmod 644 ${AUTEWAREFS_DIR}/files/opt/eag/radius_errorcode_profile_CMCC
+	-rm -rf ${AUTEWAREFS_DIR}/files/opt/eag/vendor_id
+	cp -RP ${EAG_MOD}/res/eag/vendor_id ${AUTEWAREFS_DIR}/files/opt/eag/
 	
 pppoe: preparedirs
 	echo "Building pppoe ..."
