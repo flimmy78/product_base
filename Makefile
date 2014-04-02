@@ -770,6 +770,7 @@ hmd: preparedirs
 	@echo "Building HMD daemon..."
 	$(MAKE) -C ${HMD_MOD}
 	cp $(HMD_MOD)/hmd ${BIN_EXPORT_DIR}/
+	cp $(HMD_MOD)/clear_radio_if ${BIN_EXPORT_DIR}/
 wbmd: preparedirs
 	@echo "Building WBMD daemon..."
 	$(MAKE) -C ${WBMD_MOD}
