@@ -312,6 +312,9 @@ PREREQ_WCPSS=$(shell if [ -d ${WCPSS_MOD} ] ; then echo "wcpss"; fi)
 CLEAN_WCPSS=$(subst wcpss,cleanwcpss,${PREREQ_WCPSS})
 PREREQ_WIFIKMOD=$(shell if [ -d ${WCPSS_MOD} ] ; then echo "wifikmod"; fi)
 CLEAN_WIFIKMOD=$(shell if [ -d ${WCPSS_MOD} ] ; then echo "cleanwifikmod"; fi)
+#wangchao add
+PREREQ_AATKMOD=$(shell if [ -d src/Any-Addr-Translate ] ; then echo "aatkmod"; fi)
+CLEAN_AATKMOD=$(shell if [ -d src/Any-Addr-Translate ] ; then echo "cleanaatkmod"; fi)
 
 PREREQ_IPTABLES=$(shell if [ -d ${IPTABLES_MOD} ] ; then echo "iptables"; fi)
 CLEAN_IPTABLES=$(subst iptables,cleaniptables,${PREREQ_IPTABLES})
@@ -1114,6 +1117,11 @@ wifikmod: kmod
 	@echo "Building wifi-ehternet ..."
 	$(MAKE) -C ${WCPSS_MOD}/src/kmod/wifi-ethernet/
 	cp ${WCPSS_MOD}/src/kmod/wifi-ethernet/wifi-ethernet.ko ${KMOD_EXPORT_DIR}/
+#wangchao add	
+aatkmod: kmod
+	@echo "Building  any-addr-translate..."
+	$(MAKE) -C src/Any-Addr-Translate/
+	cp src/Any-Addr-Translate/any-addr-translate.ko ${KMOD_EXPORT_DIR}/
 dba: kmod
 	@echo "Building DBA kernel module."
 	$(MAKE) -C ${DBA_MOD}
@@ -1202,7 +1210,11 @@ bashtools:
 		cp -rf ${BASHTOOLS_DIR}/services/init/eag_init_old ${ROOTFS_DIR}/files/opt/services/init/eag_init;\
 	fi
 
-
+#wangchao add
+pubkmod: ${PREREQ_IPTABLES} ${PREREQ_WIFIKMOD} ${PREREQ_AATKMOD} 
+	@echo "Copying kernel modules ..."
+	-cd ${KERNEL_ROOT} && find . -name "*.ko" | xargs cp --parents --target-directory="${ROOTFS_KMOD_DIR}/kernel";
+	-cp -RP auteware/files/kmod/* ${ROOTFS_KMOD_DIR}/misc
 
 pubkmod: ${PREREQ_IPTABLES} ${PREREQ_WIFIKMOD} ${PREREQ_IPFWD_LEARN}
 	@echo "Copying kernel modules ..."
@@ -1536,6 +1548,11 @@ cleanrpa:
 
 cleanwifikmod:
 	$(MAKE) -C ${WCPSS_MOD}/src/kmod/wifi-ethernet/ clean
+	
+#wangchao add
+cleanaatkmod:
+	$(MAKE) -C src/Any-Addr-Translate/ clean	
+	
 
 cleansfd:
 	echo "Cleanning sfd ..."

@@ -189,6 +189,9 @@ load_module wifi-ethernet
 #load_module cavium_ratelimit
 #[ -e /dev/cavium_ratelimit ] || mknod /dev/cavium_ratelimit c 244 0
 
+load_module any-addr-translate 
+[ -e /dev/aat0 ] || mknod /dev/aat0 c 249 0
+
 load_module dba
 
 load_module e1000e
