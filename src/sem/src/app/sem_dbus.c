@@ -167,6 +167,17 @@ extern DBusMessage *sem_dbus_read_cpld(DBusConnection *conn, DBusMessage *msg, v
 extern DBusMessage *sem_dbus_sem_send_trap(DBusConnection *conn, DBusMessage *msg, void  *user_data);
 extern DBusMessage *sem_dbus_show_6185(DBusConnection *conn, DBusMessage *msg, void  *user_data);
 extern DBusMessage *sem_dbus_set_6185(DBusConnection *conn, DBusMessage *msg, void  *user_data);
+extern DBusMessage *sem_dbus_set_route_policy(DBusConnection *conn, DBusMessage *msg, void *user_data);
+extern DBusMessage *sem_dbus_del_route_policy(DBusConnection *conn, DBusMessage *msg, void *user_data);
+extern DBusMessage *sem_dbus_route_policy_ip(DBusConnection *conn, DBusMessage *msg, void *user_data);
+extern DBusMessage *sem_dbus_route_policy_tos(DBusConnection * conn,DBusMessage * msg,void * user_data);
+extern DBusMessage *sem_dbus_route_policy_interface(DBusConnection * conn,DBusMessage * msg,void * user_data);
+extern DBusMessage *sem_dbus_show_route_policy(DBusConnection * conn,DBusMessage * msg,void * user_data);
+extern DBusMessage *sem_dbus_show_ip_route_policy(DBusConnection * conn,DBusMessage * msg,void * user_data);
+extern DBusMessage *sem_dbus_show_route_policy_all(DBusConnection * conn,DBusMessage * msg,void * user_data);
+extern DBusMessage *sem_dbus_add_ip_route_policy(DBusConnection * conn,DBusMessage * msg,void * user_data);
+extern DBusMessage *sem_dbus_del_ip_route_policy(DBusConnection * conn,DBusMessage * msg,void * user_data);
+extern DBusMessage *sem_dbus_route_policy_show_running(DBusConnection * conn,DBusMessage * msg,void * user_data);
 
 static DBusConnection * sem_dbus_conn = NULL;
 
@@ -1805,6 +1816,50 @@ static DBusHandlerResult sem_dbus_msg_handler (
 		else if (dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_DOWNLOAD_CPY_CONFIG_SLOT))
 		{
 			reply = sem_dbus_download_cpy_config_slot(conn, msg, user_data);		
+		}
+		else if(dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_SET_ROUTE_POLICY))
+		{
+			reply = sem_dbus_set_route_policy(conn, msg, user_data);		
+		}
+		else if(dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_DEL_ROUTE_POLICY))
+		{
+			reply = sem_dbus_del_route_policy(conn, msg, user_data);		
+		}		
+		else if(dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_ROUTE_POLICY_IP))
+		{
+			reply = sem_dbus_route_policy_ip(conn, msg, user_data);		
+		}
+		else if(dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_ROUTE_POLICY_TOS))
+		{
+			reply = sem_dbus_route_policy_tos(conn, msg, user_data); 	
+		}
+		else if(dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_ROUTE_POLICY_INTERFACE))
+		{
+			reply = sem_dbus_route_policy_interface(conn, msg, user_data); 	
+		}
+		else if(dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_SHOW_ROUTE_POLICY))
+		{
+			reply = sem_dbus_show_route_policy(conn, msg, user_data); 	
+		}
+		else if(dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_SHOW_IP_ROUTE_POLICY))
+		{
+			reply = sem_dbus_show_ip_route_policy(conn, msg, user_data); 	
+		}
+		else if(dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_SHOW_ROUTE_POLICY_ALL))
+		{
+			reply = sem_dbus_show_route_policy_all(conn, msg, user_data); 	
+		}
+		else if(dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_IP_ROUTE_POLICY))
+		{
+			reply = sem_dbus_add_ip_route_policy(conn, msg, user_data); 	
+		}
+		else if(dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_NO_IP_ROUTE_POLICY))
+		{
+			reply = sem_dbus_del_ip_route_policy(conn, msg, user_data); 	
+		}
+		else if(dbus_msg_is_method_call(msg, SEM_DBUS_INTERFACE, SEM_DBUS_ROUTE_POLICY_SHOW_RUNNING))
+		{
+			reply = sem_dbus_route_policy_show_running(conn, msg, user_data); 	
 		}
     }
 	else if (strcmp(dbus_message_get_path(msg), SEM_DBUS_ETHPORTS_OBJPATH) == 0) 

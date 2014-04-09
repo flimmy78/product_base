@@ -2850,6 +2850,1342 @@ out:
 	return reply;
 }
 
+#if 1
+
+static char *dcli_rp_table[256] ;
+static char * dcli_rtdsfield_table[256] ;
+static struct rp_rule_node * g_rp_rule = NULL;
+static struct rp_ip_route_node * g_rp_ip_route = NULL;
+
+static void rtdsfield_initialize()
+{
+	char buf[512];
+	FILE *fp;
+	int size = 256;
+
+	fp = fopen(RTFIELD_DATABASE_FILE, "r");
+	if (!fp)
+		return;
+	while (fgets(buf, sizeof(buf), fp)) {
+		char *p = buf;
+		int id;
+		char namebuf[512];
+
+		while (*p == ' ' || *p == '\t')
+			p++;
+		if (*p == '#' || *p == '\n' || *p == 0)
+			continue;
+		if (sscanf(p, "0x%x %s\n", &id, namebuf) != 2 &&
+		    sscanf(p, "0x%x %s #", &id, namebuf) != 2 &&
+		    sscanf(p, "%d %s\n", &id, namebuf) != 2 &&
+		    sscanf(p, "%d %s #", &id, namebuf) != 2) {
+			return;
+		}
+		
+		if (id<0 || id>size)
+			continue;
+
+		dcli_rtdsfield_table[id] = strdup(namebuf);
+	}
+	fclose(fp);
+}
+
+static void rt_tables_initialize()
+{
+	char buf[512];
+	FILE *fp;
+	int size = 256;
+	int i;
+
+	for(i=0;i<size;i++)
+	{
+		if(dcli_rp_table[i]){
+			free(dcli_rp_table[i]);
+			dcli_rp_table[i] = NULL;
+		}
+	}
+	fp = fopen(RT_TABLE_DATABASE_FILE, "r");
+	if (!fp)
+		return;
+	
+	while (fgets(buf, sizeof(buf), fp)) {
+		char *p = buf;
+		int id;
+		char namebuf[512];
+
+		while (*p == ' ' || *p == '\t')
+			p++;
+		if (*p == '#' || *p == '\n' || *p == 0)
+			continue;
+		if (sscanf(p, "0x%x %s\n", &id, namebuf) != 2 &&
+		    sscanf(p, "0x%x %s #", &id, namebuf) != 2 &&
+		    sscanf(p, "%d %s\n", &id, namebuf) != 2 &&
+		    sscanf(p, "%d %s #", &id, namebuf) != 2) {
+		    fclose(fp);
+			return;
+		}
+		
+		if (id<0 || id>size)
+			continue;
+
+		dcli_rp_table[id] = strdup(namebuf);
+	}
+	fclose(fp);
+}
+static void rt_tables_write()
+{
+	FILE *fp;
+	int size = 256;
+
+	fp = fopen(RT_TABLE_DATABASE_FILE, "w");
+	if (!fp)
+		return;
+	fprintf(fp,
+			"#\n"
+			"# reserved values\n"
+			"#\n"
+			"255 local\n"
+			"254 main\n"
+			"253 default\n"
+			"0 unspec\n"
+			"#\n"
+			"# local\n"
+			"#\n"
+			"#1 inr.ruhep\n");
+	for(size=1;size<253;size++)
+	{
+		if(rt_tables_entry_name(size)!=NULL)
+			fprintf(fp,"%d %s\n",size,dcli_rp_table[size]);
+	}
+	fclose(fp);
+}
+
+struct rp_ip_route_node * rp_ip_route_pares(char *buf)
+{
+	char *p = buf;
+	int sn,id;
+	char namebuf[512];
+	struct rp_ip_route_node *result;
+
+	while (*p == ' ' || *p == '\t')
+		p++;
+	
+	if (*p == '#' || *p == '\n' || *p == 0)
+		return NULL;
+
+	result = malloc(sizeof(*result));
+	if(result == NULL)
+		return NULL;
+	memset(result,0,sizeof(*result));
+	
+	/*32756:  from all iif eth1-9 lookup _rp100*/
+	if (sscanf(p, "%s via %s dev", result->prefix,result->dst) == 2)
+	{
+		if(!strcmp(result->prefix,"default"))
+		{
+			sprintf(result->prefix,"0.0.0.0/0");
+		}
+		else if(!strchr(result->prefix,'/'))
+		{
+			strcat(result->prefix,"/32");
+		}
+		result->type = 1;
+	}
+	/*32765:  from 100.0.0.0/8 lookup _rp100*/	
+	else if(sscanf(p, "%s dev %s scope link", result->prefix,result->dst) == 2)
+	{
+		if(!strcmp(result->prefix,"default"))
+		{
+			sprintf(result->prefix,"0.0.0.0/0");
+		}
+		else if(!strchr(result->prefix,'/'))
+		{
+			strcat(result->prefix,"/32");
+		}
+		result->type = 2;
+	}
+
+	else
+	{
+		free(result);
+		return NULL;
+	}
+	return result;
+}
+
+struct rp_rule_node * rp_rule_pares(char *buf)
+{
+	char *p = buf;
+	int sn,id;
+	char namebuf[32];
+	struct rp_rule_node *result;
+
+	while (*p == ' ' || *p == '\t')
+		p++;
+	
+	if (*p == '#' || *p == '\n' || *p == 0)
+		return NULL;
+
+	result = malloc(sizeof(struct rp_rule_node));
+	if(result == NULL)
+		return NULL;
+	memset(result,0,sizeof(struct rp_rule_node));
+	memset(namebuf,0,32);
+	/*32756:  from all iif eth1-9 lookup _rp100*/
+	if (sscanf(p, "%d:	from all iif %s lookup %s", &result->sn,result->ifname, result->tablename) == 3)
+	{
+		result->type = 1;
+	}
+	/*32765:  from 100.0.0.0/8 lookup _rp100*/	
+	else if(sscanf(p, "%d:	from %s lookup %s", &result->sn, result->prefix,result->tablename) == 3)
+	{
+			result->type = 2;
+			if(!strcmp(result->prefix,"all"))
+			{
+				sprintf(result->prefix,"0.0.0.0/0");
+			}
+			else if(!strchr(result->prefix,'/'))
+			{
+				strcat(result->prefix,"/32");
+			}
+	}
+	/*32757:  from all to 220.0.0.0/24 lookup _rp100*/
+	else if(sscanf(p, "%d:	from all to %s lookup %s", &result->sn, result->prefix,result->tablename) == 3)
+	{
+		result->type = 3;
+		if(!strchr(result->prefix,'/'))
+		{
+			strcat(result->prefix,"/32");
+		}
+	}
+	/*32761:  from all tos 0x06 lookup _rp100 */
+	else if(sscanf(p, "%d:	from all tos %s lookup %s", &result->sn,namebuf,result->tablename) == 3)
+	{
+		int i=0;
+		
+		for(i=0;i<256;i++)
+		{
+			if (dcli_rtdsfield_table[i] && (strcmp(dcli_rtdsfield_table[i], namebuf) == 0)) 
+			{
+				break;
+			}
+		}
+		if(i<256){
+			result->tos = i;
+			result->type = 4;
+		}
+		else{
+			free(result);
+			return NULL;
+		}
+	}
+
+	else
+	{
+		free(result);
+		return NULL;
+	}
+	return result;
+}
+
+struct rp_ip_route_node *rp_ip_route_get(unsigned char rtb_id)
+{
+	FILE *fp;
+	char cmdstr[CMD_STR_LEN]={0};
+	char buf[512];
+	struct rp_ip_route_node *ptmp;
+
+	sprintf(cmdstr,"ip route list table %d",rtb_id);
+	fp = popen(cmdstr, "r");
+	if (!fp)
+		return 	NULL;
+	
+	while (fgets(buf, sizeof(buf), fp)) {
+		char *p = buf;
+
+		ptmp = rp_ip_route_pares(p);
+		if(!ptmp)
+			continue;
+		if(!g_rp_ip_route){
+			g_rp_ip_route= ptmp;
+			g_rp_ip_route->prev=g_rp_ip_route;
+		}
+		else
+		{
+			g_rp_ip_route->prev->next=ptmp;
+			ptmp->prev=g_rp_ip_route->prev;
+			g_rp_ip_route->prev=ptmp;
+		}
+	}
+
+	pclose(fp);
+	return g_rp_ip_route;
+}
+
+struct rp_rule_node *rp_rule_get(void)
+{
+	FILE *fp;
+	char *cmdstr= "ip rule list";
+	char buf[512];
+	struct rp_rule_node *ptmp,*tmp;
+
+	
+	fp = popen(cmdstr, "r");
+	if (!fp)
+		return 	NULL;
+	memset(buf,0,512);
+	while (buf == fgets(buf, 512, fp)) {
+		char *p = buf;
+
+		while (*p == ' ' || *p == '\t')
+			p++;
+		
+		if (*p == '#' || *p == '\n' || *p == 0)
+			continue;
+
+		
+		ptmp = rp_rule_pares(p);
+		if(!ptmp)
+			continue;
+		if(!g_rp_rule){
+			g_rp_rule= ptmp;
+			g_rp_rule->prev=g_rp_rule;
+/*			ptmp->next = g_rp_rule;*/
+
+		}
+		else if(ptmp->type == 2)
+		{
+
+			u_char isset=1;
+			tmp=g_rp_rule;
+			while(tmp)
+			{
+				if( tmp->type == 2 &&
+					!(strcmp(tmp->tablename ,ptmp->tablename) 
+					||strcmp(tmp->prefix, ptmp->prefix)))
+				{	
+					free(ptmp);
+					isset = 0;
+					break;
+				}
+				tmp=tmp->next;
+			}
+			
+			if(isset)
+			{
+				g_rp_rule->prev->next=ptmp;
+				
+				ptmp->prev=g_rp_rule->prev;
+				g_rp_rule->prev=ptmp;
+/*				ptmp->next = g_rp_rule;*/
+
+			}
+
+		}
+		else
+		{
+			g_rp_rule->prev->next=ptmp;
+
+			ptmp->prev=g_rp_rule->prev;
+			g_rp_rule->prev=ptmp;
+/*			ptmp->next = g_rp_rule;*/
+
+		}
+		memset(buf,0,512);
+	}
+
+	pclose(fp);
+	return g_rp_rule;
+}
+
+void rp_ip_route_delete(unsigned char rtb_id)
+{
+	int i;	
+	struct rp_ip_route_node * rtrn,*tmp;
+	char cmdstr[CMD_STR_LEN]= {0};
+
+
+	rtrn = rp_ip_route_get(rtb_id);
+	if(rtrn == NULL)
+	{
+		return ;
+	}
+	
+	while(rtrn )
+	{
+		switch(rtrn->type){
+		case 1: /*32756:  from all iif eth1-9 lookup _rp100*/
+			sprintf(cmdstr,"ip route del %s via %s table %d",rtrn->prefix,rtrn->dst,rtb_id);
+			break;
+		case 2: /*32765:  from 100.0.0.0/8 lookup _rp100*/	
+			sprintf(cmdstr,"ip route del %s dev %s table %d",rtrn->prefix,rtrn->dst,rtb_id);
+			break;
+		default:
+			break;
+		}
+		tmp = rtrn;
+		rtrn=rtrn->next;
+		free(tmp);
+		system(cmdstr);
+		system("ip route flush cache");
+	}
+	g_rp_ip_route = NULL;
+	return;
+}
+
+void rp_rule_delete(unsigned char rtb_id)
+{
+	int i;	
+	struct rp_rule_node * rtrn,*tmp;
+	char cmdstr[CMD_STR_LEN]= {0};
+
+	rt_tables_initialize();
+
+	rtrn = rp_rule_get();
+	if(rtrn == NULL)
+	{
+		return ;
+	}
+	
+	while(rtrn )
+	{
+		if(rt_tables_entry_name(rtb_id)&&(strcmp(rtrn->tablename,rt_tables_entry_name(rtb_id)) == 0))
+		{
+			switch(rtrn->type){
+				case 1: /*32756:  from all iif eth1-9 lookup _rp100*/
+					sprintf(cmdstr,"ip rule del dev %s table %s",rtrn->ifname,rtrn->tablename);
+					break;
+				case 2: /*32765:  from 100.0.0.0/8 lookup _rp100*/	
+					sprintf(cmdstr,"ip rule del from %s table %s",rtrn->prefix,rtrn->tablename);
+					break;
+				case 3: /*32757:  from all to 220.0.0.0/24 lookup _rp100*/
+					sprintf(cmdstr,"ip rule del to %s table %s",rtrn->prefix,rtrn->tablename);
+					break;
+				case 4: /*32761:  from all tos 0x06 lookup _rp100 */
+					sprintf(cmdstr,"ip rule del tos %x table %s",rtrn->tos,rtrn->tablename);
+					break;
+				default:
+					break;
+				}
+			system(cmdstr);
+			system("ip route flush cache");
+		}
+		tmp = rtrn;
+		rtrn=rtrn->next;
+		free(tmp);
+	}
+
+	g_rp_rule = NULL;
+	return;
+}
+
+
+/****************************************************
+*cmd:
+*	0 delete
+*	1 add or modify
+*
+************************************************************/
+static int rt_tables_entry_changed(int cmd,unsigned char rtb_id )
+{
+	char rtb_name[32];
+	char *tmp_str;
+
+	if(rtb_id==0 || rtb_id>32 )
+		return 0;
+
+	if(dcli_rp_table[rtb_id] != NULL)
+	{
+		free(dcli_rp_table[rtb_id]);
+		dcli_rp_table[rtb_id]=NULL;
+	}
+	if(cmd == 1)/*add or modify*/
+	{
+	//	tmp_str=RTB_NAME(rtb_name,rtb_id);//
+		//#define RTB_NAME(_buf,_rtb_id) sprintf(_buf,"_rp%u",_rtb_id)
+		sprintf(rtb_name,"_rp%u",rtb_id);
+		dcli_rp_table[rtb_id] = strdup(rtb_name);
+	}
+	return 1;
+}
+
+
+int set_route_policy(unsigned char rtb_id)
+{	
+	/*if(!IS_RTB_ID(rtb_id))
+	{
+		sem_syslog_warning("Error policy id %s\n",rtb_id);
+		return -1;
+	}*/
+	rt_tables_initialize();
+	if(rt_tables_entry_name(rtb_id))
+	{
+	//	g_rtb_id = (unsigned char)rtb_id;
+	//	vty->node = ROUTE_POLICY_NODE;
+	//	vty->index = &g_rtb_id;
+		return 0;
+	}
+	if(rt_tables_entry_changed(1,rtb_id))
+	{
+		rt_tables_write();
+	//	g_rtb_id = (unsigned char)rtb_id;
+	//	vty->index = &g_rtb_id;
+	//	vty->node = ROUTE_POLICY_NODE;
+		return 0;
+	}
+	else
+	{
+		sem_syslog_warning("Can't create route policy %s\n",rtb_id);
+		return -1;
+	}
+}
+int del_route_policy(unsigned char rtb_id)
+{	
+	/*if(!IS_RTB_ID(rtb_id))
+	{
+		sem_syslog_warning("Error policy id %s\n",rtb_id);
+		return -1;
+	}*/
+	
+	rt_tables_initialize();
+	
+	rp_ip_route_delete(rtb_id);
+	rp_rule_delete(rtb_id);
+	
+	if(!rt_tables_entry_name(rtb_id))
+	{
+		sem_syslog_warning("The policy of id %s isn't exist\n",rtb_id);
+		return 0;
+	}
+	if(rt_tables_entry_changed(0,rtb_id))
+	{
+		rt_tables_write();
+		return 0;
+	}
+	else
+	{
+		sem_syslog_warning("Can't delete route policy %s\n",rtb_id);
+		return -1;
+	}
+}
+
+
+int route_policy_ip(unsigned char rtb_id, char *action, char *direction, char *ip)
+{	
+    char cmdstr[128] ={0};
+	char *rtb_name=NULL;
+	
+	if(!(rtb_name = rt_tables_entry_name(rtb_id)))
+	{
+		sem_syslog_warning("Get route policy error, please check it: %s\n",rtb_id);
+		return -1;
+	}
+	sprintf(cmdstr,"ip rule %s %s %s table %s",
+		strncmp(action,"a",1)?"del":"add",
+		strncmp(direction,"f",1)?"to":"from",ip,
+		rtb_name);
+	
+	system(cmdstr);
+	system("ip route flush cache");/*ip rule show*/
+	return 0;
+	
+}
+
+int route_policy_tos(unsigned char rtb_id, char *action, int tos)
+{	
+    char cmdstr[128] ={0};
+	char *rtb_name=NULL;
+	
+	if(!(rtb_name = rt_tables_entry_name(rtb_id)))
+	{
+		sem_syslog_warning("Get route policy error, please check it: %s\n",rtb_id);
+		return -1;
+	}
+	sprintf(cmdstr,"ip rule %s tos %x table %s",
+		strncmp(action,"a",1)?"del":"add",tos,rtb_name);
+	
+	system(cmdstr);
+	system("ip route flush cache");/*ip rule show*/
+	return 0;
+	
+}
+
+int route_policy_interface(unsigned char rtb_id, char *action, char *ifname)
+{	
+    char cmdstr[128] ={0};
+	char *rtb_name=NULL;
+	
+	if(!(rtb_name = rt_tables_entry_name(rtb_id)))
+	{
+		sem_syslog_warning("Get route policy error, please check it: %s\n",rtb_id);
+		return -1;
+	}
+	sprintf(cmdstr,"ip rule %s dev %s table %s",
+		strncmp(action,"a",1)?"del":"add",ifname,rtb_name);
+	
+	system(cmdstr);
+	system("ip route flush cache");
+	
+	return 0;
+	
+}
+
+int ip_route_policy_add(unsigned char rtb_id, int action, char *dst_str, char *gw_str)
+{	
+    char cmdstr[128] ={0};
+	char *rtb_name=NULL;
+	
+	if(!(rtb_name = rt_tables_entry_name(rtb_id)))
+	{
+		sem_syslog_warning("Get route policy error, please check it: %s\n",rtb_id);
+		return -1;
+	}
+
+	/*1 : gw is ip adress ; 0: gw is interface*/
+	if(action==1)
+		sprintf(cmdstr,"ip route add %s via %s table %s",dst_str,gw_str,rtb_name);
+	else
+		sprintf(cmdstr,"ip route add %s dev %s table %s",dst_str,gw_str,rtb_name);
+
+	system(cmdstr);
+	
+	return 0;
+	
+}
+
+int ip_route_policy_del(unsigned char rtb_id, int action, char *dst_str, char *gw_str)
+{	
+    char cmdstr[128] ={0};
+	char *rtb_name=NULL;
+	
+	if(!(rtb_name = rt_tables_entry_name(rtb_id)))
+	{
+		sem_syslog_warning("Get route policy error, please check it: %s\n",rtb_id);
+		return -1;
+	}
+
+	/*1 : gw is ip adress ; 0: gw is interface*/
+	if(action==1)
+		sprintf(cmdstr,"ip route del %s via %s table %s",dst_str,gw_str,rtb_name);
+	else
+		sprintf(cmdstr,"ip route del %s dev %s table %s",dst_str,gw_str,rtb_name);
+
+	system(cmdstr);
+	
+	return 0;
+	
+}
+
+static void ip_rule_show(unsigned char rtb_id,const char* rtb_name,char *conf)
+{
+	int i;	
+	struct rp_rule_node * rtrn,*tmp;
+
+	if(rtb_name)/*show */
+	{
+		rtrn = rp_rule_get();
+		if(rtrn == NULL)
+		{
+			sprintf(conf,"%sThe system route policy rule %d is NULL.\n",conf,rtb_id);
+			return ;
+		}
+		
+		sprintf(conf,"%sRoute policy %d ip rule :\n",conf,rtb_id);
+		while(rtrn )
+		{
+			if(strcmp(rtrn->tablename,rtb_name) == 0)
+			{
+				switch(rtrn->type){
+					case 1: /*32756:  from all iif eth1-9 lookup _rp100*/
+						sprintf(conf,"%s%8d: from all IIF %s\n",conf,rtrn->sn,rtrn->ifname);
+						break;
+					case 2: /*32765:  from 100.0.0.0/8 lookup _rp100*/	
+						sprintf(conf,"%s%8d: from %s \n",conf,rtrn->sn,rtrn->prefix);
+						break;
+					case 3: /*32757:  from all to 220.0.0.0/24 lookup _rp100*/
+						sprintf(conf,"%s%8d: from all to %s \n",conf,rtrn->sn,rtrn->prefix);
+						break;
+					case 4: /*32761:  from all tos 0x06 lookup _rp100 */
+						sprintf(conf,"%s%8d: from all tos %d \n",conf,rtrn->sn,rtrn->tos);
+						break;
+					default:
+						break;
+					}
+			}
+			tmp = rtrn;
+			rtrn=rtrn->next;
+			free(tmp);
+		
+		}
+		g_rp_rule = NULL;
+	}
+	sprintf(conf,"%s\n",conf);
+	return;
+}
+
+static void ip_route_show(unsigned char rtb_id,const char* rtb_name, char *conf)
+{
+	int i;	
+	struct rp_ip_route_node * rtrn,*tmp;
+
+	if(rtb_name)/*show */
+	{
+		rtrn = rp_ip_route_get(rtb_id);
+		if(rtrn == NULL)
+		{
+			sprintf(conf,"%sThe system policy route rule %d is none.\n",conf,rtb_id);
+			return ;
+		}
+		
+		sprintf(conf,"%sRoute policy %d ip route \n",conf,rtb_id);
+		while(rtrn )
+		{
+			switch(rtrn->type){
+			case 1: /*32756:  from all iif eth1-9 lookup _rp100*/
+				sprintf(conf,"%s%s via %s \n",conf,rtrn->prefix,rtrn->dst);
+				break;
+			case 2: /*32765:  from 100.0.0.0/8 lookup _rp100*/	
+				sprintf(conf,"%s%s dev %s scope link \n",conf,rtrn->prefix,rtrn->dst);
+				break;
+			default:
+				break;
+			}
+			tmp = rtrn;
+			rtrn=rtrn->next;
+			free(tmp);
+		
+		}
+		g_rp_ip_route = NULL;
+	}
+	sprintf(conf,"%s\n",conf);
+	return;
+}
+
+int route_policy_show(unsigned char rtb_id, char *conf)
+{	
+
+	rt_tables_initialize();
+	if(rtb_id != 0)/*some one*/
+	{
+		if(rt_tables_entry_name(rtb_id))
+			ip_rule_show(rtb_id,rt_tables_entry_name(rtb_id),conf);
+		else{
+			sprintf(conf,"The route policy %d doesn't create.\n",rtb_id);
+			return -2;
+		}
+	}
+	else /*all*/
+	{
+		for(rtb_id = 1; rtb_id<=32;rtb_id++)
+		{			
+			if(rt_tables_entry_name(rtb_id))
+				ip_rule_show(rtb_id,rt_tables_entry_name(rtb_id),conf);
+		}
+	}
+	return 0;
+
+}
+
+
+int ip_route_policy_show(unsigned char rtb_id, char *conf)
+{	
+
+	rt_tables_initialize();
+	if(rtb_id != 0)/*some one*/
+	{
+		if(rt_tables_entry_name(rtb_id))
+			ip_route_show(rtb_id,rt_tables_entry_name(rtb_id),conf);
+		else{
+			sprintf(conf,"The route policy %d doesn't create.\n",rtb_id);
+			return -2;
+		}
+	}
+	else /*all*/
+	{
+		for(rtb_id = 1; rtb_id<=32;rtb_id++)
+		{			
+			if(rt_tables_entry_name(rtb_id))
+				ip_route_show(rtb_id,rt_tables_entry_name(rtb_id),conf);
+		}
+	}
+	return 0;
+
+}
+
+int route_policy_show_all(char *conf)
+{
+	unsigned char rtb_id;
+
+	rt_tables_initialize(); 
+	
+	for(rtb_id = 1; rtb_id<=32;rtb_id++)
+	{
+		if(rt_tables_entry_name(rtb_id) )
+		{
+			ip_rule_show(rtb_id,rt_tables_entry_name(rtb_id),conf);
+			sprintf(conf,"%s\n",conf);
+			ip_route_show(rtb_id,rt_tables_entry_name(rtb_id),conf);
+			sprintf(conf,"%s\n\n",conf);
+		}
+		
+	}
+
+	return 0;
+}
+
+int route_policy_show_running(char *conf)
+{
+//	char _tmpstr[256];
+	unsigned char rtb_id;
+
+	//memset(_tmpstr,0,256);
+	//sprintf(_tmpstr,BUILDING_MOUDLE,"ROUTE POLICY");
+//	vtysh_add_show_string(_tmpstr);
+
+	rt_tables_initialize(); 
+	
+	for(rtb_id = 1; rtb_id<=32;rtb_id++)
+	{			
+		if(rt_tables_entry_name(rtb_id)){
+			struct rp_ip_route_node * ip_rtrn,*ip_rtrn_tmp;
+			struct rp_rule_node * rule_rtrn, *rule_rtrn_tmp;
+
+			sprintf(conf,"%s\nroute policy %d\n",conf,rtb_id);
+			//vtysh_add_show_string(_tmpstr);
+
+			rule_rtrn = rp_rule_get();
+			while(rule_rtrn )
+			{
+				if(strcmp(rule_rtrn->tablename,rt_tables_entry_name(rtb_id)) == 0)
+				{
+					switch(rule_rtrn->type){
+						case 1: /*32756:  from all iif eth1-9 lookup _rp100*/
+							sprintf(conf,"%s policy rule add interface %s\n",conf,rule_rtrn->ifname);
+							//vtysh_add_show_string(_tmpstr);
+							break;
+						case 2: /*32765:  from 100.0.0.0/8 lookup _rp100*/	
+							sprintf(conf,"%s policy rule add from %s\n",conf,rule_rtrn->prefix);
+							//vtysh_add_show_string(_tmpstr);
+							break;
+						case 3: /*32757:  from all to 220.0.0.0/24 lookup _rp100*/
+							sprintf(conf,"%s policy rule add to %s\n",conf,rule_rtrn->prefix);
+							//vtysh_add_show_string(_tmpstr);
+							break;
+						case 4: /*32761:  from all tos 0x06 lookup _rp100 */
+							sprintf(conf,"%s policy rule add tos %d\n",conf,rule_rtrn->tos);
+							//vtysh_add_show_string(_tmpstr);
+							break;
+						default:
+							break;
+						}
+				}
+				rule_rtrn_tmp = rule_rtrn;
+				rule_rtrn=rule_rtrn->next;
+				free(rule_rtrn_tmp);
+			}
+			g_rp_rule = NULL;
+			
+
+			ip_rtrn = rp_ip_route_get(rtb_id);
+			while(ip_rtrn)
+			{
+				sprintf(conf,"%s ip route %s %s\n",conf,ip_rtrn->prefix,ip_rtrn->dst);
+				//vtysh_add_show_string(_tmpstr);
+				
+				ip_rtrn_tmp = ip_rtrn;
+				ip_rtrn=ip_rtrn->next;
+				free(ip_rtrn_tmp);				
+			}
+			g_rp_ip_route = NULL;
+		
+
+			sprintf(conf,"%s exit\n",conf);
+
+		}
+		
+	}
+	
+	sprintf(conf,"%s\n",conf);
+
+	return 0;
+
+}
+
+
+
+DBusMessage *sem_dbus_set_route_policy(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+	unsigned char rtb_id = 0;
+	int ret = 0;
+	
+	sem_syslog_dbg("Dbus to sem for set route policy.\n");
+
+	dbus_error_init(&err);
+	
+	/*sem_syslog_warning(" %s : line %d\n",__func__,__LINE__);*/
+
+	if (!(dbus_message_get_args ( msg, &err,
+		                                    DBUS_TYPE_BYTE,&rtb_id,
+											DBUS_TYPE_INVALID))) {
+											
+			sem_syslog_warning("Unable to get input args ");
+			if (dbus_error_is_set(&err)) {
+				sem_syslog_warning("%s raised: %s",err.name,err.message);
+				dbus_error_free(&err);
+			}
+			return NULL;
+	}
+	/*sem_syslog_warning(" %s : line %d\n",__func__,__LINE__);*/
+	ret = set_route_policy(rtb_id);
+	
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append (reply, &iter);
+	dbus_message_iter_append_basic (&iter,DBUS_TYPE_INT32,&ret);
+
+	return reply;
+
+}
+
+DBusMessage *sem_dbus_del_route_policy(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+	unsigned char rtb_id = 0;
+	int ret = 0;
+	
+	sem_syslog_dbg("Dbus to sem for set route policy.\n");
+
+	dbus_error_init(&err);
+
+	if (!(dbus_message_get_args ( msg, &err,
+		                                    DBUS_TYPE_BYTE,&rtb_id,
+											DBUS_TYPE_INVALID))) {
+											
+			sem_syslog_warning("Unable to get input args ");
+			if (dbus_error_is_set(&err)) {
+				sem_syslog_warning("%s raised: %s",err.name,err.message);
+				dbus_error_free(&err);
+			}
+			return NULL;
+	}
+	
+	ret = del_route_policy(rtb_id);
+	
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append (reply, &iter);
+	dbus_message_iter_append_basic (&iter,DBUS_TYPE_INT32,&ret);
+
+	return reply;
+
+}
+
+
+DBusMessage *sem_dbus_route_policy_ip(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+	unsigned char rtb_id = 0;
+	int ret = 0;
+	
+	char *action = NULL;
+	char *direction = NULL;
+	char *ip = NULL;
+	
+	sem_syslog_dbg("Dbus to sem for set route policy.\n");
+
+	dbus_error_init(&err);
+	
+	if (!(dbus_message_get_args ( msg, &err,
+		                                    DBUS_TYPE_BYTE,&rtb_id,
+		                                    DBUS_TYPE_STRING,&action,
+		                                    DBUS_TYPE_STRING,&direction,
+		                                    DBUS_TYPE_STRING,&ip,
+											DBUS_TYPE_INVALID))) {
+											
+			sem_syslog_warning("Unable to get input args ");
+			if (dbus_error_is_set(&err)) {
+				sem_syslog_warning("%s raised: %s",err.name,err.message);
+				dbus_error_free(&err);
+			}
+			return NULL;
+	}
+	
+	ret = route_policy_ip(rtb_id,action,direction,ip);
+	
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append (reply, &iter);
+	dbus_message_iter_append_basic (&iter,DBUS_TYPE_INT32,&ret);
+
+	return reply;
+
+}
+
+
+DBusMessage *sem_dbus_route_policy_tos(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+	unsigned char rtb_id = 0;
+	int ret = 0;
+	int tos = 0;
+	
+	char *action = NULL;
+	
+	sem_syslog_dbg("Dbus to sem for set route policy.\n");
+
+	dbus_error_init(&err);
+	
+	if (!(dbus_message_get_args ( msg, &err,
+		                                    DBUS_TYPE_BYTE,&rtb_id,
+		                                    DBUS_TYPE_STRING,&action,
+		                                    DBUS_TYPE_INT32,&tos,
+											DBUS_TYPE_INVALID))) {
+											
+			sem_syslog_warning("Unable to get input args ");
+			if (dbus_error_is_set(&err)) {
+				sem_syslog_warning("%s raised: %s",err.name,err.message);
+				dbus_error_free(&err);
+			}
+			return NULL;
+	}
+	
+	ret = route_policy_tos(rtb_id,action,tos);
+	
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append (reply, &iter);
+	dbus_message_iter_append_basic (&iter,DBUS_TYPE_INT32,&ret);
+
+	return reply;
+
+}
+
+
+DBusMessage *sem_dbus_route_policy_interface(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+	unsigned char rtb_id = 0;
+	int ret = 0;
+	char *ifname = NULL;
+	
+	char *action = NULL;
+	
+	sem_syslog_dbg("Dbus to sem for set route policy.\n");
+
+	dbus_error_init(&err);
+	
+	if (!(dbus_message_get_args ( msg, &err,
+		                                    DBUS_TYPE_BYTE,&rtb_id,
+		                                    DBUS_TYPE_STRING,&action,
+		                                    DBUS_TYPE_STRING,&ifname,
+											DBUS_TYPE_INVALID))) {
+											
+			sem_syslog_warning("Unable to get input args ");
+			if (dbus_error_is_set(&err)) {
+				sem_syslog_warning("%s raised: %s",err.name,err.message);
+				dbus_error_free(&err);
+			}
+			return NULL;
+	}
+	
+	ret = route_policy_interface(rtb_id,action,ifname);
+	
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append (reply, &iter);
+	dbus_message_iter_append_basic (&iter,DBUS_TYPE_INT32,&ret);
+
+	return reply;
+
+}
+
+
+DBusMessage *sem_dbus_add_ip_route_policy(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+	unsigned char rtb_id = 0;
+	int ret = 0;
+	int action = -1;
+	char *dst_str = NULL;
+	char *gw_str = NULL;
+	
+	sem_syslog_dbg("Dbus to sem for set route policy.\n");
+
+	dbus_error_init(&err);
+	
+	if (!(dbus_message_get_args ( msg, &err,
+		                                    DBUS_TYPE_BYTE,&rtb_id,
+		                                    DBUS_TYPE_INT32,&action,
+		                                    DBUS_TYPE_STRING,&dst_str,
+		                                    DBUS_TYPE_STRING,&gw_str,
+											DBUS_TYPE_INVALID))) {
+											
+			sem_syslog_warning("Unable to get input args ");
+			if (dbus_error_is_set(&err)) {
+				sem_syslog_warning("%s raised: %s",err.name,err.message);
+				dbus_error_free(&err);
+			}
+			return NULL;
+	}
+	
+	ret = ip_route_policy_add(rtb_id,action,dst_str,gw_str);
+	
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append (reply, &iter);
+	dbus_message_iter_append_basic (&iter,DBUS_TYPE_INT32,&ret);
+
+	return reply;
+
+}
+
+
+DBusMessage *sem_dbus_del_ip_route_policy(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+	unsigned char rtb_id = 0;
+	int ret = 0;
+	int action = -1;
+	char *dst_str = NULL;
+	char *gw_str = NULL;
+	
+	sem_syslog_dbg("Dbus to sem for set route policy.\n");
+
+	dbus_error_init(&err);
+	
+	if (!(dbus_message_get_args ( msg, &err,
+		                                    DBUS_TYPE_BYTE,&rtb_id,
+		                                    DBUS_TYPE_INT32,&action,
+		                                    DBUS_TYPE_STRING,&dst_str,
+		                                    DBUS_TYPE_STRING,&gw_str,
+											DBUS_TYPE_INVALID))) {
+											
+			sem_syslog_warning("Unable to get input args ");
+			if (dbus_error_is_set(&err)) {
+				sem_syslog_warning("%s raised: %s",err.name,err.message);
+				dbus_error_free(&err);
+			}
+			return NULL;
+	}
+	
+	ret = ip_route_policy_del(rtb_id,action,dst_str,gw_str);
+	
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append (reply, &iter);
+	dbus_message_iter_append_basic (&iter,DBUS_TYPE_INT32,&ret);
+
+	return reply;
+
+}
+
+#define ROUTE_CONF_SIZE (1024 * 1024)
+#define	rc_calloc(cnt, sz)	calloc((cnt), (sz))
+#define	rc_free(p)		free((p))
+
+DBusMessage *sem_dbus_show_route_policy(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+	unsigned char rtb_id = 0;
+	int ret = 0;
+	char *conf = rc_calloc(1, ROUTE_CONF_SIZE);
+	
+	if(!conf) {
+		sem_syslog_warning("out of memory\n");
+		goto failed;
+	}
+	
+	sem_syslog_dbg("Dbus to sem for show route policy.\n");
+
+	dbus_error_init(&err);
+	
+	if (!(dbus_message_get_args ( msg, &err,
+		                                    DBUS_TYPE_BYTE,&rtb_id,
+											DBUS_TYPE_INVALID))) {
+											
+			sem_syslog_warning("Unable to get input args ");
+			if (dbus_error_is_set(&err)) {
+				sem_syslog_warning("%s raised: %s",err.name,err.message);
+				dbus_error_free(&err);
+			}
+			goto failed;
+	}
+	/*rtb_id = 0 : all info; relse is someone.*/
+	ret = route_policy_show(rtb_id,conf);
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_append_args(reply,
+									DBUS_TYPE_INT32, &ret,
+									DBUS_TYPE_STRING, &conf,
+									DBUS_TYPE_INVALID);
+
+	done:
+		if(conf)
+			rc_free(conf);
+		return reply;
+	
+	failed:
+		reply = NULL;
+		goto done;
+
+}
+
+DBusMessage *sem_dbus_show_ip_route_policy(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+	unsigned char rtb_id = 0;
+	int ret = 0;
+	char *conf = rc_calloc(1, ROUTE_CONF_SIZE);
+	
+	if(!conf) {
+		sem_syslog_warning("out of memory\n");
+		goto failed;
+	}
+	
+	sem_syslog_dbg("Dbus to sem for show route policy.\n");
+
+	dbus_error_init(&err);
+	
+	if (!(dbus_message_get_args ( msg, &err,
+		                                    DBUS_TYPE_BYTE,&rtb_id,
+											DBUS_TYPE_INVALID))) {
+											
+			sem_syslog_warning("Unable to get input args ");
+			if (dbus_error_is_set(&err)) {
+				sem_syslog_warning("%s raised: %s",err.name,err.message);
+				dbus_error_free(&err);
+			}
+			goto failed;
+	}
+	/*rtb_id = 0 : all info; relse is someone.*/
+	ret = ip_route_policy_show(rtb_id,conf);
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_append_args(reply,
+									DBUS_TYPE_INT32, &ret,
+									DBUS_TYPE_STRING, &conf,
+									DBUS_TYPE_INVALID);
+
+	done:
+		if(conf)
+			rc_free(conf);
+		return reply;
+	
+	failed:
+		reply = NULL;
+		goto done;
+
+}
+
+
+DBusMessage *sem_dbus_show_route_policy_all(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+	unsigned char rtb_id = 0;
+	int ret = 0;
+	char *conf = rc_calloc(1, ROUTE_CONF_SIZE);
+	
+	if(!conf) {
+		sem_syslog_warning("out of memory\n");
+		goto failed;
+	}
+	
+	sem_syslog_dbg("Dbus to sem for show route policy.\n");
+
+	dbus_error_init(&err);
+	
+	if (!(dbus_message_get_args ( msg, &err,
+		                                    DBUS_TYPE_BYTE,&rtb_id,
+											DBUS_TYPE_INVALID))) {
+											
+			sem_syslog_warning("Unable to get input args ");
+			if (dbus_error_is_set(&err)) {
+				sem_syslog_warning("%s raised: %s",err.name,err.message);
+				dbus_error_free(&err);
+			}
+			goto failed;
+	}
+	/*rtb_id = 0 : all info; relse is someone.*/
+	ret = route_policy_show_all(conf);
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_append_args(reply,
+									DBUS_TYPE_INT32, &ret,
+									DBUS_TYPE_STRING, &conf,
+									DBUS_TYPE_INVALID);
+
+	done:
+		if(conf)
+			rc_free(conf);
+		return reply;
+	
+	failed:
+		reply = NULL;
+		goto done;
+
+}
+
+
+DBusMessage *sem_dbus_route_policy_show_running(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	DBusMessage* reply = NULL;
+	DBusMessageIter  iter;
+	DBusError err;
+	unsigned char rtb_id = 0;
+	int ret = 0;
+	char *conf = rc_calloc(1, ROUTE_CONF_SIZE);
+	
+	if(!conf) {
+		sem_syslog_warning("out of memory\n");
+		goto failed;
+	}
+	
+	sem_syslog_dbg("Dbus to sem for show route running.\n");
+
+	dbus_error_init(&err);
+	
+	if (!(dbus_message_get_args ( msg, &err,
+		                                    DBUS_TYPE_BYTE,&rtb_id,
+											DBUS_TYPE_INVALID))) {
+											
+			sem_syslog_warning("Unable to get input args ");
+			if (dbus_error_is_set(&err)) {
+				sem_syslog_warning("%s raised: %s",err.name,err.message);
+				dbus_error_free(&err);
+			}
+			goto failed;
+	}
+	/*rtb_id = 0 : all info; relse is someone.*/
+	ret = route_policy_show_running(conf);
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_append_args(reply,
+									DBUS_TYPE_INT32, &ret,
+									DBUS_TYPE_STRING, &conf,
+									DBUS_TYPE_INVALID);
+
+	done:
+		if(conf)
+			rc_free(conf);
+		return reply;
+	
+	failed:
+		reply = NULL;
+		goto done;
+
+}
+
+#endif
 #ifdef __cplusplus
 extern "C"
 }
