@@ -38,7 +38,6 @@ int aat_kernel_rx(struct sk_buff *skb){
 	*/
 	int datalen = 0;
 	char *tmp = NULL;
-	unsigned int v_ip = 0;
 	tmp = skb->data;
 	eth = (struct ethhdr *)(skb->data);
 	if(aat_debug >= AAT_DEBUG)
@@ -70,21 +69,21 @@ int aat_kernel_rx(struct sk_buff *skb){
 			if(aat_debug >= AAT_DEBUG)
 			printk("aat_kernel_rx  we get sta in udp\n");
 			sta->realsip = iph->saddr;
+			if(aat_debug >= AAT_DEBUG)
+			printk("%s iph->saddr before changed,sta real ip %d.%d.%d.%d.\n", \
+						__func__, ((iph->saddr) >> 24) & 0xFF, ((iph->saddr) >> 16) & 0xFF,((iph->saddr) >> 8) & 0xFF, (iph->saddr) & 0xFF);
 			memcpy(sta->realdmac, eth->h_dest, MAC_LEN);
 			memcpy(eth->h_dest, sta->acmac, MAC_LEN);
 			put_unaligned(htonl(sta->staip), &(iph->saddr));
 			if(aat_debug >= AAT_DEBUG)
-			printk("%s,%d,sta->realdmac:%2X:%2X:%2X:%2X:%2X:%2X.\n",__func__,__LINE__,sta->realdmac[0],sta->realdmac[1],sta->realdmac[2],sta->realdmac[3],sta->realdmac[4],sta->realdmac[5]);
-			if(aat_debug >= AAT_DEBUG)
-			printk("%s,%d,sta->acmac:%2X:%2X:%2X:%2X:%2X:%2X.\n",__func__,__LINE__,sta->acmac[0],sta->acmac[1],sta->acmac[2],sta->acmac[3],sta->acmac[4],sta->acmac[5]);
-			v_ip = sta->staip;
-			if(aat_debug >= AAT_DEBUG)
-			printk("sta->staip %d.%d.%d.%d.\n", \
-						(v_ip >> 24) & 0xFF, (v_ip >> 16) & 0xFF,(v_ip >> 8) & 0xFF, v_ip & 0xFF);
-			v_ip = iph->saddr;
-			if(aat_debug >= AAT_DEBUG)
-			printk("iph->saddr %d.%d.%d.%d.\n", \
-						(v_ip >> 24) & 0xFF, (v_ip >> 16) & 0xFF,(v_ip >> 8) & 0xFF, v_ip & 0xFF);
+			{
+			    printk("%s,%d,sta->realdmac:%02X:%02X:%02X:%02X:%02X:%02X.\n",__func__,__LINE__,sta->realdmac[0],sta->realdmac[1],sta->realdmac[2],sta->realdmac[3],sta->realdmac[4],sta->realdmac[5]);
+			    printk("%s,%d,sta->acmac:%02X:%02X:%02X:%02X:%02X:%02X.\n",__func__,__LINE__,sta->acmac[0],sta->acmac[1],sta->acmac[2],sta->acmac[3],sta->acmac[4],sta->acmac[5]);
+			    printk("%s sta virtual ip ,sta->staip %d.%d.%d.%d.\n", \
+						    __func__, ((sta->staip) >> 24) & 0xFF, ((sta->staip) >> 16) & 0xFF,((sta->staip) >> 8) & 0xFF, (sta->staip) & 0xFF);
+			    printk("%s iph->saddr after changed %d.%d.%d.%d.\n", \
+						    __func__, ((iph->saddr) >> 24) & 0xFF, ((iph->saddr) >> 16) & 0xFF,((iph->saddr) >> 8) & 0xFF, (iph->saddr) & 0xFF);
+			}
 			iph->check = 0;
 			iph->check	  = ip_fast_csum((unsigned char *)iph, iph->ihl);
 			udph->check = 0;
@@ -113,9 +112,21 @@ int aat_kernel_rx(struct sk_buff *skb){
 			if(aat_debug >= AAT_DEBUG)
 			printk("aat_kernel_rx  we get sta in tcp\n");
 			sta->realsip = iph->saddr;
+			if(aat_debug >= AAT_DEBUG)
+			printk("%s iph->saddr before changed,sta real ip %d.%d.%d.%d.\n", \
+						__func__, ((iph->saddr) >> 24) & 0xFF, ((iph->saddr) >> 16) & 0xFF,((iph->saddr) >> 8) & 0xFF, (iph->saddr) & 0xFF);
 			memcpy(sta->realdmac, eth->h_dest, MAC_LEN);
 			memcpy(eth->h_dest, sta->acmac, MAC_LEN);
 			put_unaligned(htonl(sta->staip), &(iph->saddr));
+			if(aat_debug >= AAT_DEBUG)
+			{
+			    printk("%s,%d,sta->realdmac:%02X:%02X:%02X:%02X:%02X:%02X.\n",__func__,__LINE__,sta->realdmac[0],sta->realdmac[1],sta->realdmac[2],sta->realdmac[3],sta->realdmac[4],sta->realdmac[5]);
+			    printk("%s,%d,sta->acmac:%02X:%02X:%02X:%02X:%02X:%02X.\n",__func__,__LINE__,sta->acmac[0],sta->acmac[1],sta->acmac[2],sta->acmac[3],sta->acmac[4],sta->acmac[5]);
+			    printk("%s sta virtual ip ,sta->staip %d.%d.%d.%d.\n", \
+						    __func__, ((sta->staip) >> 24) & 0xFF, ((sta->staip) >> 16) & 0xFF,((sta->staip) >> 8) & 0xFF, (sta->staip) & 0xFF);
+			    printk("%s iph->saddr after changed %d.%d.%d.%d.\n", \
+						    __func__, ((iph->saddr) >> 24) & 0xFF, ((iph->saddr) >> 16) & 0xFF,((iph->saddr) >> 8) & 0xFF, (iph->saddr) & 0xFF);
+			}
 			iph->check = 0;
 			iph->check	  = ip_fast_csum((unsigned char *)iph, iph->ihl);
 			tcph->check = 0;
