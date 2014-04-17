@@ -228,6 +228,12 @@ struct tipc_node *tipc_net_select_node(u32 addr)
 	dbg_assert(addr != addr_zone(tipc_own_addr));
 	dbg_assert(addr != 0);
 
+	//no route addr which not belongs to our cluster
+	if (unlikely(!in_own_cluster(addr))) {
+		printk("tipc_debug: addr=0x%x\n", addr);
+		return NULL;
+	}
+	
 	if (likely(in_own_cluster(addr)))
 		return (struct tipc_node *)tipc_net_lookup_element(addr,
 							      &tipc_local_nodes);
