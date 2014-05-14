@@ -77,7 +77,7 @@ int pure_ip_enable = FUNC_DISABLE;
 int pure_ipv6_enable = FUNC_DISABLE;
 int ipv6_enable = FUNC_DISABLE;
 int pppoe_enable = FUNC_DISABLE;
-
+int aat_enable = FUNC_DISABLE;
 
 /* work mode */
 #define IPFWD_LEARN_MODE_NONE                  0
@@ -142,6 +142,13 @@ MODULE_PARM_DESC(pppoe_enable,"\n"
 	    "\t\t 0 disable pppoe learned\n"
 	    "\t\t 1 enable pppoe learned\n"
 	    );
+
+module_param(aat_enable,int,0644);
+MODULE_PARM_DESC(aat_enable,"\n"
+		"\t\t 0 disable aat learned\n"
+		"\t\t 1 enable  aat learned\n"
+		);
+
 
 
 #ifdef IPFWD_LEARN_MODE_STANDALONE   
@@ -967,7 +974,8 @@ static inline int cw_802_3_cache_learned(struct sk_buff *skb,
 		uint32_t *rpa_flag,
 		uint8_t dev_type,
 		uint16_t pppoe_session_id,
-		uint16_t pppoe_flag
+		uint16_t pppoe_flag,
+		struct aat_sta_info *sta_info
 )
 {
 
@@ -1083,6 +1091,13 @@ static inline int cw_802_3_cache_learned(struct sk_buff *skb,
 
 
 	memcpy(fccp_cmd->fccp_data.rule_info.rule_param.acl_tunnel_eth_header_dmac, in_l2_hd, MAC_LEN);
+	
+	/* add for spuurt aat 2013-11-12 */
+	if (FUNC_ENABLE == aat_enable)
+	{
+		memcpy(sta_info->stamac, fccp_cmd->fccp_data.rule_info.rule_param.acl_tunnel_eth_header_dmac, MAC_LEN);
+	}
+	
 	memcpy(fccp_cmd->fccp_data.rule_info.rule_param.acl_tunnel_eth_header_smac, (in_l2_hd + MAC_LEN), MAC_LEN);
 	fccp_cmd->fccp_data.rule_info.rule_param.acl_tunnel_eth_header_ether = *((uint16_t*)(in_l2_hd + MAC_LEN*2));
 
@@ -1175,7 +1190,8 @@ static inline int cw_cache_learned(struct sk_buff *skb,
 				uint32_t*  rpa_flag,
 				uint8_t dev_type,
 				uint16_t pppoe_session_id,
-				uint16_t pppoe_flag
+				uint16_t pppoe_flag,
+				struct aat_sta_info *sta_info
 )
 {
 	struct ieee80211_frame *ieee80211_hdr = NULL;
@@ -1310,6 +1326,12 @@ static inline int cw_cache_learned(struct sk_buff *skb,
 	/* add for coverity by wangjian dont need modify */
 	memcpy(fccp_cmd->fccp_data.rule_info.rule_param.tunnel_l2_header.wifi_header.addr, \
 			         ieee80211_hdr->i_addr1, MAC_LEN * 3); 
+					 
+	/* add for spuurt aat 2013-11-12 */
+	if (FUNC_ENABLE == aat_enable)
+	{
+		memcpy(sta_info->stamac, fccp_cmd->fccp_data.rule_info.rule_param.tunnel_l2_header.wifi_header.addr, MAC_LEN);
+	}
 
 	if (IP_VERSION_V4 == ip->version)
 	{
@@ -1907,11 +1929,15 @@ static inline int cw_802_11_icmp_cache_learned(struct sk_buff *skb,
 }
 
 static inline void
-nat_cache_learned(struct net *net, control_cmd_t *fccp_cmd, struct iphdr *ip) {
+nat_cache_learned(struct net *net, control_cmd_t *fccp_cmd, struct iphdr *ip, struct aat_sta_info *sta_info) {
 	struct nf_conntrack_tuple tuple, *t;	
 	struct nf_conntrack_tuple_hash *h;
 	struct nf_conn *ct;
 	struct tcphdr *th;
+	uint32_t vip = 0;
+	uint32_t tip = 0;
+	int upward = 0;
+	int downward = 0;
 
 	if (unlikely(!ip))
 		return;
@@ -1933,7 +1959,39 @@ nat_cache_learned(struct net *net, control_cmd_t *fccp_cmd, struct iphdr *ip) {
 	tuple.src.u.all = th->dest;
 	tuple.dst.u.all = th->source;
 
+	/* eth->capwap (mac get vip) add for support aat 2013-11-12 */
+	if ((FUNC_ENABLE == aat_enable) && 
+		((sta_info->stamac[0] != 0) || (sta_info->stamac[1] != 0) || (sta_info->stamac[2] != 0) || (sta_info->stamac[3] != 0) || (sta_info->stamac[4] != 0) || (sta_info->stamac[5] != 0)))
+	{
+		if (AAT_RETURN_SUCCESS == aat_get_sta_info(AAT_STA_GET_TYPE_MAC,sta_info))
+		{
+			vip = sta_info->staip;
+			if (0 != vip)
+			{
+				downward = 1;
+				log(DEBUG_LVL, "IPFWD_LEARN:aat (mac get vip) vip %u.%u.%u.%u .\n",NIPQUAD(vip));
+			}
+			else
+			{
+				log(DEBUG_LVL, "IPFWD_LEARN:aat (mac get vip fail vip = 0) .\n");
+			}
+		}
+		else
+		{
+			log(DEBUG_LVL, "IPFWD_LEARN:aat (mac get vip fail) .\n");
+		}
+	}
+
+	/* eth->capwap nat & aat add for support aat 2013-11-12 */
+	if (vip != 0)
+	{
+		tuple.src.u3.ip = vip;
+		log(DEBUG_LVL, "IPFWD_LEARN:aat (vip get nat before aat&nat eth->capwap) vip %u.%u.%u.%u .\n",NIPQUAD(vip));
+	}
+
+
 	h = nf_conntrack_find_get(net, &tuple);
+	/*
 	if (!h) {
 		log(DEBUG_LVL, "nat_cache_learned: conntrack find failed, "
 						"%s, src=%u.%u.%u.%u:%u dst=%u.%u.%u.%u:%u\n",
@@ -1942,33 +2000,35 @@ nat_cache_learned(struct net *net, control_cmd_t *fccp_cmd, struct iphdr *ip) {
 						NIPQUAD(tuple.dst.u3.ip), tuple.dst.u.all);
 		return;
 	}
+	*/
+	if (NULL != h)
+	{
+		ct = nf_ct_tuplehash_to_ctrack(h);
 
-	ct = nf_ct_tuplehash_to_ctrack(h);
-	
-	/* identify if occured snat or dnat ? test bit IPS_NAT_MASK and IPS_NAT_DONE_MASK */
-	if (!(ct->status & IPS_NAT_MASK) || !(ct->status & IPS_NAT_DONE_MASK))
-		goto out;
+		/* identify if occured snat or dnat ? test bit IPS_NAT_MASK and IPS_NAT_DONE_MASK */
+		if (!(ct->status & IPS_NAT_MASK) || !(ct->status & IPS_NAT_DONE_MASK))
+			goto out;
 
-	if (ip->protocol == IP_PROTOCOL_TCP) {
-		log(DEBUG_LVL, "nat_cache_learned: TCP: src=%u.%u.%u.%u:%u dst=%u.%u.%u.%u:%u "
-						"[%s%s%s%s], ct->status %lu, ct->proto.tcp.state %u\n",
-						NIPQUAD(ip->saddr), th->source, NIPQUAD(ip->daddr), th->dest,
-						th->syn ? "SYN " : "", th->fin ? "FIN " : "", 
-						th->rst ? "RST " : "", th->ack ? "ACK" : "",
-						ct->status, ct->proto.tcp.state);
-	} else if (ip->protocol == IP_PROTOCOL_UDP) {
-		log(DEBUG_LVL, "nat_cache_learned: UDP: src=%u.%u.%u.%u:%u dst=%u.%u.%u.%u:%u ct->status %lu\n",
-						NIPQUAD(ip->saddr), th->source, NIPQUAD(ip->daddr), th->dest, ct->status);
-	}
+		if (ip->protocol == IP_PROTOCOL_TCP) {
+			log(DEBUG_LVL, "nat_cache_learned: TCP: src=%u.%u.%u.%u:%u dst=%u.%u.%u.%u:%u "
+							"[%s%s%s%s], ct->status %lu, ct->proto.tcp.state %u\n",
+							NIPQUAD(ip->saddr), th->source, NIPQUAD(ip->daddr), th->dest,
+							th->syn ? "SYN " : "", th->fin ? "FIN " : "", 
+							th->rst ? "RST " : "", th->ack ? "ACK" : "",
+							ct->status, ct->proto.tcp.state);
+		} else if (ip->protocol == IP_PROTOCOL_UDP) {
+			log(DEBUG_LVL, "nat_cache_learned: UDP: src=%u.%u.%u.%u:%u dst=%u.%u.%u.%u:%u ct->status %lu\n",
+							NIPQUAD(ip->saddr), th->source, NIPQUAD(ip->daddr), th->dest, ct->status);
+		}
 
-	/* identify if conntrack assured ? test bit IPS_ASSURED_BIT */
-	if (!test_bit(IPS_ASSURED_BIT, &ct->status))
-		goto out;
+		/* identify if conntrack assured ? test bit IPS_ASSURED_BIT */
+		if (!test_bit(IPS_ASSURED_BIT, &ct->status))
+			goto out;
 
-	t = &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple;
-	if (nf_ct_tuple_equal(t, &tuple)) {
-		t = &ct->tuplehash[IP_CT_DIR_REPLY].tuple;
-	}
+		t = &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple;
+		if (nf_ct_tuple_equal(t, &tuple)) {
+			t = &ct->tuplehash[IP_CT_DIR_REPLY].tuple;
+		}
 
 	fccp_cmd->fccp_data.rule_info.rule_param.ipv4_sip = t->src.u3.ip;
 	fccp_cmd->fccp_data.rule_info.rule_param.ipv4_dip = t->dst.u3.ip;	
@@ -1976,20 +2036,109 @@ nat_cache_learned(struct net *net, control_cmd_t *fccp_cmd, struct iphdr *ip) {
 	fccp_cmd->fccp_data.rule_info.rule_param.dport = t->dst.u.all;
 	fccp_cmd->fccp_data.rule_info.rule_param.protocol = t->dst.protonum;
 
-	fccp_cmd->fccp_data.rule_info.rule_param.nat_flag = 1;
-	fccp_cmd->fccp_data.rule_info.rule_param.nat_sip = tuple.dst.u3.ip;
-	fccp_cmd->fccp_data.rule_info.rule_param.nat_dip = tuple.src.u3.ip;
-	fccp_cmd->fccp_data.rule_info.rule_param.nat_sport = tuple.dst.u.all;
-	fccp_cmd->fccp_data.rule_info.rule_param.nat_dport = tuple.src.u.all; 
+		/* add for support aat 2013-08-21 */
+		if ((FUNC_ENABLE == aat_enable) && (0 == downward))
+		{
+			sta_info->staip = fccp_cmd->fccp_data.rule_info.rule_param.ipv4_sip;
+			if (AAT_RETURN_SUCCESS == aat_get_sta_info(AAT_STA_GET_TYPE_VIP,sta_info))
+			{
+				tip= sta_info->realsip;
+				/* capwap->eth aat & nat */
+				if (0 != tip)
+				{
+					fccp_cmd->fccp_data.rule_info.rule_param.ipv4_sip = tip;
+					upward = 1;
+					log(DEBUG_LVL, "IPFWD_LEARN:aat (vip get tip nat&aat capwap->eth) vip %u.%u.%u.%u tip %u.%u.%u.%u. \n",NIPQUAD(sta_info->staip),NIPQUAD(tip));
+				}
+				else 
+				{
+					log(DEBUG_LVL, "IPFWD_LEARN:aat (vip get tip fail tip = 0) \n");
+				}
+			}
+			else 
+			{
+				log(DEBUG_LVL, "IPFWD_LEARN:aat (vip get tip fail) \n");
+			}
+		}
 
-	log(DEBUG_LVL, "nat_cache_learned: %s: %s: src=%u.%u.%u.%u:%u dst=%u.%u.%u.%u:%u "
-					"src=%u.%u.%u.%u:%u dst=%u.%u.%u.%u:%u\n",
-					test_bit(IPS_SRC_NAT_DONE_BIT, &ct->status) ? "SNAT" : "DNAT",	
-					t->dst.protonum == IP_PROTOCOL_TCP ? "TCP" : "UDP",
-					NIPQUAD(t->src.u3.ip), t->src.u.all, NIPQUAD(t->dst.u3.ip), t->dst.u.all,
-					NIPQUAD(tuple.dst.u3.ip), tuple.dst.u.all, NIPQUAD(tuple.src.u3.ip), tuple.src.u.all);
-out:
-	nf_ct_put(ct);
+		/* add for support aat 2013-08-21 */
+		if ((0 == upward) && (0 == downward))
+		{
+			fccp_cmd->fccp_data.rule_info.rule_param.nat_flag |= NAT_FLAG;
+		}
+		else
+		{
+			fccp_cmd->fccp_data.rule_info.rule_param.nat_flag |= AAT_NAT_FLAG;
+		}
+		fccp_cmd->fccp_data.rule_info.rule_param.nat_sip = tuple.dst.u3.ip;
+		fccp_cmd->fccp_data.rule_info.rule_param.nat_dip = tuple.src.u3.ip;
+		/* eth->capwap nat & aat */ 
+		if ((FUNC_ENABLE == aat_enable) && (vip != 0))
+		{
+			fccp_cmd->fccp_data.rule_info.rule_param.nat_dip = ip->daddr;
+		}
+		fccp_cmd->fccp_data.rule_info.rule_param.nat_sport = tuple.dst.u.all;
+		fccp_cmd->fccp_data.rule_info.rule_param.nat_dport = tuple.src.u.all; 
+
+		log(DEBUG_LVL, "nat_cache_learned: %s: %s: src=%u.%u.%u.%u:%u dst=%u.%u.%u.%u:%u "
+						"src=%u.%u.%u.%u:%u dst=%u.%u.%u.%u:%u\n",
+						test_bit(IPS_SRC_NAT_DONE_BIT, &ct->status) ? "SNAT" : "DNAT",	
+						t->dst.protonum == IP_PROTOCOL_TCP ? "TCP" : "UDP",
+						NIPQUAD(t->src.u3.ip), t->src.u.all, NIPQUAD(t->dst.u3.ip), t->dst.u.all,
+						NIPQUAD(tuple.dst.u3.ip), tuple.dst.u.all, NIPQUAD(tuple.src.u3.ip), tuple.src.u.all);
+		out:
+		nf_ct_put(ct);
+	}
+	else
+	{
+		log(DEBUG_LVL, "nat_cache_learned: conntrack find failed, "
+				"%s, src=%u.%u.%u.%u:%u dst=%u.%u.%u.%u:%u\n",
+				tuple.dst.protonum == IP_PROTOCOL_TCP ? "TCP" : "UDP",
+				NIPQUAD(tuple.src.u3.ip), tuple.src.u.all, 
+				NIPQUAD(tuple.dst.u3.ip), tuple.dst.u.all);
+	}
+
+	/* only aat eth->capwap */
+	if ((FUNC_ENABLE == aat_enable) && (vip != 0) && (0 == fccp_cmd->fccp_data.rule_info.rule_param.nat_flag))
+	{
+		fccp_cmd->fccp_data.rule_info.rule_param.ipv4_dip 		= vip;	
+		
+		fccp_cmd->fccp_data.rule_info.rule_param.nat_flag 	|= AAT_FLAG;
+		fccp_cmd->fccp_data.rule_info.rule_param.nat_sip 	= ip->saddr;
+		fccp_cmd->fccp_data.rule_info.rule_param.nat_dip 	= ip->daddr;
+		fccp_cmd->fccp_data.rule_info.rule_param.nat_sport 	= th->source;
+		fccp_cmd->fccp_data.rule_info.rule_param.nat_dport 	= th->dest;	
+		
+		log(DEBUG_LVL, "IPFWD_LEARN:aat (only aat eth->capwap) \n");
+	}
+
+
+	/* only aat capwap->eth */
+	if ((FUNC_ENABLE == aat_enable) && (0 == downward) && (0 == upward))
+	{
+		sta_info->staip = ip->saddr;
+		if (AAT_RETURN_SUCCESS == aat_get_sta_info(AAT_STA_GET_TYPE_VIP,sta_info))
+		{
+			upward = 1;
+			tip = sta_info->realsip;
+			if (0 != tip)
+			{
+				fccp_cmd->fccp_data.rule_info.rule_param.ipv4_sip = tip; 
+
+				fccp_cmd->fccp_data.rule_info.rule_param.nat_flag 	|= AAT_FLAG;
+				fccp_cmd->fccp_data.rule_info.rule_param.nat_sip 	= ip->saddr;
+				fccp_cmd->fccp_data.rule_info.rule_param.nat_dip 	= ip->daddr;
+				fccp_cmd->fccp_data.rule_info.rule_param.nat_sport 	= th->source;
+				fccp_cmd->fccp_data.rule_info.rule_param.nat_dport 	= th->dest;	
+
+				log(DEBUG_LVL, "IPFWD_LEARN:aat (vip get tip only aat capwap->eth) vip %u.%u.%u.%u tip %u.%u.%u.%u. \n",NIPQUAD(ip->saddr),NIPQUAD(tip));
+			}
+		}
+		else 
+		{
+			log(DEBUG_LVL, "IPFWD_LEARN:aat (vip get tip fail ) \n");
+		}
+	}
 }
 
 
@@ -2031,12 +2180,17 @@ int ipfwd_learn (struct sk_buff *skb,uint8_t dev_type)
 	uint16_t pppoe_flag = 0;
 	uint16_t pppoe_session_id = 0;
 	struct ipv6hdr *ipv6 = NULL;
+	struct aat_sta_info sta_info;
+
+
 
 	cvmx_wqe_t *work = NULL;
 #ifdef IPFWD_LEARN_MODE_STANDALONE
 	struct sk_buff *fccp_skb = NULL;
 #endif
-	
+
+	memset(&sta_info, 0, sizeof(struct aat_sta_info));
+
 	if(!learn_enable)
 	{
 		return IPFWD_LEARN_RETURN_OK;
@@ -2321,7 +2475,7 @@ int ipfwd_learn (struct sk_buff *skb,uint8_t dev_type)
 	{		
 		if(cw_cache_learned(skb, ip, (struct udphdr*)th, vtag1, vtag2, out_ether_type,\
 			                  inter_ether_type, dsa_info,\
-			                  fccp_cmd,&rpa_flag,dev_type,pppoe_session_id,pppoe_flag) == IPFWD_LEARN_RETURN_FAIL)
+			                  fccp_cmd,&rpa_flag,dev_type,pppoe_session_id,pppoe_flag,&sta_info) == IPFWD_LEARN_RETURN_FAIL)
 		{
 			cvmx_atomic_add64(&fwd_learn_stats.cw_learn_fail, 1);
             goto free_buf;
@@ -2333,7 +2487,7 @@ int ipfwd_learn (struct sk_buff *skb,uint8_t dev_type)
 	{			
 		if(cw_802_3_cache_learned(skb, ip, (struct udphdr*)th, vtag1, vtag2,  out_ether_type,\
 			                  inter_ether_type, dsa_info,\
-			                  fccp_cmd,&rpa_flag,dev_type,pppoe_session_id,pppoe_flag) == IPFWD_LEARN_RETURN_FAIL)
+			                  fccp_cmd,&rpa_flag,dev_type,pppoe_session_id,pppoe_flag,&sta_info) == IPFWD_LEARN_RETURN_FAIL)
 		{
 			cvmx_atomic_add64(&fwd_learn_stats.cw8023_learn_fail, 1);
             goto free_buf;
@@ -2383,7 +2537,7 @@ int ipfwd_learn (struct sk_buff *skb,uint8_t dev_type)
 	/* lixiang modify NAT ipfwd_learn: 20130412 */
 	if (IP_VERSION_V4 == true_ip->version)
 	{
-		nat_cache_learned(dev_net(skb->dev), fccp_cmd, true_ip);
+		nat_cache_learned(dev_net(skb->dev), fccp_cmd, true_ip, &sta_info);
 	}
 	
 	/* Filter local ip if nat_flag == 1 dont filter */

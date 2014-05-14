@@ -130,7 +130,7 @@ int read_specified_rule(rule_param_t *dst_rule,rule_item_t *src_rule)
 	}
 
 	/*wangjian add for slave cpu ip is 0 20121214*/
-	if (src_rule->rules.nat_flag == 1)
+	if (src_rule->rules.nat_flag != 0)
 	{
 		dst_rule->nat_flag = src_rule->rules.nat_flag;
 		dst_rule->nat_sip = src_rule->rules.nat_sip;

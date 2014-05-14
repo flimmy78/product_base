@@ -1037,11 +1037,13 @@ void se_agent_save_cfg(unsigned char *buf,int cpu_tag, unsigned int bufLen)
 	FILE *file_ipv6 = NULL;
 	FILE *file_pure_ipv6 = NULL;
 	FILE *file_pure_ip = NULL;
+	FILE *file_aat = NULL;
 	char file_path[100] = {0};
 	unsigned char stricmp[64] = {0};
 	unsigned char strfastfwd[64] = {0};
 	int icmp_enable = FUNC_DISABLE;
 	int pppoe_enable = FUNC_DISABLE;
+	int aat_enable = FUNC_DISABLE;
 	int fastfwd_enable = FUNC_ENABLE;
 	int ipv6_enable_master = FUNC_DISABLE;
 	int pure_ipv6_enable_master = FUNC_DISABLE;
@@ -1121,6 +1123,24 @@ void se_agent_save_cfg(unsigned char *buf,int cpu_tag, unsigned int bufLen)
 			if(pppoe_enable==1)
 			{
 				length +=sprintf(current," config fast-pppoe enable\n");
+				current =showStr + length;
+			}
+		}
+
+		memset(file_path, 0, sizeof(file_path));
+		sprintf(file_path,"/sys/module/%s/parameters/aat_enable",ipfwd_learn_name);
+		file_aat = fopen(file_path,"r");
+		if(file_aat !=NULL)
+		{
+			ret=fread(stricmp,sizeof(int),sizeof(stricmp),file_aat);
+			fclose(file_aat);
+			aat_enable=atoi((char*)stricmp);
+		}
+		if((length +30)<bufLen)
+		{
+			if(aat_enable==1)
+			{
+				length +=sprintf(current," config fast-aat enable\n");
 				current =showStr + length;
 			}
 		}
@@ -2252,6 +2272,61 @@ func_end:
 	return ;
 }
 
+void se_agent_aat_enable(char *buf,struct sockaddr_tipc *client_addr,unsigned int len)
+{
+	uint32_t enable;
+	se_interative_t *se_buf=NULL;
+	int ret,rval,status;
+	char str[100]={0};
+
+	if(NULL==buf || NULL==client_addr ||0==len)
+	{
+		se_agent_syslog_err("se_agent_aat_enable  param error\n");
+		return ;
+	}
+	if(NULL == ipfwd_learn_name)
+	{
+		se_agent_syslog_err("se_agent_aat_enable not find ipfwd_learn module\n");
+		return ;
+	}
+	
+	se_buf=(se_interative_t *)buf;
+	if(FASTFWD_NOT_LOADED == (fast_forward_module_load_check()))
+	{
+		strncpy((se_buf->err_info),FASTFWD_NOT_LOADED_STR,strlen(FASTFWD_NOT_LOADED_STR));
+		se_buf->cmd_result = AGENT_RETURN_FAIL;
+		goto func_end;
+	}
+	enable=se_buf->fccp_cmd.fccp_data.module_enable;
+	sprintf(str,"echo %d > /sys/module/%s/parameters/aat_enable",enable, ipfwd_learn_name);
+	rval=system(str);
+	status=WEXITSTATUS(rval);
+	if(status)
+	{
+		se_agent_syslog_err("set fast_forward aat learned error\n");
+		goto learned_aat_err;
+	}
+	else 
+	{	
+		se_buf->cmd_result=AGENT_RETURN_OK;
+		goto func_end;
+	}
+learned_aat_err:
+	se_buf->cmd_result=AGENT_RETURN_FAIL;
+	strncpy((char*)(se_buf->err_info),"set ipfwd_learned aat failed\n",ERR_INFO_SIZE);
+	goto func_end;
+func_end:
+	ret=sendto(se_socket,(char*)buf,sizeof(se_interative_t),0,(struct sockaddr*)client_addr,len);
+	if(ret<0)
+	{
+		se_agent_syslog_err("se_agent_aat_enable send to client failed:%s\n",strerror(errno));
+		return;
+	}
+	
+	return;
+}
+
+
 
 void se_agent_pure_ip_enable(char *buf, struct sockaddr_tipc *client_addr, unsigned int len)
 {
@@ -3136,6 +3211,7 @@ int se_agent_cmd_func_table_init()
 	se_agent_cmd_func_register(SE_AGENT_CLEAR_PART_FAU64,(cmd_handle_func)se_agent_clear_part_fau64);
 	se_agent_cmd_func_register(SE_AGENT_ICMP_ENABLE,(cmd_handle_func)se_agent_icmp_enable);
 	se_agent_cmd_func_register(SE_AGENT_PPPOE_ENABLE,(cmd_handle_func)se_agent_pppoe_enable);
+	se_agent_cmd_func_register(SE_AGENT_AAT_ENABLE,(cmd_handle_func)se_agent_aat_enable);
 	se_agent_cmd_func_register(SE_AGENT_PURE_IP_ENABLE,(cmd_handle_func)se_agent_pure_ip_enable);
 	se_agent_cmd_func_register(SE_AGENT_SHOW_PURE_IP_ENABLE,(cmd_handle_func)se_agent_show_pure_ip_enable);
 	se_agent_cmd_func_register(SE_AGENT_PURE_IPV6_ENABLE,(cmd_handle_func)se_agent_pure_ipv6_enable);

@@ -714,7 +714,31 @@ typedef struct ipfwd_learn_stats_s
 
 CVMX_SHARED ipfwd_learn_stats_t fwd_learn_stats;
 
+#define AAT_RETURN_SUCCESS (1)
+#define AAT_RETURN_FAIL    (0)
 
+#define NAT_FLAG		(0x01)
+#define AAT_FLAG		(0x02)
+#define AAT_NAT_FLAG	(0x03)
+
+#define ETH_LEN				16
+
+typedef enum AAT_STA_GET_TYPE_S
+{
+	AAT_STA_GET_TYPE_MAC = 0,       /* ipfwd_learn get sta info by MAC */
+	AAT_STA_GET_TYPE_VIP = 1,       /* ipfwd_learn get sta info by VIP */
+}AAT_STA_GET_TYPE_T;
+
+/* for ipfwd_learn get sta info */
+struct aat_sta_info
+{
+	unsigned char stamac[MAC_LEN];   /* sta mac address */
+	unsigned char acmac[MAC_LEN];    /* reserved */
+	unsigned char ifname[ETH_LEN];   /* reserved */
+	unsigned int staip;              /* sta virtal ip address */
+	unsigned int realsip;            /* sta real ip address */
+};
+extern unsigned int aat_get_sta_info(int type,struct aat_sta_info *sta);
 #endif
 
 

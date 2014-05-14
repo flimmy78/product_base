@@ -771,7 +771,7 @@ static inline void encap_eth_packet_v4(cvmx_wqe_t *work, rule_item_t *rule, cvm_
 
 
 	/* add by yin for fwd nat *//*wangjian_nat*/
-	if (rule->rules.nat_flag == 1) 
+	if (rule->rules.nat_flag != 0) 
 	{
 		cvm_common_udp_hdr_t *uh = NULL;
 		cvm_common_tcp_hdr_t *th = NULL;
@@ -1021,7 +1021,7 @@ static inline void encap_802_11_cw_packet_v4(cvmx_wqe_t *work, rule_item_t *rule
 	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) - offset);
 
 	/* add by yin for fwd nat *//*wangjian_nat*/
-	if (rule->rules.nat_flag == 1) 
+	if (rule->rules.nat_flag != 0) 
 	{
 		cvm_common_udp_hdr_t *uh = NULL;
 		uh = ( cvm_common_udp_hdr_t*)((uint32_t *)ip + ip->ip_hl);
@@ -1589,7 +1589,7 @@ static inline void encap_802_3_cw_packet_v4(cvmx_wqe_t *work, rule_item_t *rule,
 	CVM_WQE_SET_LEN(work, CVM_WQE_GET_LEN(work) - offset);
 
 	/* add by yin for fwd nat *//*wangjian_nat*/
-	if (rule->rules.nat_flag == 1) 
+	if (rule->rules.nat_flag != 0) 
 	{
 		cvm_common_udp_hdr_t *uh = NULL;
 		uh = ( cvm_common_udp_hdr_t*)((uint32_t *)ip + ip->ip_hl);
@@ -2498,7 +2498,7 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
 			}
 			
-			if (1 == prule->rules.nat_flag)
+			if (0 != prule->rules.nat_flag)
 			{
 				pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 				pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -2539,7 +2539,7 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
 			}
 						
-			if (1 == prule->rules.nat_flag)
+			if (0 != prule->rules.nat_flag)
 			{
 				pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 				pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -2580,7 +2580,7 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
 			}			
 			
-			if (1 == prule->rules.nat_flag)
+			if (0 != prule->rules.nat_flag)
 			{
 				pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 				pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -2624,7 +2624,7 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 			}
 						
-			if (1 == prule->rules.nat_flag)
+			if (0 != prule->rules.nat_flag)
 			{
 				pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 				pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -2665,7 +2665,7 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 			}
 			
-			if (1 == prule->rules.nat_flag)
+			if (0 != prule->rules.nat_flag)
 			{
 				pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 				pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -2709,7 +2709,7 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 			}
 			
-			if (1 == prule->rules.nat_flag)
+			if (0 != prule->rules.nat_flag)
 			{
 				pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 				pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -2750,7 +2750,7 @@ int32_t flow_icmp_fast_path(rule_item_t *prule, cvmx_wqe_t *work, cvm_common_ip_
 				cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 			}
 			
-			if (1 == prule->rules.nat_flag)
+			if (0 != prule->rules.nat_flag)
 			{
 				pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 				pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -3315,7 +3315,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 
 
 				
-				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (1 == prule->rules.nat_flag))
+				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (0 != prule->rules.nat_flag))
 				{
 					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -3352,7 +3352,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
 				}
 				
-				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (1 == prule->rules.nat_flag))
+				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (0 != prule->rules.nat_flag))
 				{
 					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -3389,7 +3389,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_ETH, CVM_WQE_GET_LEN(work));
 				}
 				
-				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (1 == prule->rules.nat_flag))
+				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (0 != prule->rules.nat_flag))
 				{
 					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -3443,7 +3443,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 				}
 				
-				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (1 == prule->rules.nat_flag))
+				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (0 != prule->rules.nat_flag))
 				{
 					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -3479,7 +3479,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 				}
 								
-				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (1 == prule->rules.nat_flag))
+				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (0 != prule->rules.nat_flag))
 				{
 					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -3522,7 +3522,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 				}
 				
-				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (1 == prule->rules.nat_flag))
+				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (0 != prule->rules.nat_flag))
 				{
 					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;
@@ -3558,7 +3558,7 @@ void flow_action_process(cvmx_wqe_t *work, uint32_t action_type,
 					cvmx_fau_atomic_add64(CVM_FAU_ENET_OUTPUT_BYTES_CAPWAP, CVM_WQE_GET_LEN(work));
 				}
 				
-				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (1 == prule->rules.nat_flag))
+				if ((CVM_IP_IPVERSION == true_ip->ip_v) && (0 != prule->rules.nat_flag))
 				{
 					pkt_ptr = (uint8_t *)cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 					pko_ip_offset = (uint8_t *)true_ip - (uint8_t *)pkt_ptr + 1;

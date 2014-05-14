@@ -496,7 +496,7 @@ inline int32_t acl_fill_rule(rule_param_t* dst_rule_para, rule_param_t* src_rule
 	dst_rule_para->rule_state = src_rule_para->rule_state;
 
 	/* add by yin for fwd nat *//*wangjian_nat*/
-	if (src_rule_para->nat_flag == 1) {
+	if (src_rule_para->nat_flag != 0) {
 		dst_rule_para->nat_flag = src_rule_para->nat_flag;
 		dst_rule_para->nat_sip = src_rule_para->nat_sip;
 		dst_rule_para->nat_dip = src_rule_para->nat_dip;
@@ -1011,7 +1011,8 @@ inline int32_t fwd_get_user_idx(rule_param_t *rule_param)
 				dip_user_flag = 1;
 			}
 		}
-		else if (1 == rule_param->nat_flag)
+		//else if (1 == rule_param->nat_flag)
+		else if (0 != rule_param->nat_flag)
 		{
 			if ((rule_param->nat_sip == rule_param->ipv4_sip)
 		        && (rule_param->nat_dip != rule_param->ipv4_dip))
