@@ -53,10 +53,6 @@ static irqreturn_t sem_irq_interrupt(int irq, void *dev_id)
 	
 	ksemDBG("**********************start*******************\n");
     ksemDBG("GPIO5 INTERRUPT  irq = %d\n", irq);
-
-	printk(KERN_ERR"**********************start*******************\n");
-    printk(KERN_ERR"GPIO5 INTERRUPT  irq = %d\n", irq);
-       
        
     switch(product_id)
     {
