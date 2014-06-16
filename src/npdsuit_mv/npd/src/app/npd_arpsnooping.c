@@ -10392,16 +10392,15 @@ end_without_close_fd:
 			dbus_message_iter_next(&iter);
 			if(ARP_FILTER_IFINDEX == filterType)
 			{
-				dst_ifname = (char *)malloc(MAX_IFNAME_LEN+1);
-				memset(dst_ifname,0,MAX_IFNAME_LEN+1);
+				/*dst_ifname = (char *)malloc(MAX_IFNAME_LEN+1);
+				memset(dst_ifname,0,MAX_IFNAME_LEN+1);*/
 				dbus_message_iter_get_basic(&iter, &dst_ifname);
 				dbus_message_iter_next(&iter); 
 				filter = if_nametoindex(dst_ifname);
 
-
 				npd_syslog_dbg("filter = %d,dst_ifname = %s\n",filter,dst_ifname);
-				free(dst_ifname);
-				dst_ifname = NULL;
+				/*free(dst_ifname);
+				dst_ifname = NULL;*/
 			}
 		}
 			
