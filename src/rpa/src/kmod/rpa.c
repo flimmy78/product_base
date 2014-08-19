@@ -68,6 +68,8 @@ int rpa_rx_debug = 0;
 module_param(rpa_rx_debug,int,0644);
 int rpa_arp_eth_debug = 0;
 module_param(rpa_arp_eth_debug,int,0644);
+int rpa_ipv6_na_debug = 0;
+module_param(rpa_ipv6_na_debug,int,0644);
 
 
 rpa_tx_dev_info_t rpa_tx_dev_index[RPA_SLOT_NUM][RPA_SLOT_NUM];/* tx_dev when rpa send packet out of board */

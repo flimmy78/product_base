@@ -55,6 +55,7 @@ extern int rpa_rx_debug;
 extern int rpa_tx_debug;
 extern int rpa_rx_eth_debug;
 extern int rpa_arp_eth_debug;
+extern int rpa_ipv6_na_debug;
 extern int rpa_local_slot_num;
 
 extern uint32_t (*cvm_rpa_rx_hook) (struct sk_buff *);
@@ -161,7 +162,8 @@ rpa_callback_result_t rpa_ipv6_neighbor_advertisement_broadcast(struct sk_buff *
 	struct sk_buff *skb_cp = NULL;
 	int ret;
 
-	return 0;  /* for debug, need remove later! */
+	if (rpa_ipv6_na_debug)
+		return 0;  /* for debug, need remove later! */
 	
 	if ((NULL == skb) || (NULL == skb->dev)) {
 		return -1;
