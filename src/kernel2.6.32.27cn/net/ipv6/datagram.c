@@ -547,11 +547,16 @@ int datagram_send_ctl(struct net *net,
 				return -EINVAL;
 
 			if (addr_type != IPV6_ADDR_ANY) {
+				/*
 				int strict = __ipv6_addr_src_scope(addr_type) <= IPV6_ADDR_SCOPE_LINKLOCAL;
 				if (!ipv6_chk_addr(net, &src_info->ipi6_addr,
-						   strict ? dev : NULL, 0))
+						   strict ? dev : NULL, 0)){
+					printk("datagram_send_ctl: ipv6_chk_addr check err,strict=%d,ipv6_chk_addr(net,addr,NULL,0)=%d\r\n",
+						strict,ipv6_chk_addr(net,&src_info->ipi6_addr,NULL,0));
 					err = -EINVAL;
+				}
 				else
+				*/
 					ipv6_addr_copy(&fl->fl6_src, &src_info->ipi6_addr);
 			}
 

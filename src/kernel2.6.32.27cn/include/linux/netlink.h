@@ -31,6 +31,7 @@
 #define NETLINK_KSEM        23
 #define NETLINK_DISTRIBUTED 24
 #define NETLINK_RPA 		25
+#define NETLINK_RTMD        26
 #define NETLINK_PPPOE		28
 
 #define MAX_LINKS 32		

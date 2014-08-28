@@ -19,6 +19,7 @@
 #define NETLINK_DISTRIBUTED 24
 #define NETLINK_KSEM        23
 #define NETLINK_RPA 25
+#define NETLINK_RTMD 26
 
 
 #define ACTIVE_STDBY_SWITCH_EVENT 5
@@ -47,7 +48,9 @@ enum netlink_msg_type
 	RPA_BROADCAST_MASK_ACTION_EVENT,
 	RPA_DEBUG_CMD_EVENT,
 	ASIC_DYNAMIC_TRUNK_NOTIFIER_EVENT,
-	NL_MSG_TYPE_MAX
+	NL_MSG_TYPE_MAX,
+	VRRP_STATE_NOTIFIER_EVENT
+
 };
 
 enum module_type
@@ -122,6 +125,12 @@ typedef struct product_state_info_s{
     int slotid;
 }product_state_info_t;
 
+typedef struct vrrp_state_info_s{
+	char interface[32];
+    int state;
+}vrrp_state_info_t;
+
+
 typedef struct asic_port_update_s{
 	unsigned char devNum;
 	unsigned char virportNum;
@@ -194,6 +203,8 @@ typedef struct netlink_msg_s{
 		mac_addr_t base_mac_addr[6];
 		rpa_mask_action_t broadcast_mask_action;
 		rpa_debug_cmd_t debug_cmd_type;
+		vrrp_state_info_t vrrpInfo;
+
 	}msgData;	
 }netlink_msg_t;
 
