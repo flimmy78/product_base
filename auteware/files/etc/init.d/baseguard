@@ -12,6 +12,9 @@ mem_status_dog.sh >/dev/null 2>&1 &
 
 log_action_end_msg $?
 
+log_action_begin_msg "Starting wcpss monitor"
+nice -n-2 wcpss_check.sh >/dev/null 2>&1 &
+log_action_end_msg $?
 
 log_action_begin_msg "Starting system base guard"
 . /usr/bin/libsnapshot.sh
