@@ -4,7 +4,8 @@
 #include <linux/netdevice.h>
 
 #define AAT_DEBUG    9
-#define AAT_WARNING  5
+#define AAT_INFO  5
+#define AAT_WARNING  3
 #define AAT_ERROR    1
 
 #define MAC_LEN		6
@@ -15,6 +16,24 @@
 
 #define AAT_NEED_DROP_PACKET 2
 #define AAT_NORMAL	0
+
+#define STA_HASH(sta) ((sta[2]+sta[3]+sta[4]+sta[5])%HASH_SIZE)
+#define AAT_STA_VIP_HASH(vip)  (vip % HASH_SIZE)
+
+#define IPFORMAT	"%u.%u.%u.%u"
+#define MACFORMAT	"%02x:%02x:%02x:%02x:%02x:%02x"
+#define format_ip(x)	\
+ (x>>24)&0xFF,(x>>16)&0xFF,(x>>8)&0xFF,x&0xFF
+#define format_mac(x)	\
+	x[0],x[1],x[2],x[3],x[4],x[5]
+
+
+#define PTR_MIN	0x1
+#define PTR_MAX 0xffff
+#define PTR_KADD 0xA80000
+#define IS_INVALID_PTR(p)	\
+	(((p >> 40) != PTR_KADD) || (p >= PTR_MIN && p <= PTR_MAX))
+//	(((p >> 40) == PTR_KADD) && p >= PTR_MIN && p <= PTR_MAX)
 
 /**
   * Command number for ioctl.
@@ -27,6 +46,7 @@ struct io_info
 	unsigned char in_ifname[ETH_LEN];	
 	unsigned int staip;
 	unsigned int vrrid;
+	unsigned int seq_num;
 };
 
 /* for ipfwd_learn get sta info */
@@ -78,7 +98,7 @@ struct aat_info{
 	struct sta_info *sta_vip_hash[HASH_SIZE];    /* STA virtual IP hash */
 };
 
-//void netlink_with_asd(void);
+void netlink_with_asd(void);
 extern struct aat_info allif;
 
 #endif

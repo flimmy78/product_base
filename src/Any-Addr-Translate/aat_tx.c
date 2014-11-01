@@ -1,6 +1,8 @@
 #include <linux/stddef.h>
-//#include <cvmx.h>
-//#include <cvmx-app-init.h>
+#if 0
+#include <cvmx.h>
+#include <cvmx-app-init.h>
+#endif
 #include <linux/ip.h>
 #include <linux/udp.h>
 #include <linux/tcp.h>
@@ -22,21 +24,26 @@
 #include "aat.h"
 #include "aat_ioctl.h"
 
+extern int allif_lock;
+
 int aat_kernel_tx(struct sk_buff *skb){
-	struct ethhdr *eth;	
-	struct iphdr *iph;
-	struct udphdr *udph;
-	struct tcphdr *tcph;
+	struct ethhdr *eth = NULL;	
+	struct iphdr *iph= NULL;
+	struct udphdr *udph= NULL;
+	struct tcphdr *tcph= NULL;
 	struct icmphdr *icmph = NULL;
 	struct sta_info *sta = NULL;
 	int ethlen = sizeof(struct ethhdr);
 	int iplen = sizeof(struct iphdr);
-	/*
-	int udplen = sizeof(struct udphdr);
-	int tcplen = sizeof(struct tcphdr);
-	int len = skb->len;
-	*/
 	int datalen = 0;
+	if (1 == allif_lock)
+	{
+		if (aat_debug >= AAT_DEBUG)
+		{
+			printk("%s-%d allif_lock LOCKED, drop\n", __func__, __LINE__);
+		}
+		return AAT_NEED_DROP_PACKET;
+	}
 	eth = (struct ethhdr *)(skb->data);
 	if(aat_debug >= AAT_DEBUG)
 	printk("%s sta: %02X:%02X:%02X:%02X:%02X:%02X\n",__func__,eth->h_dest[0],eth->h_dest[1],eth->h_dest[2],eth->h_dest[3],eth->h_dest[4],eth->h_dest[5]);
@@ -44,8 +51,8 @@ int aat_kernel_tx(struct sk_buff *skb){
 		iph = (struct iphdr *)(skb->data + ethlen);	
 		if (iph->ihl < 5 || iph->version != 4)
 		{
-			printk(KERN_ERR"[aat tx]sta %02x:%02x:%02x:%02x:%02x:%02x ip head ver %d len %d err\n", \
-						eth->h_dest[0],eth->h_dest[1],eth->h_dest[2],eth->h_dest[3],eth->h_dest[4], \
+			printk(KERN_ERR"%s-%d error pkt to sta %02X:%02X:%02X:%02X:%02X:%02X with ip head ver %d len %d\n", \
+						__func__, __LINE__,eth->h_dest[0],eth->h_dest[1],eth->h_dest[2],eth->h_dest[3],eth->h_dest[4], \
 						eth->h_dest[5],iph->version, iph->ihl);
 			return AAT_NEED_DROP_PACKET; /* error packet, need drop!*/
 		}
@@ -53,7 +60,14 @@ int aat_kernel_tx(struct sk_buff *skb){
 			udph = (struct udphdr *)(skb->data + ethlen + iplen);
 			sta = aat_get_sta(&allif, eth->h_dest);
 			if(sta == NULL)
+			{
+				if(aat_debug >= AAT_ERROR)
+				{
+					printk(KERN_ERR"%s-%d error :udp pkt to %02X:%02X:%02X:%02X:%02X:%02X no sta found\n",__func__, __LINE__,
+							eth->h_dest[0],eth->h_dest[1],eth->h_dest[2],eth->h_dest[3],eth->h_dest[4],eth->h_dest[5]);
+				}
 				return AAT_NORMAL;
+			}
 			if(aat_debug >= AAT_DEBUG)
 			printk("aat_kernel_tx  we get sta in udp\n");
 			memcpy(eth->h_source, sta->realdmac, MAC_LEN);
@@ -71,8 +85,15 @@ int aat_kernel_tx(struct sk_buff *skb){
 			datalen = skb->len - iph->ihl * 4 - ethlen;
 			tcph = (struct tcphdr *)(skb->data + ethlen + iplen);
 			sta = aat_get_sta(&allif, eth->h_dest);
-			if(sta == NULL)
+			if(sta == NULL) 
+			{
+				if(aat_debug >= AAT_ERROR)
+				{
+					printk(KERN_ERR"%s-%d error :tcp pkt to %02X:%02X:%02X:%02X:%02X:%02X no sta found\n",__func__, __LINE__,
+							eth->h_dest[0],eth->h_dest[1],eth->h_dest[2],eth->h_dest[3],eth->h_dest[4],eth->h_dest[5]);
+				}
 				return AAT_NORMAL;
+			}
 			if(aat_debug >= AAT_DEBUG)
 			printk("aat_kernel_tx  we get sta in tcp\n");
 			memcpy(eth->h_source, sta->realdmac, MAC_LEN);
@@ -92,8 +113,15 @@ int aat_kernel_tx(struct sk_buff *skb){
 			datalen = skb->len - iph->ihl * 4 - ethlen;
 			icmph = (struct icmphdr *)(skb->data + ethlen + iplen);
 			sta = aat_get_sta(&allif, eth->h_dest);
-			if(sta == NULL)
+			if(sta == NULL) 
+			{
+				if(aat_debug >= AAT_ERROR)
+				{
+					printk(KERN_ERR"%s-%d error :icmp pkt to %02X:%02X:%02X:%02X:%02X:%02X no sta found\n",__func__, __LINE__,
+							eth->h_dest[0],eth->h_dest[1],eth->h_dest[2],eth->h_dest[3],eth->h_dest[4],eth->h_dest[5]);
+				}
 				return AAT_NORMAL;
+			}
 			if(aat_debug >= AAT_DEBUG)
 			{
 				printk("aat_kernel_tx  we get sta in icmp\n");
