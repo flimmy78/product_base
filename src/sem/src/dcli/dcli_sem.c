@@ -987,6 +987,112 @@ DEFUN(sem_execute_system_command,
 	return CMD_SUCCESS;
 }
 
+/* 
+ * caojia add for snmp performance fake optimize
+ * 
+ */
+DEFUN(snmp_performance_optimize_fake_command,
+	snmp_performance_optimize_fake_command_cmd,
+	"distributed_debug_log (enable|disable)",
+	"distributed_debug_log switch command\n"
+	"distributed_debug_log switch on\n"
+	"distributed_debug_log switch off\n")
+{
+	DBusMessage *query, *reply;
+	DBusError err;
+	int ret = 1;
+
+	FILE *fd;
+	int be_enable = 0;
+	int slot_id = 0;
+	char *cmd = NULL;
+	pid_t status;
+
+	/* after mcb active standby switched, the is_active_master need get value again , caojia added*/
+	fd = fopen("/dbm/local_board/is_active_master", "r");
+	if (fd == NULL)
+	{
+		fprintf(stderr,"Get production information [1] error\n");
+		return -1;
+	}
+	fscanf(fd, "%d", &is_active_master);
+	fclose(fd);
+
+	if ((is_active_master != 1) || (is_distributed == NON_DISTRIBUTED_SYSTEM))
+	{
+		vty_out(vty, "This command is only surpported by distributed system and only on active master board\n");
+
+		return CMD_SUCCESS;
+	}
+
+	cmd = (char *)malloc(128);
+	memset(cmd, 0, 128);
+
+	if (0 == strncmp(argv[0], "enable", strlen(argv[0]))) {
+		be_enable = 1;
+	}
+
+	sprintf(cmd, "echo %d > /var/run/x_switch", be_enable);
+	//vty_out(vty, "cmd : %s\n", cmd);
+
+	status = system(cmd);
+	if (status != -1) {
+		if (WIFEXITED(status)) {
+			if (0 == WEXITSTATUS(status)) {
+				ret = 1;
+			}
+		}
+	}
+
+	if (ret) {
+		query = dbus_sem_msg_new_method_call(SEM_DBUS_BUSNAME, SEM_DBUS_OBJPATH,
+												 SEM_DBUS_INTERFACE, SEM_DBUS_EXECUTE_SYSTEM_COMMAND);
+	
+		dbus_error_init(&err);
+	
+		dbus_message_append_args(query,
+								DBUS_TYPE_UINT32, &slot_id,
+								DBUS_TYPE_STRING, &cmd,
+								DBUS_TYPE_INVALID);
+
+		reply = dbus_connection_send_with_reply_and_block(dcli_dbus_connection, query, -1, &err);
+		dbus_message_unref(query);
+
+		if (NULL == reply){
+			vty_out(vty,"<error> failed get reply.\n");
+			if (dbus_error_is_set(&err)) {
+				vty_out(vty,"%s raised: %s",err.name,err.message);
+				dbus_error_free_for_dcli(&err);
+			}
+			return CMD_SUCCESS;
+		}
+		
+		if (dbus_message_get_args (reply, &err,
+					DBUS_TYPE_UINT32, &ret,
+					DBUS_TYPE_INVALID)) {
+			if(ret == 0){
+				vty_out(vty,"Success\n");
+				return CMD_SUCCESS;
+			}
+			else if (ret == 1)
+			{
+				vty_out(vty,"Send %s message failed\n", argv[0]);
+				return CMD_WARNING;
+			}
+			else
+			{
+				vty_out(vty,"Failed\n");
+				return CMD_WARNING;
+			}
+		}
+	}
+	else {
+		vty_out(vty, "distributed_debug_log %s failed, please try again.\n", argv[0]);
+		return CMD_WARNING;
+	}
+
+	return CMD_SUCCESS;
+}
 
 int parse_slot_id_from_ifname(const char *if_name, int *slot_id)
 {
@@ -2179,6 +2285,10 @@ void dcli_sem_init(void)
 	install_element(HIDDENDEBUG_NODE, &no_debug_sem_info_cmd);
 	install_element(HIDDENDEBUG_NODE, &show_6185_reg_cmd);
 	install_element(HIDDENDEBUG_NODE, &set_6185_reg_cmd);
+	
+	/* caojia add for snmp performance fake optimize */
+	install_element(CONFIG_NODE, &snmp_performance_optimize_fake_command_cmd);
+
 }
 
 #endif
