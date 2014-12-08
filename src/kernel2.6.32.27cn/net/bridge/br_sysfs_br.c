@@ -359,6 +359,11 @@ static void clear_uplink_port(struct net_bridge *br)
     if(!br)return;
     for(i = 0; i < UPLINK_MAX_COUNT;i ++){
         if((br->uplink_port[i])&&(rcu_dereference(br->uplink_port[i]->br_port))){
+			if (!((unsigned long long)br->uplink_port[i]->br_port & 0xff00000000000000ull)) {
+				printk(KERN_CRIT"invalid address br->uplink_port[%d]->br_port %p\n", i, br->uplink_port[i]->br_port);
+				br->uplink_port[i] = NULL;
+				continue;
+			}
             br->uplink_port[i]->br_port->isuplink = 0;            
         }
         br->uplink_port[i] = NULL;
