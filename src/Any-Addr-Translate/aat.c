@@ -42,6 +42,19 @@ int aat_minor_num = 0;
 module_param(aat_minor_num,int,0444);
 int aat_debug = 0;
 module_param(aat_debug,int,0644);
+int aat_all_packet_switch = 1; /* 1: aat receive and deal all packet; 0: aat drop all packet */
+module_param(aat_all_packet_switch, int, 0644);
+int aat_udp_switch = 1;/* 1: aat receive and deal UDP packet; 0: aat drop UDP packet */
+module_param(aat_udp_switch,int,0644);
+int aat_tcpip_switch = 1;
+module_param(aat_tcpip_switch,int,0644);
+int aat_icmp_switch = 1;
+module_param(aat_icmp_switch,int,0644);
+int aat_tcp_port8080_limit = 0;
+module_param(aat_tcp_port8080_limit,int,0644);
+int aat_tcp_port80_limit = 0;/* 0: aat deal all TCP packet; 1: aat do only deal TCP packet of port 80 */
+module_param(aat_tcp_port80_limit, int, 0644);
+
 
 
 extern int (*aat_ko_rx_hook)(struct sk_buff *);

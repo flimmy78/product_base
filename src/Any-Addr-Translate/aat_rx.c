@@ -25,6 +25,12 @@
 #include "aat_ioctl.h"
 
 extern int allif_lock;
+extern int aat_all_packet_switch;
+extern int aat_udp_switch;
+extern int aat_tcpip_switch;
+extern int aat_icmp_switch;
+extern int aat_tcp_port8080_limit;
+extern int aat_tcp_port80_limit;
 
 int aat_kernel_rx(struct sk_buff *skb){
 	struct ethhdr *eth = NULL;	
@@ -38,6 +44,13 @@ int aat_kernel_rx(struct sk_buff *skb){
 	int datalen = 0;
 	char *tmp = NULL;
 
+	if(0 == aat_all_packet_switch)
+	{
+		if(aat_debug >= AAT_DEBUG)
+			printk("%s-%d aat_all_packet_switch closed, drop all packet\n", __func__, __LINE__);
+
+		return AAT_NORMAL;
+	}
 	if (1 == allif_lock)
 	{
 		if (aat_debug >= AAT_DEBUG)
@@ -62,7 +75,7 @@ int aat_kernel_rx(struct sk_buff *skb){
 						eth->h_dest[5],iph->version, iph->ihl);
 			return AAT_NEED_DROP_PACKET; /* error packet, need drop!*/
 		}
-		if(iph->protocol == IPPROTO_UDP){
+		if(aat_udp_switch && (iph->protocol == IPPROTO_UDP)){
 			udph = (struct udphdr *)(skb->data + ethlen + iplen);
 			sta = aat_get_sta(&allif, eth->h_source);
 			if(sta == NULL)
@@ -74,10 +87,7 @@ int aat_kernel_rx(struct sk_buff *skb){
 				}
 				return AAT_NORMAL;
 			}
-			if(aat_debug >= AAT_DEBUG)	
-			{
-				printk("aat skb name %s  sta %s\n",skb->dev->name,sta->in_ifname);
-			}/*yjl*	
+			/*yjl*	
 			if (memcmp(sta->in_ifname , skb->dev->name, ETH_LEN))
 			{
 				return AAT_NORMAL;
@@ -108,12 +118,30 @@ int aat_kernel_rx(struct sk_buff *skb){
 							udph->len,  IPPROTO_UDP,
 							csum_partial((unsigned char *)udph, udph->len, 0));
 			
-
-		}else if((iph->protocol == IPPROTO_TCP)||(iph->protocol == IPPROTO_IP)){
+		}else if (aat_tcpip_switch && ((iph->protocol == IPPROTO_TCP)||(iph->protocol == IPPROTO_IP))){
 			if(aat_debug >= AAT_DEBUG)
 			printk("aat_kernel_rx iph->ihl %d iplen %d\n",iph->ihl, iplen);
 			datalen = skb->len - iph->ihl * 4 - ethlen;
 			tcph = (struct tcphdr *)(skb->data + ethlen + iplen);
+			if(aat_tcp_port8080_limit || aat_tcp_port80_limit)
+			{
+				if(aat_tcp_port8080_limit && !aat_tcp_port80_limit)
+				{
+					if((tcph->source != 0x1F90) && (tcph->dest != 0x1F90))
+						return AAT_NORMAL;
+				}
+				if(!aat_tcp_port8080_limit && aat_tcp_port80_limit)
+				{
+					if((tcph->source != 0x50) && (tcph->dest != 0x50))
+						return AAT_NORMAL;
+				}
+				if(aat_tcp_port8080_limit && aat_tcp_port80_limit) 
+				{
+					if((tcph->source != 0x1F90) && (tcph->dest != 0x1F90) && 
+						(tcph->source != 0x50) && (tcph->dest != 0x50))
+						return AAT_NORMAL;
+				}
+			}
 			sta = aat_get_sta(&allif, eth->h_source);
 			if(sta == NULL)
 			{
@@ -125,10 +153,7 @@ int aat_kernel_rx(struct sk_buff *skb){
 				
 				return AAT_NORMAL;
 			}
-			if(aat_debug >= AAT_DEBUG)	
-			{
-				printk("aat skb name %s  sta %s\n",skb->dev->name,sta->in_ifname);
-			}/*yjl*	
+			/*yjl*	
 			if (memcmp(sta->in_ifname , skb->dev->name, ETH_LEN))
 			{
 				return AAT_NORMAL;
@@ -160,7 +185,7 @@ int aat_kernel_rx(struct sk_buff *skb){
 							csum_partial((unsigned char *)tcph, datalen, 0));
 						
 		}
-		else if(IPPROTO_ICMP == iph->protocol)
+		else if (aat_icmp_switch && (IPPROTO_ICMP == iph->protocol))
 		{
 			if(aat_debug >= AAT_DEBUG)
 			{
@@ -178,10 +203,7 @@ int aat_kernel_rx(struct sk_buff *skb){
 				}				
 				return AAT_NORMAL;
 			}
-			if(aat_debug >= AAT_DEBUG)	
-			{
-				printk("aat skb name %s  sta %s\n",skb->dev->name,sta->in_ifname);
-			}/*yjl*	
+			/*yjl*	
 			if (memcmp(sta->in_ifname , skb->dev->name, ETH_LEN))
 			{
 				return AAT_NORMAL;

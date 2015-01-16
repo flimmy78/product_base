@@ -369,7 +369,7 @@ struct sta_info* aat_add_sta(struct io_info * ioinfo)
 
 	if(aat_debug > AAT_INFO)
 	{
-		printk("%s-%d cmd %#x %u sta %02X:%02X:%02X:%02X:%02X:%02X ac %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %s %s %d\n",
+		printk("%s-%d cmd %#x %u sta %02X:%02X:%02X:%02X:%02X:%02X ac %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %s %d\n",
 			__func__, __LINE__, (unsigned int)AAT_IOC_ADD_STA, ioinfo->seq_num,
 			ioinfo->stamac[0], ioinfo->stamac[1],ioinfo->stamac[2],
 			ioinfo->stamac[3], ioinfo->stamac[4], ioinfo->stamac[5],
@@ -377,7 +377,7 @@ struct sta_info* aat_add_sta(struct io_info * ioinfo)
 			ioinfo->acmac[3], ioinfo->acmac[4], ioinfo->acmac[5], \
 			(ioinfo->staip>>24)&0xFF,(ioinfo->staip>>16)&0xFF, \
 			(ioinfo->staip>>8)&0xFF,(ioinfo->staip)&0xFF,
-			ioinfo->ifname, ioinfo->in_ifname, ioinfo->vrrid);
+			ioinfo->ifname, ioinfo->vrrid);
 	}
 
 	tmp = aat_get_stav2(&allif, ioinfo->stamac, ioinfo->vrrid);
@@ -402,7 +402,7 @@ struct sta_info* aat_add_sta(struct io_info * ioinfo)
 				tmp->stamac[3], tmp->stamac[4], tmp->stamac[5]);
 		}
 		memcpy(tmp->ifname, ioinfo->ifname, ETH_LEN);
-		memcpy(tmp->in_ifname, ioinfo->in_ifname, ETH_LEN);
+		//memcpy(tmp->in_ifname, ioinfo->in_ifname, ETH_LEN);
 
 		if (tmp->staip != ioinfo->staip)
 		{
@@ -486,7 +486,7 @@ struct sta_info* aat_add_sta(struct io_info * ioinfo)
 	}		
 	
 	memcpy(tmp->ifname, ioinfo->ifname, ETH_LEN);
-	memcpy(tmp->in_ifname, ioinfo->in_ifname, ETH_LEN);
+	//memcpy(tmp->in_ifname, ioinfo->in_ifname, ETH_LEN);
 	tmp->staip = ioinfo->staip;
 	tmp->vrrid = ioinfo->vrrid;
 
@@ -504,7 +504,7 @@ int aat_del_sta(struct io_info * ioinfo)
 	tmp = aat_get_stav2(&allif, ioinfo->stamac, ioinfo->vrrid);
 	if(NULL == tmp)
 	{
-		printk("%s-%d cmd %#x %u error no sta %02X:%02X:%02X:%02X:%02X:%02X ac %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %s %s %d\n",
+		printk("%s-%d cmd %#x %u error no sta %02X:%02X:%02X:%02X:%02X:%02X ac %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %s %d\n",
 					__func__, __LINE__, (unsigned int)AAT_IOC_DEL_STA, ioinfo->seq_num,
 					ioinfo->stamac[0], ioinfo->stamac[1],ioinfo->stamac[2],
 					ioinfo->stamac[3], ioinfo->stamac[4], ioinfo->stamac[5],
@@ -512,7 +512,7 @@ int aat_del_sta(struct io_info * ioinfo)
 					ioinfo->acmac[3], ioinfo->acmac[4], ioinfo->acmac[5],
 					(ioinfo->staip>>24)&0xFF,(ioinfo->staip>>16)&0xFF, \
 					(ioinfo->staip>>8)&0xFF,(ioinfo->staip)&0xFF,
-					ioinfo->ifname, ioinfo->in_ifname, ioinfo->vrrid);
+					ioinfo->ifname, ioinfo->vrrid);
 		
 		return 0;
 	}
