@@ -2249,9 +2249,9 @@ void dcli_sem_init(void)
 	install_element(ENABLE_NODE, &sem_execute_system_command_cmd);
 	install_element(ENABLE_NODE, &sem_clean_messageoftoday_command_cmd);
 	install_element(ENABLE_NODE, &sem_show_messageoftoday_command_cmd);
-	install_element(ENABLE_NODE, &cf_card_partition_cmd);
+//install_element(ENABLE_NODE, &cf_card_partition_cmd);
 	
-    install_element(CONFIG_NODE, &cf_card_partition_cmd);
+  //install_element(CONFIG_NODE, &cf_card_partition_cmd);
 	install_element(CONFIG_NODE, &config_send_file);
 	install_element(CONFIG_NODE, &config_sem_cmd);	
 	install_element(CONFIG_NODE, &config_tipc_cmd);/*clx*/
