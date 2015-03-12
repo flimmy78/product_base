@@ -248,6 +248,8 @@ load_blk_files()
 	load_one_file "Embedded-Portal Customization Pages" eag_html/*
 	load_one_file "WTP Compatible" wtp/wtpcompatible.xml 
 	load_one_file "SYSOP Record" $SYSOPLOG
+	load_one_file "NEW_CONFIG" new_config/*.conf
+    	load_one_file "NEW_CONFIG_FLAG" new_config_flag	
 	load_var_run_config "CONFIG" config/*
 	
 	load_sys_boot_img
