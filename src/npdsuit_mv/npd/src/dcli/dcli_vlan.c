@@ -7920,7 +7920,439 @@ DEFUN(show_vlan_egress_filter_cmd_func,
 	dbus_message_unref(reply);
 	return CMD_SUCCESS;
 }
+DEFUN(show_ax81_12x_port_state_cmd_func,
+	show_ax81_12x_port_state_cmd,
+	"show ax81 12x slot <1-10> dev <0-1> port <0-30> states",
+	"\n"
+	
+)
+{
+    DBusMessage *query = NULL, *reply = NULL;
+	DBusError err;
+	
+	unsigned int ret = 0;
+	unsigned short slot_id =0;
+	unsigned int opDevice = 0;
+	unsigned short opPort = 0;
+	
+    unsigned short portStatus;
+	unsigned short xfiLink, pcsStatus, LaneStatus, signalDetect;
+	unsigned short intStatus, pcsStatus2;
+	unsigned short macBypass;
+  
+	
+	ret = parse_single_param_no((char*)argv[0],&slot_id);
+	if(NPD_SUCCESS != ret) {
+		vty_out(vty,"%% parse param failed!\n");
+		return CMD_WARNING;
+	}
+	if(slot_id < 1 || slot_id > 10)
+	{
+        vty_out(vty,"Bad parameter!slot id is illegal!\n");
+	}
+    if (0 == strncmp("0", argv[1], strlen(argv[1]))) {
+	   opDevice= 0;
+	}
+	else if (0 == strncmp("1", argv[1], strlen(argv[1]))) {
+	   opDevice = 1;
+	}
+	else{
+		vty_out(vty, "%% Bad parameter %s!\n", argv[0]);
+		return CMD_WARNING;
+	}
+	opPort = strtoul((char*)argv[2], NULL, 0);
+	if (opPort > 30) {
+	   vty_out(vty,"%% Bad parameter %s!\n", argv[1]);
+	   return CMD_WARNING;
+	}
+    query = dbus_message_new_method_call(NPD_DBUS_BUSNAME,	\
+        							NPD_DBUS_VLAN_OBJPATH ,	\
+        							NPD_DBUS_VLAN_INTERFACE ,	\
+        						    NPD_DBUS_METHOD_SHOW_AX81_12X_PORT_STATE );
 
+	dbus_error_init(&err);
+	dbus_message_append_args(query,
+						DBUS_TYPE_UINT32, &opDevice,
+						DBUS_TYPE_UINT16, &opPort,
+						DBUS_TYPE_INVALID);
+	if(NULL == dbus_connection_dcli[slot_id]->dcli_dbus_connection) 				
+    {
+        if(NULL == dcli_dbus_connection)
+        {
+            vty_out(vty,"Can not connect to slot:%d \n",slot_id);
+            return CMD_WARNING;						
+        }
+        else 
+        {	
+            reply = dbus_connection_send_with_reply_and_block (dcli_dbus_connection,query,-1, &err);		
+        }	
+    }
+    else
+    {
+        reply = dbus_connection_send_with_reply_and_block (dbus_connection_dcli[slot_id]->dcli_dbus_connection,query,-1, &err);				
+    }
+    dbus_message_unref(query);
+                    	
+    if (NULL == reply) 
+    {
+        vty_out(vty,"Dbus reply==NULL, Please check slot: %d\n",slot_id);
+        return CMD_WARNING;
+    }
+	
+	if (!(dbus_message_get_args ( reply, &err,
+								DBUS_TYPE_UINT32, &ret,
+								DBUS_TYPE_UINT16, &portStatus,
+								DBUS_TYPE_UINT16, &xfiLink,
+								DBUS_TYPE_UINT16, &pcsStatus,
+								DBUS_TYPE_UINT16, &LaneStatus,
+								DBUS_TYPE_UINT16, &signalDetect,
+								DBUS_TYPE_UINT16, &intStatus,
+								DBUS_TYPE_UINT16, &pcsStatus2,
+								DBUS_TYPE_UINT16, &macBypass,
+								DBUS_TYPE_INVALID)))
+	{
+		if (dbus_error_is_set(&err)) {
+			vty_out(vty, "%s raised: %s\n", err.name, err.message);
+			dbus_error_free_for_dcli(&err);
+		}
+	}
+    if(ret == VLAN_RETURN_CODE_ERR_NONE)
+	{
+        vty_out(vty, "--------------------------------------------\r\n");
+	    vty_out(vty, "%-14s:%-4d\r\n", "  device", opDevice);
+	    vty_out(vty, "%-14s:%-4d\r\n", "  port", opPort);
+	    vty_out(vty, "%-14s%-12s:%#-4x\r\n","  portStatus","(addr:0x0001)" ,portStatus);
+	    vty_out(vty, "%-14s%-12s:%#-4x\r\n","  xfiLink","(addr:0x1001)",xfiLink);
+	    vty_out(vty, "%-14s%-12s:%#-4x\r\n","  pcsStatus","(addr:0x0021)",pcsStatus);
+		vty_out(vty, "%-14s%-12s:%#-4x\r\n","  LaneStatus","(addr:0x1018)",LaneStatus);
+		vty_out(vty, "%-14s%-12s:%#-4x\r\n","  signalDetect","(addr:0x000a)",signalDetect);
+		vty_out(vty, "%-14s%-12s:%#-4x\r\n","  intStatus","(addr:0x9004)",intStatus);
+		vty_out(vty, "%-14s%-12s:%#-4x\r\n","  pcsStatus2","(addr:0x1008)",pcsStatus2);
+		vty_out(vty, "%-14s%-12s:%#-4x\r\n","  macBypass","(addr:0xf000)",macBypass);
+	    vty_out(vty, "--------------------------------------------\r\n");
+	    dbus_message_unref(reply);
+	    return CMD_SUCCESS;     
+    }
+	else if(ret == VLAN_RETURN_CODE_ERR_GENERAL)
+	{
+        vty_out(vty, "slot %d is not a 12X board!\n",slot_id);
+		return CMD_WARNING;
+		
+	}
+}
+DEFUN(config_ax81_12x_phy_88x2140_init_cmd_func,
+	config_ax81_12x_phy_88x2140_init_cmd,
+	"config phy_88x2140 init slot <1-10> dev <0-1> port <0-30>",
+	"\n"
+	
+)
+{
+    DBusMessage *query = NULL, *reply = NULL;
+	DBusError err; 
+
+	unsigned int ret = 0;
+	unsigned short slot_id =0;
+	unsigned int opDevice = 0;
+	unsigned short opPort = 0;
+
+	ret = parse_single_param_no((char*)argv[0],&slot_id);
+	if(NPD_SUCCESS != ret) {
+		vty_out(vty,"%% parse param failed!\n");
+		return CMD_WARNING;
+	}
+	if(slot_id < 1 || slot_id > 10)
+	{
+        vty_out(vty,"Bad parameter!slot id is illegal!\n");
+	}
+    if (0 == strncmp("0", argv[1], strlen(argv[1]))) {
+	   opDevice= 0;
+	}
+	else if (0 == strncmp("1", argv[1], strlen(argv[1]))) {
+	   opDevice = 1;
+	}
+	else{
+		vty_out(vty, "%% Bad parameter %s!\n", argv[0]);
+		return CMD_WARNING;
+	}
+	opPort = strtoul((char*)argv[2], NULL, 0);
+	if (opPort > 30) {
+	   vty_out(vty,"%% Bad parameter %s!\n", argv[1]);
+	   return CMD_WARNING;
+	}
+    query = dbus_message_new_method_call(NPD_DBUS_BUSNAME,	\
+        							NPD_DBUS_VLAN_OBJPATH ,	\
+        							NPD_DBUS_VLAN_INTERFACE ,	\
+        						    NPD_DBUS_METHOD_CONFIG_PHY_88X2140_INIT );
+	dbus_error_init(&err);
+	dbus_message_append_args(query,
+						DBUS_TYPE_UINT32, &opDevice,
+						DBUS_TYPE_UINT16, &opPort,
+						DBUS_TYPE_INVALID);
+
+	 if(NULL == dbus_connection_dcli[slot_id]->dcli_dbus_connection) 				
+    {
+        if(NULL == dcli_dbus_connection)
+        {
+            vty_out(vty,"Can not connect to slot:%d \n",slot_id);
+            return CMD_WARNING;						
+        }
+        else 
+        {	
+            reply = dbus_connection_send_with_reply_and_block (dcli_dbus_connection,query,-1, &err);		
+        }	
+    }
+    else
+    {
+        reply = dbus_connection_send_with_reply_and_block (dbus_connection_dcli[slot_id]->dcli_dbus_connection,query,-1, &err);				
+    }
+    dbus_message_unref(query);
+                    	
+    if (NULL == reply) 
+    {
+        vty_out(vty,"Dbus reply==NULL, Please check slot: %d\n",slot_id);
+        return CMD_WARNING;
+    }
+
+	if (!(dbus_message_get_args ( reply, &err,
+								DBUS_TYPE_UINT32, &ret,
+								DBUS_TYPE_INVALID)))
+	{
+		if (dbus_error_is_set(&err)) {
+			vty_out(vty, "%s raised: %s\n", err.name, err.message);
+			dbus_error_free_for_dcli(&err);
+		}
+	}
+
+	if(ret == VLAN_RETURN_CODE_ERR_NONE)
+	{
+        vty_out(vty, "slot %d phy_88x2140 init OK!\n",slot_id);
+		return CMD_SUCCESS;
+	}
+	else if(ret == VLAN_RETURN_CODE_ERR_GENERAL)
+	{
+        vty_out(vty, "slot %d is not a 12X board!\n",slot_id);
+		return CMD_WARNING;
+		
+	}
+	
+}
+DEFUN(config_ax81_12x_serdes_power_state_cmd_func,
+	config_ax81_12x_serdes_power_state_cmd,
+	"config serdes power slot <1-10> dev <0-1> port <0-30> (up|down)",
+	"\n"
+)
+
+{
+    DBusMessage *query = NULL, *reply = NULL;
+	DBusError err;
+
+	unsigned int ret = 0;
+	unsigned short slot_id =0;
+	unsigned int opDevice = 0;
+	unsigned short opPort = 0;
+	unsigned char powerup = 0;
+
+	ret = parse_single_param_no((char*)argv[0],&slot_id);
+	if(NPD_SUCCESS != ret) {
+		vty_out(vty,"%% parse param failed!\n");
+		return CMD_WARNING;
+	}
+	if(slot_id < 1 || slot_id > 10)
+	{
+        vty_out(vty,"Bad parameter!slot id is illegal!\n");
+	}
+    if (0 == strncmp("0", argv[1], strlen(argv[1]))) {
+	   opDevice= 0;
+	}
+	else if (0 == strncmp("1", argv[1], strlen(argv[1]))) {
+	   opDevice = 1;
+	}
+	else{
+		vty_out(vty, "%% Bad parameter %s!\n", argv[0]);
+		return CMD_WARNING;
+	}
+	opPort = strtoul((char*)argv[2], NULL, 0);
+	if (opPort > 30) {
+	   vty_out(vty,"%% Bad parameter %s!\n", argv[1]);
+	   return CMD_WARNING;
+	}
+
+	if(0 == strncmp(argv[3],"up",strlen(argv[3]))) {
+		powerup= 1;
+	}
+	else if (0 == strncmp(argv[3],"down",strlen(argv[3]))) {
+		powerup= 0;
+	}
+	else {
+		vty_out(vty,"% Bad parameter!\n");
+		return CMD_WARNING;
+	}
+	query = dbus_message_new_method_call(NPD_DBUS_BUSNAME,	\
+        							NPD_DBUS_VLAN_OBJPATH ,	\
+        							NPD_DBUS_VLAN_INTERFACE ,	\
+        						    NPD_DBUS_METHOD_CONFIG_SERDES_POWER_STATE );
+	dbus_error_init(&err);
+	dbus_message_append_args(query,
+						DBUS_TYPE_UINT32, &opDevice,
+						DBUS_TYPE_UINT16, &opPort,
+						DBUS_TYPE_BYTE,   &powerup,
+						DBUS_TYPE_INVALID);
+
+	if(NULL == dbus_connection_dcli[slot_id]->dcli_dbus_connection) 				
+    {
+        if(NULL == dcli_dbus_connection)
+        {
+            vty_out(vty,"Can not connect to slot:%d \n",slot_id);
+            return CMD_WARNING;						
+        }
+        else 
+        {	
+            reply = dbus_connection_send_with_reply_and_block (dcli_dbus_connection,query,-1, &err);		
+        }	
+    }
+    else
+    {
+        reply = dbus_connection_send_with_reply_and_block (dbus_connection_dcli[slot_id]->dcli_dbus_connection,query,-1, &err);				
+    }
+    dbus_message_unref(query);
+                    	
+    if (NULL == reply) 
+    {
+        vty_out(vty,"Dbus reply==NULL, Please check slot: %d\n",slot_id);
+        return CMD_WARNING;
+    }
+
+	if (!(dbus_message_get_args ( reply, &err,
+								DBUS_TYPE_UINT32, &ret,
+								DBUS_TYPE_INVALID)))
+	{
+		if (dbus_error_is_set(&err)) {
+			vty_out(vty, "%s raised: %s\n", err.name, err.message);
+			dbus_error_free_for_dcli(&err);
+		}
+	}
+
+	if(ret == VLAN_RETURN_CODE_ERR_NONE)
+	{
+        vty_out(vty, "set slot %d serdes power %s OK!\n",slot_id,powerup ? "up":"down");
+		return CMD_SUCCESS;
+	}
+	else if(ret == VLAN_RETURN_CODE_ERR_GENERAL)
+	{
+        vty_out(vty, "slot %d is not a 12X board!\n",slot_id);
+		return CMD_WARNING;
+		
+	}	
+}
+
+DEFUN(config_ax81_12x_port_state_cmd_func,
+	config_ax81_12x_port_state_cmd,
+	"config ax81 12x slot <1-10> dev <0-1> port <0-30> (up|down)",
+	"\n"
+)
+
+{
+    DBusMessage *query = NULL, *reply = NULL;
+	DBusError err;
+
+	unsigned int ret = 0;
+	unsigned short slot_id =0;
+	unsigned int opDevice = 0;
+	unsigned short opPort = 0;
+	unsigned char link_up = 0;
+
+	ret = parse_single_param_no((char*)argv[0],&slot_id);
+	if(NPD_SUCCESS != ret) {
+		vty_out(vty,"%% parse param failed!\n");
+		return CMD_WARNING;
+	}
+	if(slot_id < 1 || slot_id > 10)
+	{
+        vty_out(vty,"Bad parameter!slot id is illegal!\n");
+	}
+    if (0 == strncmp("0", argv[1], strlen(argv[1]))) {
+	   opDevice= 0;
+	}
+	else if (0 == strncmp("1", argv[1], strlen(argv[1]))) {
+	   opDevice = 1;
+	}
+	else{
+		vty_out(vty, "%% Bad parameter %s!\n", argv[0]);
+		return CMD_WARNING;
+	}
+	opPort = strtoul((char*)argv[2], NULL, 0);
+	if (opPort > 30) {
+	   vty_out(vty,"%% Bad parameter %s!\n", argv[1]);
+	   return CMD_WARNING;
+	}
+
+	if(0 == strncmp(argv[3],"up",strlen(argv[3]))) {
+		link_up= 1;
+	}
+	else if (0 == strncmp(argv[3],"down",strlen(argv[3]))) {
+		link_up= 0;
+	}
+	else {
+		vty_out(vty,"% Bad parameter!\n");
+		return CMD_WARNING;
+	}
+	query = dbus_message_new_method_call(NPD_DBUS_BUSNAME,	\
+        							NPD_DBUS_VLAN_OBJPATH ,	\
+        							NPD_DBUS_VLAN_INTERFACE ,	\
+        						    NPD_DBUS_METHOD_CONFIG_AX81_12X_PORT_STATE );
+	dbus_error_init(&err);
+	dbus_message_append_args(query,
+						DBUS_TYPE_UINT32, &opDevice,
+						DBUS_TYPE_UINT16, &opPort,
+						DBUS_TYPE_BYTE,   &link_up,
+						DBUS_TYPE_INVALID);
+
+	if(NULL == dbus_connection_dcli[slot_id]->dcli_dbus_connection) 				
+    {
+        if(NULL == dcli_dbus_connection)
+        {
+            vty_out(vty,"Can not connect to slot:%d \n",slot_id);
+            return CMD_WARNING;						
+        }
+        else 
+        {	
+            reply = dbus_connection_send_with_reply_and_block (dcli_dbus_connection,query,-1, &err);		
+        }	
+    }
+    else
+    {
+        reply = dbus_connection_send_with_reply_and_block (dbus_connection_dcli[slot_id]->dcli_dbus_connection,query,-1, &err);				
+    }
+    dbus_message_unref(query);
+                    	
+    if (NULL == reply) 
+    {
+        vty_out(vty,"Dbus reply==NULL, Please check slot: %d\n",slot_id);
+        return CMD_WARNING;
+    }
+
+	if (!(dbus_message_get_args ( reply, &err,
+								DBUS_TYPE_UINT32, &ret,
+								DBUS_TYPE_INVALID)))
+	{
+		if (dbus_error_is_set(&err)) {
+			vty_out(vty, "%s raised: %s\n", err.name, err.message);
+			dbus_error_free_for_dcli(&err);
+		}
+	}
+
+	if(ret == VLAN_RETURN_CODE_ERR_NONE)
+	{
+        vty_out(vty, "config slot %d dev %d port %d %s OK!\n",slot_id,opDevice,opPort,link_up? "up":"down");
+		return CMD_SUCCESS;
+	}
+	else if(ret == VLAN_RETURN_CODE_ERR_GENERAL)
+	{
+        vty_out(vty, "slot %d is not a 12X board!\n",slot_id);
+		return CMD_WARNING;
+		
+	}	
+}
 int dcli_vlan_egress_filter_show_running_config(struct vty *vty) {	
 	char *showStr = NULL,*cursor = NULL,ch = 0,tmpBuf[SHOWRUN_PERLINE_SIZE] = {0};
 	int ret = 1;
@@ -8139,6 +8571,10 @@ void dcli_vlan_init() {
 	install_element(CONFIG_NODE,&bond_vlan_to_ms_cpu_port_cmd);	
 	install_element(CONFIG_NODE,&config_vlan_qinq_tocpuport_cmd);
 	install_element(CONFIG_NODE,&config_vlan_to_ms_cpu_port_qinq_cmd);
+	install_element(CONFIG_NODE,&show_ax81_12x_port_state_cmd);
+	install_element(CONFIG_NODE,&config_ax81_12x_phy_88x2140_init_cmd);
+	install_element(CONFIG_NODE,&config_ax81_12x_serdes_power_state_cmd);
+	install_element(CONFIG_NODE,&config_ax81_12x_port_state_cmd);
     #endif	
 	/*install_element(CONFIG_NODE,&show_supervlan_cmd);*/
 }

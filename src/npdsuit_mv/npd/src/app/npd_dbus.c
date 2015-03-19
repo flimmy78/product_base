@@ -578,6 +578,22 @@ static DBusHandlerResult npd_dbus_message_handler (DBusConnection *connection, D
 										NPD_DBUS_VLAN_METHOD_IGMP_SNP_VLAN_SHOW_RUNNING_CONFIG)) {
 			reply = npd_dbus_vlan_igmp_snp_show_running_config(connection,message,user_data);
 		}
+		else if(dbus_message_is_method_call(message,NPD_DBUS_VLAN_INTERFACE,  \
+										NPD_DBUS_METHOD_SHOW_AX81_12X_PORT_STATE)) {
+			reply = npd_dbus_vlan_show_ax81_12x_port_state(connection,message,user_data);
+		}	
+		else if(dbus_message_is_method_call(message,NPD_DBUS_VLAN_INTERFACE,  \
+										NPD_DBUS_METHOD_CONFIG_PHY_88X2140_INIT)) {
+			reply = npd_dbus_vlan_config_phy_88x2140_init(connection,message,user_data);
+		}		
+		else if(dbus_message_is_method_call(message,NPD_DBUS_VLAN_INTERFACE,  \
+										NPD_DBUS_METHOD_CONFIG_SERDES_POWER_STATE)) {
+			reply = npd_dbus_vlan_config_serdes_power_state(connection,message,user_data);
+		}	
+		else if(dbus_message_is_method_call(message,NPD_DBUS_VLAN_INTERFACE,  \
+										NPD_DBUS_METHOD_CONFIG_AX81_12X_PORT_STATE)) {
+			reply = npd_dbus_vlan_config_ax81_12x_port_state(connection,message,user_data);
+		}		
 	}  
 	else if(strcmp(dbus_message_get_path(message),NPD_DBUS_TRUNK_OBJPATH) == 0){
 			syslog_ax_dbus_dbg("npd obj path"NPD_DBUS_TRUNK_OBJPATH);

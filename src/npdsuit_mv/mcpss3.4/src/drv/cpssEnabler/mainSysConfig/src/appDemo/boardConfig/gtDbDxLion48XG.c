@@ -48,6 +48,10 @@
 #include <cpss/dxCh/dxChxGen/phy/cpssDxChPhySmi.h>
 
 #include <cpss/dxCh/dxChxGen/diag/cpssDxChDiag.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 
 /*******************************************************************************
  * External definitions
@@ -131,6 +135,27 @@ static GT_U32 lion48RdMpc8544XsmiAddr[] =
 
 #endif 
 
+
+/* Data base holds ports link status for all devices */
+static GT_U32 portLinkStatusBmp[PRV_CPSS_MAX_PP_DEVICES_CNS];
+
+#define DEV_PORT_LINK_STATUS_SET(dev, port, status) \
+    portLinkStatusBmp[dev] &= ~(1 << (port)); \
+    portLinkStatusBmp[dev] |= ((status) << (port));
+
+#define DEV_PORT_LINK_STATUS_GET(dev, port) \
+    ((portLinkStatusBmp[dev] >> (port)) & 0x1)
+
+
+/* Data base holds ports link status for all devices */
+static GT_U32 portPreLinkStatusBmp[PRV_CPSS_MAX_PP_DEVICES_CNS];
+
+#define DEV_PORT_PRE_LINK_STATUS_SET(dev, port, status) \
+    portPreLinkStatusBmp[dev] &= ~(1 << (port)); \
+    portPreLinkStatusBmp[dev] |= ((status) << (port));
+
+#define DEV_PORT_PRE_LINK_STATUS_GET(dev, port) \
+    ((portPreLinkStatusBmp[dev] >> (port)) & 0x1)
 /*******************************************************************************
 * getBoardInfo
 *
@@ -1932,6 +1957,296 @@ static GT_STATUS preformanceTestBoardConfig
     return GT_OK;
 }
 
+extern int npd_startup_end ;
+
+/*******************************************************************************
+* netPortsForceLinkUp
+*
+* DESCRIPTION:
+*       Perform continuous polling of the network ports and do following:
+*       - read the Phy link status
+*       - when the link is up force xCat link to up state
+*       - keep probing the Phy link status and when it is down force down the port.
+*
+*
+* INPUTS:
+*       unused - this argument is not used.
+*
+* OUTPUTS:
+*       None.
+*
+* RETURNS:
+*       GT_BAD_PARAM             - wrong devNum, portNum
+*       GT_FAIL                  - on error
+*       GT_BAD_PTR               - one of the parameters is NULL pointer
+*       GT_OUT_OF_RANGE          - phyAddr bigger then 31
+*       GT_NOT_SUPPORTED         - for XG ports
+*       GT_HW_ERROR              - on hardware error
+*       GT_NOT_APPLICABLE_DEVICE - on not applicable device
+*
+* COMMENTS:
+*       Applied only on regular network ports for devices:
+*       CPSS_98DX5128_CNS and CPSS_98DX287_CNS.
+*
+*******************************************************************************/
+static GT_U8 set_serdes[12] = {0};
+static GT_U8 read_again[12] = {5};
+extern ax81_12x_xg_port_to_phyid[12];
+static unsigned __TASKCONV netPortsForceLinkUp
+(
+    GT_VOID * param
+)
+{
+    GT_U16                          regVal;     /* Register value */
+    GT_U8                           portNum;    /* Port number */
+    GT_U32                          i;          /* Array index */
+    GT_STATUS                       rc;         /* Return status */
+    GT_U8                           devNum;     /* Device number */
+    GT_U32 boardRevId = (GT_U32)param;          /* Board revision Id */
+    GT_U32 prevStatBit;                         /* Previouse port's link status */
+    GT_U32 currStatBit;                         /* Current port's link status */
+	GT_U8  phyId;     							/* Phy address */
+	GT_U16 phyReg	= 0x0001;					/* Phy Register */
+	GT_U8  phyDev	= 0x1;						/* Phy Device */
+	GT_U16 sfiLink, xfiLink, pcsStatus, LaneStatus, signalDetect;
+	GT_U16 intStatus, pcsStatus2;
+	GT_U32 readStatusAgain = 0;
+	GT_U16 macBypass;
+    GT_U32 prevPreStatBit;                         /* Previouse port's link status */
+    CPSS_DXCH_PORT_SERDES_CONFIG_STC  serdesCfg;
+    CPSS_DXCH_PORT_SERDES_CONFIG_STC  old_serdesCfg;	
+	CPSS_PORT_INTERFACE_MODE_ENT ifMode;
+	GT_U32 check_internval = 10;
+	
+
+		
+	osMemSet(portLinkStatusBmp, 0, sizeof(portLinkStatusBmp));
+	osMemSet(portPreLinkStatusBmp, 0, sizeof(portPreLinkStatusBmp));
+	memset(&serdesCfg, 0, sizeof(CPSS_DXCH_PORT_SERDES_CONFIG_STC));
+	memset(&old_serdesCfg, 0, sizeof(CPSS_DXCH_PORT_SERDES_CONFIG_STC));
+	memset(read_again,5,sizeof(read_again));
+	memset(set_serdes,1,sizeof(read_again));
+	
+	
+    serdesCfg.ffeResistorSelect = 4;
+    serdesCfg.ffeSignalSwingControl = 3;
+    serdesCfg.txAmp = 0x1F;
+    serdesCfg.txAmpAdj = 3;
+    serdesCfg.txEmphLevelAdjEnable = GT_TRUE;	
+	serdesCfg.txEmphAmp = 0xD;
+   	serdesCfg.ffeCapacitorSelect = 0xB;							
+
+
+    for(i = 0; i < ppCounter; i++)
+    {
+        devNum = appDemoPpConfigList[i].devNum;
+
+        for(portNum = 0; portNum < 12; portNum++)
+        {  
+            rc = cpssDxChPortEnableSet(devNum, portNum, GT_FALSE);
+            CPSS_ENABLER_DBG_TRACE_RC_MAC("cpssDxChPortEnableSet", rc);
+            if(rc != GT_OK)
+            {
+                return rc;
+            }
+
+			rc = cpssDxChPortForceLinkDownEnableSet(devNum, portNum, GT_TRUE);
+            CPSS_ENABLER_DBG_TRACE_RC_MAC("cpssDxChPortForceLinkPassEnableSet", rc);
+            if(rc != GT_OK)
+            {
+                continue;
+            }
+			
+			/* write to make mac in phy enable */
+			rc = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1, 0xF000, 31, 0xec9);
+            CPSS_ENABLER_DBG_TRACE_RC_MAC("cpssDxChPhyPort10GSmiRegisterWrite", rc);
+            if(rc != GT_OK)
+            {
+                continue;
+            }
+			
+        }
+    }
+
+
+	while (!npd_startup_end)
+	{
+        osTimerWkAfter(1000);
+		continue;
+	}
+
+	
+    while (1)
+    {
+		/*osPrintf("\r\n\r\nThread : PortsForceLinkUp\r\n");*/
+        for(i = 0; i < ppCounter; i++)
+        {
+            devNum = appDemoPpConfigList[i].devNum;
+			if (check_internval == 0)
+			{
+				check_internval = 10;
+			}
+			check_internval--;
+			
+            /* Check ports link status and if link state down, force it to up */
+            for(portNum = 0; portNum < 12; portNum++)
+            { 
+                /* get the link status from phy */
+                phyId = ax81_12x_xg_port_to_phyid[portNum];
+				rc = cpssDxChPhyPort10GSmiRegisterRead(devNum, portNum, phyId, 1, phyReg, phyDev, &regVal);
+				/*osPrintf("Thread : Port[%d].reg = %d\r\n", portNum, regVal);*/
+                CPSS_ENABLER_DBG_TRACE_RC_MAC("cpssDxChPhyPortSmiRegisterRead", rc);
+                if(rc != GT_OK)
+                {
+                    continue;
+                }
+
+				cpssDxChPhyPort10GSmiRegisterRead(devNum, portNum, phyId, 1, 0x000A, 1, &signalDetect);
+				cpssDxChPhyPort10GSmiRegisterRead(devNum, portNum, phyId, 1, 0x1001, 1, &xfiLink);
+				cpssDxChPhyPort10GSmiRegisterRead(devNum, portNum, phyId, 1, 0x0021, 3, &pcsStatus);
+				cpssDxChPhyPort10GSmiRegisterRead(devNum, portNum, phyId, 1, 0x1018, 4, &LaneStatus);
+				cpssDxChPhyPort10GSmiRegisterRead(devNum, portNum, phyId, 1, 0x1008, 4, &pcsStatus2);
+				cpssDxChPhyPort10GSmiRegisterRead(devNum, portNum, phyId, 1, 0x9004, 4, &intStatus);
+
+                currStatBit = (regVal >> 2) & 0x1;
+                prevStatBit = DEV_PORT_LINK_STATUS_GET(devNum, portNum);
+                prevPreStatBit = DEV_PORT_PRE_LINK_STATUS_GET(devNum, portNum);
+                npd_syslog_dbg("devNum = %d,portNUm = %d\n",devNum,portNum);
+				npd_syslog_dbg("currStatBit = %lu\n",currStatBit);
+				npd_syslog_dbg("prevStatBit = %lu\n",prevStatBit);
+				npd_syslog_dbg("prevPreStatBit = %lu\n",prevStatBit);
+				/*
+				osPrintf("Port[%d]: Signal Detect = %x\r\n", portNum, signalDetect);
+				osPrintf("Port[%d]: 1.0001 = %x, 1.1001 = %x, 3.0021 = %x, 4.1018 = %x\r\n", portNum, 
+					currStatBit, (xfiLink >> 2) & 0x1, pcsStatus, LaneStatus);
+				*/
+
+				/* Errata Workaround : There may be rare occasions where after the first 10G global initialization, 
+				    the SFI and RXAUI links may not come up and may require re-initialization of the port */
+				if(signalDetect == 1)
+				{
+					if((currStatBit == 1) && (((xfiLink >> 2) & 0x1) != 0x1) && ((LaneStatus&0x100f) != 0x100f))
+					{
+						phy_88x2140_enable_set(0, portNum, 0);
+						osTimerWkAfter(100);
+						phy_88x2140_enable_set(0, portNum, 1);
+					}
+				}
+				if (((pcsStatus2 & 0xc00) != 0) || ((intStatus & 0x300) != 0))
+				{
+					osTimerWkAfter(100);
+					cpssDxChPhyPort10GSmiRegisterRead(devNum, portNum, phyId, 1, 0x1008, 4, &pcsStatus2);
+					cpssDxChPhyPort10GSmiRegisterRead(devNum, portNum, phyId, 1, 0x9004, 4, &intStatus);
+					if (((pcsStatus2 & 0xc00) != 0) || ((intStatus & 0x300) != 0))
+					{
+						read_again[portNum]--;
+					}
+					if (0 == read_again[portNum])
+					{
+						cpssDxChPortSerdesPowerStatusSet(devNum, portNum, 2, 0x3, 0);
+						osTimerWkAfter(100);
+						cpssDxChPortSerdesPowerStatusSet(devNum, portNum, 2, 0x3, 1);
+						read_again[portNum]=5;
+					}
+					
+				}
+				#if 0
+				if (0 == set_serdes[portNum])
+				{
+				    if((rc = cpssDxChPortInterfaceModeGet(devNum,portNum,&ifMode)) != GT_OK)
+				        continue;
+
+				    if ((ifMode == CPSS_PORT_INTERFACE_MODE_RXAUI_E)
+						&& (0 == set_serdes[portNum]))
+				    {
+						cpssDxChPortSerdesPowerStatusSet(devNum, portNum, 2, 0x3, 0);												
+						rc = cpssDxChPortSerdesConfigSet(devNum,portNum, &serdesCfg);
+						osTimerWkAfter(100);
+						cpssDxChPortSerdesPowerStatusSet(devNum, portNum, 2, 0x3, 1);
+												
+						set_serdes[portNum] = 1;
+						rc = cpssDxChPortSerdesConfigGet(devNum,portNum, &old_serdesCfg);
+						if (old_serdesCfg.ffeCapacitorSelect != serdesCfg.ffeCapacitorSelect)
+						{
+							set_serdes[portNum] = 0;
+						}
+						if (old_serdesCfg.ffeResistorSelect != serdesCfg.ffeResistorSelect)
+						{
+							set_serdes[portNum] = 0;
+						}									
+				    }				
+				}		
+				if (0 == check_internval)
+				{
+					rc = cpssDxChPortSerdesConfigGet(devNum,portNum, &old_serdesCfg);
+					if (old_serdesCfg.ffeCapacitorSelect != serdesCfg.ffeCapacitorSelect)
+					{
+						set_serdes[portNum] = 0;
+					}
+					if (old_serdesCfg.ffeResistorSelect != serdesCfg.ffeResistorSelect)
+					{
+						set_serdes[portNum] = 0;
+					}	
+				}	
+				#endif		
+				cpssDxChPhyPort10GSmiRegisterRead(devNum, portNum, phyId, 1, 0xF000, 31, &macBypass);
+				if ((macBypass & 0xc00) != 0xc00)
+				{
+					cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1, 0xF000, 31, 0xec9);
+				}
+
+                if (prevStatBit != currStatBit ||
+					prevPreStatBit != prevStatBit)
+                {
+                    /* link is down */
+                    if (currStatBit == 0)
+                    {
+						/*osPrintf("Port[%d] Link down!!! \r\n", portNum);*/
+                        /* Force link status down */
+						rc = cpssDxChPortForceLinkPassEnableSet(devNum, portNum,
+						                                        GT_FALSE);		
+						 
+                        rc = cpssDxChPortForceLinkDownEnableSet(devNum, portNum,
+                                                                GT_TRUE);
+                                         
+                        CPSS_ENABLER_DBG_TRACE_RC_MAC("cpssDxChPortForceLinkPassEnableSet", rc);
+                        if(rc != GT_OK)
+                        {
+                            continue;
+                        }
+                    }
+                    else
+                    {
+						/*osPrintf("Port[%d] Link up!!! \r\n", portNum);*/
+						
+                        /* Force link status up */
+						
+                        rc = cpssDxChPortForceLinkDownEnableSet(devNum, portNum,
+                                                                GT_FALSE);
+                                        
+						rc = cpssDxChPortForceLinkPassEnableSet(devNum, portNum,
+						                                        GT_TRUE);						
+						
+                        CPSS_ENABLER_DBG_TRACE_RC_MAC("cpssDxChPortForceLinkPassEnableSet", rc);
+                        if(rc != GT_OK)
+                        {
+                            continue;
+                        }
+                    }
+
+                    DEV_PORT_LINK_STATUS_SET(devNum, portNum, currStatBit);
+                    DEV_PORT_PRE_LINK_STATUS_SET(devNum, portNum, prevStatBit);					
+                }
+
+            }
+
+        }
+
+        osTimerWkAfter(1000);
+    }
+}
+
+
 /*******************************************************************************
 * afterInitBoardConfig
 *
@@ -1962,6 +2277,13 @@ static GT_STATUS afterInitBoardConfig
     GT_U8       dev;
     GT_U8       port;
 
+	GT_U32  boardRevId_U32 = boardRevId;    /* Board revision ID in U32 format. Only to prevent casting warnings */
+    GT_TASK netPortsForceLinkUpTid;         /* Task Id */
+
+	int fd;
+	char buff[16] = {0};
+	unsigned int board_type;
+	
     /* allow processing of AA messages */
     appDemoSysConfig.supportAaMessage = GT_TRUE;
 
@@ -2018,7 +2340,35 @@ static GT_STATUS afterInitBoardConfig
             }
         }
     }
+    #if 1
+	fd = open("/proc/product_info/board_type", O_RDONLY);
+	if (fd < 0) 
+	{
+		perror("open:");
+		npd_syslog_dbg("Open file:/proc/product_info/board_type error!\n");
+		return GT_FAIL;
 
+	}
+	else
+	{   
+		if(read(fd, buff, 16) < 0){ 
+			perror("read:");
+			npd_syslog_dbg("Read error : no value\n");
+			return GT_FAIL;
+		}
+		close(fd);
+	}
+	board_type = strtoul(buff, NULL, 10);
+	if(board_type == 7)
+	{
+	    return osTaskCreate("forceLinkUp",              /* Task Name      */
+                            250,                      /* Task Priority  */
+                            _8KB,                     /* Stack Size     */
+                            netPortsForceLinkUp,      /* Starting Point */
+                            (GT_VOID*)boardRevId_U32, /* Arguments list */
+                            &netPortsForceLinkUpTid); /* task ID        */
+	}
+	#endif
     return GT_OK;
 }
 

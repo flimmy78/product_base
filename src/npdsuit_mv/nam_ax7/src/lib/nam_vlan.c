@@ -3115,6 +3115,50 @@ unsigned long nam_port_qinq_tpid_set()
 	return ret;
 
 }
+
+unsigned int nam_vlan_config_phy_88x2140
+(
+	unsigned char devNum,
+	unsigned char portNum
+)
+{
+	int ret;
+    ret = phy_88x2140_enable_set(devNum, portNum, 0);
+    osTimerWkAfter(100);
+	ret = phy_88x2140_enable_set(devNum, portNum, 1);
+	return 0;	
+}
+unsigned int nam_vlan_config_serdes_power_states
+(
+    unsigned char devNum,
+    unsigned char portNum,
+    unsigned char powerup
+)
+{   
+	int ret;
+	ret = cpssDxChPortSerdesPowerStatusSet(devNum, portNum, 2, 0x3, powerup);
+	return 0;
+}
+unsigned int nam_vlan_config_12x_port_states
+(
+    unsigned char devNum,
+    unsigned char portNum,
+    unsigned char link_up   
+)
+{
+	int ret;
+    if(link_up == 1)
+    {
+        ret = cpssDxChPortForceLinkDownEnableSet(devNum, portNum,0);
+        ret = cpssDxChPortForceLinkPassEnableSet(devNum, portNum,1);
+	}
+	else
+	{
+        ret = cpssDxChPortForceLinkPassEnableSet(devNum, portNum,0);
+		ret = cpssDxChPortForceLinkDownEnableSet(devNum, portNum,1);
+	}
+	return 0;
+}
 #ifdef __cplusplus
 }
 #endif

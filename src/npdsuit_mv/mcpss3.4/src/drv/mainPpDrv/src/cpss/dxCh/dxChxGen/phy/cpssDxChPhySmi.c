@@ -227,7 +227,9 @@ static unsigned char prvCpssDxChPhySmiVirPort2PhyPortAx5i[][2] = {
 	{22,0x0 },/* PORT11 <null port> */
 	{23,0x0 },/* PORT12 <null port> */
 };
-
+unsigned int ax81_12x_xg_port_to_phyid[12] = {
+    3,2,1,0,7,6,5,4,11,10,9,8
+    };
 /*******************************************************************************
 * cpssDxChPhySmiFindPhyPortByVirtPort
 *
@@ -291,6 +293,228 @@ unsigned short cpssDxChPhySmiFindPhyPortByVirtPort(IN GT_U8 devNum, IN unsigned 
 	}
 
 	return rc;
+}
+
+int phy_88X2140_config
+(
+    unsigned char devNum,
+    unsigned char portNum
+)
+{
+    int ret = 0;
+    GT_U8 phyId = ax81_12x_xg_port_to_phyid[12];
+	
+    ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xF002 ,31,0x8102 );
+	usleep( 10 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD0AA ,30,0x027D );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD0A0 ,30,0x000B );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD0A1 ,30,0x0204 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD0A6 ,30,0x0D09 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD0A7 ,30,0x0904 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD0A5 ,30,0x0409 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD0F1 ,30,0x7E81 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD0AE ,30,0x0080 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD0A2 ,30,0x9FFF );
+	usleep( 2 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD0A2 ,30,0x1FFF );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xF002 ,31,0x8102 );
+	usleep( 10 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xF06A ,4,0x2000 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xF06A ,4,0x3000 );
+	usleep( 5 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xC000 ,30,0x8C00 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xC000 ,30,0x9C00 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xC000 ,30,0xDC00 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xC000 ,30,0xFC00 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE000 ,30,0x7F00 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD070 ,30,0x0010 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD078 ,30,0x0010 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD080 ,30,0x0010 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD088 ,30,0x0010 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD090 ,30,0x0010 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD098 ,30,0x0010 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD073 ,30,0x0D89 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD075 ,30,0xF277 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD07B ,30,0x203A );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD07D ,30,0xDFC6 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD040 ,30,0x4020 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD0B5 ,30,0x0224 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD0B0 ,30,0x0000 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD0B1 ,30,0x0204 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD08A ,30,0x0140 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD08B ,30,0x0834 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD08C ,30,0x013F );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD08D ,30,0xF7CC );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD082 ,30,0x0140 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD083 ,30,0x0834 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD084 ,30,0x013F );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD085 ,30,0xF7CC );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD092 ,30,0x0140 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD093 ,30,0x1388 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD094 ,30,0x013F );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD095 ,30,0xEC78 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD09A ,30,0x0140 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD09B ,30,0x1388 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD09C ,30,0x013F );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD09D ,30,0xEC78 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD01C ,30,0x1800 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xC030 ,30,0x0209 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD070 ,30,0x8010 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD078 ,30,0x8010 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD080 ,30,0x8010 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD088 ,30,0x8010 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD090 ,30,0x8010 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD098 ,30,0x8010 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD040 ,30,0x4020 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD042 ,30,0x0A6C );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD04F ,30,0xC200 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD04F ,30,0xC20F );
+	usleep( 1 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD049 ,30,0x0001 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD049 ,30,0x0011 );
+	usleep( 5 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD049 ,30,0x0002 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD049 ,30,0x0012 );
+	usleep( 5 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD049 ,30,0x0004 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD049 ,30,0x0014 );
+	usleep( 5 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD049 ,30,0x0008 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD049 ,30,0x0018 );
+	usleep( 5 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD049 ,30,0x0000 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD04F ,30,0xC20F );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD012 ,30,0x0058 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD011 ,30,0x12C4 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD0AE ,30,0x0080 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD0BC ,30,0x0080 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xC205 ,30,0xF0F4 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xD0E0 ,30,0x0318 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE016 ,30,0x0B05 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE000 ,30,0x7F00 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE005 ,30,0x28A6 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE005 ,30,0x28A7 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE016 ,30,0x0B05 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE016 ,30,0x0A05 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE011 ,30,0x2380 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE02E ,30,0x00FF );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE01D ,30,0x0000 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE01C ,30,0x0000 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE011 ,30,0x2380 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE002 ,30,0x677A );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE02F ,30,0x2045 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE02F ,30,0x20A5 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE010 ,30,0x2940 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE040 ,30,0x0003 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE040 ,30,0x000B );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE02C ,30,0x007F );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE001 ,30,0x380A );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE001 ,30,0x383C );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE03C ,30,0x003C );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE001 ,30,0x383C );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE002 ,30,0x697A );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE02B ,30,0x1900 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE01D ,30,0x0000 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE01C ,30,0x0000 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE02F ,30,0x20A5 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE029 ,30,0x1900 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE02A ,30,0x0000 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE028 ,30,0x0000 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE025 ,30,0x0012 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE042 ,30,0x2000 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE043 ,30,0x0006 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE004 ,30,0x0A0C );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE023 ,30,0x1820 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE00A ,30,0x0FFF );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE00B ,30,0x0FFF );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE00C ,30,0x0FFF );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE008 ,30,0x06DB );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE009 ,30,0x0249 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE006 ,30,0x06DB );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE007 ,30,0x06DB );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE003 ,30,0x0404 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE024 ,30,0x1014 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE005 ,30,0x29F7 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE00F ,30,0x009C );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE00F ,30,0x0098 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE00D ,30,0xBF00 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE00E ,30,0x1500 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE01E ,30,0x0002 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE01F ,30,0x000A );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE01A ,30,0x0000 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE01B ,30,0x0000 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE016 ,30,0x0A05 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE016 ,30,0x0205 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE016 ,30,0x0005 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE027 ,30,0x8001 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE00D ,30,0x9F00 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE042 ,30,0x0400 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE052 ,30,0x0820 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE053 ,30,0x0820 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE048 ,30,0x0300 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE000 ,30,0x7F01 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE000 ,30,0x7F00 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE048 ,30,0x0200 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE000 ,30,0x7F01 );
+	usleep( 5 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE000 ,30,0x7F00 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xE000 ,30,0x7F02 );
+	usleep( 750 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xC005 ,30,0x0018 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xC005 ,30,0x0000 );
+	usleep( 5 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xF06A ,4,0x2000 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xF06A ,4,0x0000 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xC005 ,30,0x0001 );
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1,0xC005 ,30,0x0000);
+
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum,portNum, phyId, 1, 0xF012, 31, 0x0CB0);
+    /*LED0 configuration*/
+    ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum,portNum, phyId, 1, 0xF020, 31, 0x0100);
+    /*LED1 configuration*/
+    ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum,portNum, phyId, 1, 0xF021, 31, 0x0060);
+
+	    return GT_OK;
+}
+int phy_88x2140_init(GT_U8 devNum, GT_U8 portNum)
+{
+    int ret = 0;
+	
+    ret = gtAppDemoLionPortModeSpeedSet(devNum, portNum, 11, 3);
+    if (0 != ret)
+    {
+        return ret;
+    }
+    ret = phy_88X2140_config(devNum, portNum);
+	
+   
+	return GT_OK;
+}
+int phy_88x2140_enable_set(GT_U8 devNum, GT_U8 portNum, GT_U32 enable)
+{
+
+	GT_STATUS ret= 0;
+	GT_U8 phyId;
+    GT_U16 power, mask, state;
+	phyId = ax81_12x_xg_port_to_phyid[12];
+
+	ret = cpssDxChPhyPort10GSmiRegisterRead(devNum, portNum, phyId, 1, 0x0000, 1, &power);
+    mask = 1<<11;
+	enable = (enable)? 0:(1<<11);
+	power &= ~mask;
+	power |= enable;
+	
+	ret = cpssDxChPhyPort10GSmiRegisterWrite(devNum, portNum, phyId, 1, 0x0000, 1, power);
+
+	ret = cpssDxChPhyPort10GSmiRegisterRead(devNum, portNum, phyId, 1, 0x0001, 1, &state);
+	ret = cpssDxChPhyPort10GSmiRegisterRead(devNum, portNum, phyId, 1, 0x0001, 1, &state);
+	state &= 0x4;
+	if((state == 0)&&(enable == 0))
+	{
+	    ret = phy_88x2140_init(devNum, portNum); 
+	}
+
+	return GT_OK;
 }
 #endif
 

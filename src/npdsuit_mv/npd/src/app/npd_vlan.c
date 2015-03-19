@@ -14503,6 +14503,253 @@ DBusMessage *npd_dbus_vlan_to_cpu_exist_interface_under_vlan_on_slot
 									 &ret);
 	return reply;
 }
+DBusMessage *npd_dbus_vlan_show_ax81_12x_port_state
+(
+	DBusConnection *conn, 
+	DBusMessage *msg, 
+	void *user_data
+)
+{
+    DBusMessage* reply;
+	DBusError err;
+
+	unsigned int opDevice = 0;
+	unsigned short opPort = 0;
+	unsigned short portStatus = 0;
+	unsigned short xfiLink = 0;
+	unsigned short pcsStatus = 0;
+	unsigned short LaneStatus = 0; 
+	unsigned short signalDetect = 0;
+	unsigned short intStatus = 0;
+	unsigned short pcsStatus2 = 0;
+	unsigned short macBypass = 0;
+	unsigned int ax81_12x_xg_port_to_phyid[12] = {
+    3,2,1,0,7,6,5,4,11,10,9,8
+    };
+	int phyId;
+	
+	unsigned int ret = VLAN_RETURN_CODE_ERR_NONE;
+	
+
+    dbus_error_init(&err);
+	if (!(dbus_message_get_args(msg, &err,
+								DBUS_TYPE_UINT32, &opDevice,
+							    DBUS_TYPE_UINT16, &opPort,
+								DBUS_TYPE_INVALID)))
+	{
+	    syslog_ax_vlan_err("Unable to get input args ");
+		if (dbus_error_is_set(&err)) {
+			 syslog_ax_vlan_err("%s raised: %s",err.name,err.message);
+			dbus_error_free(&err);
+		}
+		return NULL;	
+	}
+
+	if(BOARD_TYPE == BOARD_TYPE_AX81_12X)
+	{   
+		phyId = ax81_12x_xg_port_to_phyid[opPort];
+        nam_asic_auxi_phy_read(opDevice,opPort,phyId,1,0x0001,1,&portStatus);
+		nam_asic_auxi_phy_read(opDevice,opPort,phyId,1,0x1001,1,&xfiLink);
+		nam_asic_auxi_phy_read(opDevice,opPort,phyId,1,0x0021,3,&pcsStatus);
+		nam_asic_auxi_phy_read(opDevice,opPort,phyId,1,0x1018,4,&LaneStatus);
+		nam_asic_auxi_phy_read(opDevice,opPort,phyId,1,0x000A,1,&signalDetect);
+		nam_asic_auxi_phy_read(opDevice,opPort,phyId,1,0x9004,4,&intStatus);
+		nam_asic_auxi_phy_read(opDevice,opPort,phyId,1,0x1008,4,&pcsStatus2);
+		nam_asic_auxi_phy_read(opDevice,opPort,phyId,1,0xF000,31,&macBypass);
+ 
+		reply = dbus_message_new_method_return(msg);
+	
+	    dbus_message_append_args(reply,
+							 DBUS_TYPE_UINT32, &ret,
+ 							 DBUS_TYPE_UINT16, &portStatus,
+ 							 DBUS_TYPE_UINT16, &xfiLink,
+ 							 DBUS_TYPE_UINT16, &pcsStatus,
+ 							 DBUS_TYPE_UINT16, &LaneStatus,
+ 							 DBUS_TYPE_UINT16, &signalDetect,
+ 							 DBUS_TYPE_UINT16, &intStatus,
+ 							 DBUS_TYPE_UINT16, &pcsStatus2,
+ 							 DBUS_TYPE_UINT16, &macBypass,
+							 DBUS_TYPE_INVALID);
+	    return reply;
+	}
+	else
+	{
+       ret = VLAN_RETURN_CODE_ERR_GENERAL;
+       reply = dbus_message_new_method_return(msg);
+	   
+	   dbus_message_append_args(reply,
+							 DBUS_TYPE_UINT32, &ret,
+ 							 DBUS_TYPE_UINT16, &portStatus,
+ 							 DBUS_TYPE_UINT16, &xfiLink,
+ 							 DBUS_TYPE_UINT16, &pcsStatus,
+ 							 DBUS_TYPE_UINT16, &LaneStatus,
+ 							 DBUS_TYPE_UINT16, &signalDetect,
+ 							 DBUS_TYPE_UINT16, &intStatus,
+ 							 DBUS_TYPE_UINT16, &pcsStatus2,
+ 							 DBUS_TYPE_UINT16, &macBypass,
+							 DBUS_TYPE_INVALID);
+	    return reply;
+	}
+		
+}
+DBusMessage *npd_dbus_vlan_config_phy_88x2140_init
+(
+    DBusConnection *conn, 
+	DBusMessage *msg, 
+	void *user_data   
+)
+{
+    DBusMessage* reply;
+	DBusError err;
+
+	unsigned int opDevice = 0;
+	unsigned short opPort = 0;
+
+	unsigned int ret = VLAN_RETURN_CODE_ERR_NONE;
+
+	dbus_error_init(&err);
+	if (!(dbus_message_get_args(msg, &err,
+								DBUS_TYPE_UINT32, &opDevice,
+							    DBUS_TYPE_UINT16, &opPort,
+								DBUS_TYPE_INVALID)))
+	{
+	    syslog_ax_vlan_err("Unable to get input args ");
+		if (dbus_error_is_set(&err)) {
+			 syslog_ax_vlan_err("%s raised: %s",err.name,err.message);
+			dbus_error_free(&err);
+		}
+		return NULL;	
+	}
+	if(BOARD_TYPE == BOARD_TYPE_AX81_12X)
+	{
+        nam_vlan_config_phy_88x2140(opDevice,opPort);
+		reply = dbus_message_new_method_return(msg);
+	
+	    dbus_message_append_args(reply,
+							 DBUS_TYPE_UINT32, &ret,
+							 DBUS_TYPE_INVALID);
+	    return reply;
+		
+	}
+	else
+	{
+        ret = VLAN_RETURN_CODE_ERR_GENERAL;
+		reply = dbus_message_new_method_return(msg);
+	
+	    dbus_message_append_args(reply,
+							 DBUS_TYPE_UINT32, &ret,
+							 DBUS_TYPE_INVALID);
+	    return reply;
+	}
+    
+}
+DBusMessage *npd_dbus_vlan_config_serdes_power_state
+(
+    DBusConnection *conn, 
+	DBusMessage *msg, 
+	void *user_data      
+)
+{
+    DBusMessage* reply;
+	DBusError err;
+
+	unsigned int opDevice = 0;
+	unsigned short opPort = 0;
+	unsigned char powerup = 0;
+	
+
+	unsigned int ret = VLAN_RETURN_CODE_ERR_NONE;
+
+	dbus_error_init(&err);
+	if (!(dbus_message_get_args(msg, &err,
+								DBUS_TYPE_UINT32, &opDevice,
+							    DBUS_TYPE_UINT16, &opPort,
+							    DBUS_TYPE_BYTE,   &powerup,
+								DBUS_TYPE_INVALID)))
+	{
+	    syslog_ax_vlan_err("Unable to get input args ");
+		if (dbus_error_is_set(&err)) {
+			 syslog_ax_vlan_err("%s raised: %s",err.name,err.message);
+			dbus_error_free(&err);
+		}
+		return NULL;	
+	}
+	if(BOARD_TYPE == BOARD_TYPE_AX81_12X)
+	{
+        nam_vlan_config_serdes_power_states(opDevice,opPort,powerup);
+		reply = dbus_message_new_method_return(msg);
+	
+	    dbus_message_append_args(reply,
+							 DBUS_TYPE_UINT32, &ret,
+							 DBUS_TYPE_INVALID);
+	    return reply;
+		
+	}
+	else
+	{
+        ret = VLAN_RETURN_CODE_ERR_GENERAL;
+		reply = dbus_message_new_method_return(msg);
+	
+	    dbus_message_append_args(reply,
+							 DBUS_TYPE_UINT32, &ret,
+							 DBUS_TYPE_INVALID);
+	    return reply;
+	}
+    
+}
+DBusMessage *npd_dbus_vlan_config_ax81_12x_port_state
+(
+    DBusConnection *conn, 
+	DBusMessage *msg, 
+	void *user_data    
+)
+{
+    DBusMessage* reply;
+	DBusError err;
+
+	unsigned int opDevice = 0;
+	unsigned short opPort = 0;
+	unsigned char link_up = 0;
+	
+
+	unsigned int ret = VLAN_RETURN_CODE_ERR_NONE;
+
+	dbus_error_init(&err);
+	if (!(dbus_message_get_args(msg, &err,
+								DBUS_TYPE_UINT32, &opDevice,
+							    DBUS_TYPE_UINT16, &opPort,
+							    DBUS_TYPE_BYTE,   &link_up,
+								DBUS_TYPE_INVALID)))
+	{
+	    syslog_ax_vlan_err("Unable to get input args ");
+		if (dbus_error_is_set(&err)) {
+			 syslog_ax_vlan_err("%s raised: %s",err.name,err.message);
+			dbus_error_free(&err);
+		}
+		return NULL;	
+	}
+	if(BOARD_TYPE == BOARD_TYPE_AX81_12X)
+	{
+        nam_vlan_config_12x_port_states(opDevice,opPort,link_up);
+		reply = dbus_message_new_method_return(msg);
+	
+	    dbus_message_append_args(reply,
+							 DBUS_TYPE_UINT32, &ret,
+							 DBUS_TYPE_INVALID);
+	    return reply;
+		
+	}
+	else
+	{
+        ret = VLAN_RETURN_CODE_ERR_GENERAL;
+		reply = dbus_message_new_method_return(msg);
+	
+	    dbus_message_append_args(reply,
+							 DBUS_TYPE_UINT32, &ret,
+							 DBUS_TYPE_INVALID);
+	    return reply;
+	}   
+}
 unsigned int npd_vlan_qinq_init(unsigned char devNum)
 {
 	unsigned int ret = 0;
